@@ -135,17 +135,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             .CreatePipelineStateAsync(simplePipelineStateDefinition)
             .get();
 
-    RootSignature<PostProcessingRootDescription> postProcessingRootSignature{
-        device};
-    ComputeShader postProcessingComputeShader{
-        app_folder() / L"PostProcessingComputeShader.cso"};
-    ComputePipelineStateDefinition postProcessingStateDefinition{
-        .RootSignature = &postProcessingRootSignature,
-        .ComputeShader = &postProcessingComputeShader};
-    auto postProcessingPipelineState =
-        pipelineStateProvider
-            .CreatePipelineStateAsync(postProcessingStateDefinition)
-            .get();
 
     // Group together allocations
     GroupedResourceAllocator groupedResourceAllocator{device};
@@ -277,38 +266,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         cubeMesh.Draw(allocator);
       }
 
-      // Post processing
-      {
-        allocator.TransitionResource(*renderTargetView,
-                                     ResourceStates::RenderTarget,
-                                     ResourceStates::NonPixelShaderResource);
-
-        auto mask = postProcessingRootSignature.Set(
-            allocator, RootSignatureUsage::Compute);
-        mask.ConstantBuffer = resources.DynamicBuffer.AddBuffer(i * 0.02f);
-        mask.InputTexture = *resources.ScreenResourceView;
-        mask.OutputTexture = *resources.PostProcessingBuffer.UnorderedAccess();
-        postProcessingPipelineState.Apply(allocator);
-
-        auto definition = resources.PostProcessingBuffer.Definition();
-        allocator.Dispatch(definition->Width / 16 + 1,
-                           definition->Height / 16 + 1);
-
-        allocator.TransitionResources(
-            {{resources.PostProcessingBuffer, ResourceStates::UnorderedAccess,
-              ResourceStates::CopySource},
-             {*renderTargetView, ResourceStates::NonPixelShaderResource,
-              ResourceStates::CopyDest}});
-
-        allocator.CopyResource(resources.PostProcessingBuffer,
-                               *renderTargetView);
-
-        allocator.TransitionResources(
-            {{resources.PostProcessingBuffer, ResourceStates::CopySource,
-              ResourceStates::UnorderedAccess},
-             {*renderTargetView, ResourceStates::CopyDest,
-              ResourceStates::RenderTarget}});
-      }
 
       // End frame command list
       {
