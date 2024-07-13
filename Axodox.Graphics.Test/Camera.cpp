@@ -14,11 +14,12 @@ Camera::Camera(XMVECTOR _eye, XMVECTOR _at, XMVECTOR _worldUp) {
 Camera::~Camera() {}
 
 void Camera::SetView(XMVECTOR _eye, XMVECTOR _at, XMVECTOR _worldUp) {
+  static const float eps = 0.001f;
   m_eye = _eye;
   m_at = _at;
   m_worldUp = _worldUp;
 
-  XMVECTOR toAim = XMVectorSubtract(m_at, m_eye);
+  XMVECTOR toAim = m_at - m_eye;
   m_distance = XMVectorGetX(XMVector3Length(toAim));
 
   m_u = atan2f(XMVectorGetZ(toAim), XMVectorGetX(toAim));
@@ -77,6 +78,7 @@ bool Camera::Update(float _deltaTime) {
     m_matProj = XMMatrixPerspectiveFovRH(m_angle, m_aspect, m_zNear, m_zFar);
   }
   if (m_viewDirty || m_projectionDirty) {
+    // m_matViewProj = m_matProj*m_viewMatrix;
     m_matViewProj = m_viewMatrix * m_matProj;
     m_viewDirty = false;
     m_projectionDirty = false;
@@ -103,11 +105,8 @@ void Camera::SetFirstPerson(bool _firstperson) {
 }
 
 void Camera::UpdateParams() {
-  //XMVECTOR lookDirection =
-  //    XMVectorSet(cosf(m_u) * sinf(m_v), cosf(m_v), sinf(m_u) * sinf(m_v), 0);
-    // Why?
   XMVECTOR lookDirection =
-      XMVectorSet(-cosf(m_u) * sinf(m_v), sinf(m_u) * sinf(m_v),cosf(m_v),  0);
+      XMVectorSet(cosf(m_u) * sinf(m_v), cosf(m_v), sinf(m_u) * sinf(m_v), 0);
 
   if (firstperson) {
     m_forward = XMVector3Normalize(lookDirection);
@@ -192,13 +191,13 @@ void Camera::KeyboardUp(const KeyEventArgs &key) {
 
 void Camera::MouseMove(const PointerEventArgs &mouse) {
   using CursorPos = decltype(mouse.CurrentPoint().Position());
-  static CursorPos prev = CursorPos();
   auto point = mouse.CurrentPoint().Position();
+  static CursorPos prev = point;
   if (mouse.CurrentPoint().Properties().IsLeftButtonPressed()) {
     UpdateUV((point.X - prev.X) / 100.0f, (point.Y - prev.Y) / 100.0f);
   }
   prev = point;
-  if (mouse.CurrentPoint().Properties().IsRightButtonPressed()) {
+  if (!firstperson && mouse.CurrentPoint().Properties().IsRightButtonPressed()) {
     UpdateDistance(mouse.CurrentPoint().Properties().YTilt() / 100.0f);
   }
 }

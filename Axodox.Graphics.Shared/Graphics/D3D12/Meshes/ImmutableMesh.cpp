@@ -40,6 +40,7 @@ namespace Axodox::Graphics::D3D12
     
     if (_indexBuffer)
     {
+
       allocator->DrawIndexedInstanced(_indexCount, instanceCount, 0u, 0u, 0u);
     }
     else

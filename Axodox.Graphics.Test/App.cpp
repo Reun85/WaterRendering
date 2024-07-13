@@ -1,8 +1,11 @@
 #include "pch.h"
 #include "Camera.h"
+#include <winrt/Windows.UI.Core.h>
+#include <winrt/Windows.UI.Popups.h>
 
 using namespace std;
 using namespace winrt;
+
 
 using namespace Windows;
 using namespace Windows::ApplicationModel::Core;
@@ -44,15 +47,21 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   struct SimpleRootDescription : public RootSignatureMask {
     RootDescriptor<RootDescriptorType::ConstantBuffer> ConstantBuffer;
     RootDescriptorTable<1> Texture;
-    StaticSampler Sampler;
+    RootDescriptorTable<1> Heightmap;
+    StaticSampler TextureSampler;
+    StaticSampler HeightmapSampler;
 
     SimpleRootDescription(const RootSignatureContext &context)
         : RootSignatureMask(context),
           ConstantBuffer(this, {0}, ShaderVisibility::Vertex),
           Texture(this, {DescriptorRangeType::ShaderResource},
                   ShaderVisibility::Pixel),
-          Sampler(this, {0}, Filter::Linear, TextureAddressMode::Clamp,
-                  ShaderVisibility::Pixel) {
+          TextureSampler(this, {0}, Filter::Linear, TextureAddressMode::Clamp,
+                  ShaderVisibility::Pixel),
+        Heightmap(this, {DescriptorRangeType::ShaderResource},
+					ShaderVisibility::Vertex),
+    HeightmapSampler(this, {0}, Filter::Linear, TextureAddressMode::Clamp,
+                  ShaderVisibility::Vertex){
       Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
     }
   };
@@ -74,28 +83,42 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
   struct Constants {
     XMFLOAT4X4 WorldViewProjection;
+    XMFLOAT4X4 WorldIT;
   };
 
+  D3D12_INPUT_ELEMENT_DESC InputElement(const char* semanticName, uint32_t semanticIndex, DXGI_FORMAT format)
+  {
+    return {
+      .SemanticName = semanticName,
+      .SemanticIndex = semanticIndex,
+      .Format = format,
+      .InputSlot = 0,
+      .AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT,
+      .InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+      .InstanceDataStepRate = 0
+    };
+  }
   void Run() {
     CoreWindow window = CoreWindow::GetForCurrentThread();
     window.Activate();
 
     Camera cam;
-  cam.SetView(XMVectorSet(-5.0f, 1.0f,0.0f, 0), XMVectorSet(0.0f, 0.0f, 0.0f, 0),
-          XMVectorSet(0.0f, 0.0f, 1.0f, 0));
-    cam.SetFirstPerson(true);
+    cam.SetView(XMVectorSet(-1.0f, 10.0f, 0.0f, 0),
+                XMVectorSet(0.0f, 0.0f, 0.0f, 0),
+                XMVectorSet(0.0f, 1.0f, 0.0f, 0));
     bool quit = false;
     // Events
 
     // If I redo the whole system, this could be handled when the callback is
     // made.
-    window.KeyDown([&cam,&quit](CoreWindow const &w, KeyEventArgs const &args) {
-      if (args.VirtualKey() == Windows::System::VirtualKey::Escape)
-        quit = true;
-      else
-     
-      cam.KeyboardDown(args);
-    });
+    window.KeyDown(
+        [&cam, &quit](CoreWindow const &w, KeyEventArgs const &args) {
+          if (args.VirtualKey() == Windows::System::VirtualKey::Escape)
+            quit = true;
+          else
+
+            cam.KeyboardDown(args);
+        });
     window.KeyUp([&cam](CoreWindow const &w, KeyEventArgs const &args) {
       cam.KeyboardUp(args);
     });
@@ -118,23 +141,31 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     PipelineStateProvider pipelineStateProvider{device};
 
     RootSignature<SimpleRootDescription> simpleRootSignature{device};
+
     VertexShader simpleVertexShader{app_folder() / L"SimpleVertexShader.cso"};
     PixelShader simplePixelShader{app_folder() / L"SimplePixelShader.cso"};
 
+
+
+const D3D12_INPUT_ELEMENT_DESC VertexInputDescription[] = {
+    InputElement("POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT),
+    InputElement("NORMAL", 0, DXGI_FORMAT_R8G8B8A8_SNORM),
+    InputElement("TEXCOORD", 0, DXGI_FORMAT_R16G16_UNORM),
+    InputElement("SV_VertexID", 0, DXGI_FORMAT_R32_UINT),
+  };
     GraphicsPipelineStateDefinition simplePipelineStateDefinition{
         .RootSignature = &simpleRootSignature,
         .VertexShader = &simpleVertexShader,
         .PixelShader = &simplePixelShader,
         .RasterizerState = RasterizerFlags::CullClockwise,
         .DepthStencilState = DepthStencilMode::WriteDepth,
-        .InputLayout = VertexPositionNormalTexture::Layout,
+        .InputLayout =VertexInputDescription,
         .RenderTargetFormats = {Format::B8G8R8A8_UNorm},
         .DepthStencilFormat = Format::D32_Float};
     auto simplePipelineState =
         pipelineStateProvider
             .CreatePipelineStateAsync(simplePipelineStateDefinition)
             .get();
-
 
     // Group together allocations
     GroupedResourceAllocator groupedResourceAllocator{device};
@@ -148,10 +179,18 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         .CommonDescriptorHeap = &commonDescriptorHeap,
         .DepthStencilDescriptorHeap = &depthStencilDescriptorHeap};
 
-    ImmutableMesh cubeMesh{immutableAllocationContext, CreateCube()};
+    const unsigned int subdivs = 500;
+    ImmutableMesh planeMesh{immutableAllocationContext,
+                           CreatePlane(1, XMUINT2(subdivs,subdivs))};
+    //ImmutableTexture texture{immutableAllocationContext,
+    //                         app_folder() / L"image.jpeg"};
     ImmutableTexture texture{immutableAllocationContext,
-                             app_folder() / L"image.jpeg"};
+                             app_folder() / L"iceland_heightmap.png"};
+    ImmutableTexture heightmap{immutableAllocationContext,
+                             app_folder() / L"iceland_heightmap.png"};
 
+    //ImmutableTexture texture{immutableAllocationContext,
+    //                         app_folder() / L"gradient.jpg"};
     // Acquire memory
     groupedResourceAllocator.Build();
 
@@ -218,21 +257,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       auto resolution = swapChain.Resolution();
       cam.SetAspect(float(resolution.x) / float(resolution.y));
       cam.Update(0.01f);
-      {
-        // auto projection = XMMatrixPerspectiveFovRH(
-        //     90.f, float(resolution.x) / float(resolution.y), 0.01f, 10.f);
-        // auto view = XMMatrixLookAtRH(
-        //     XMVectorSet(1.5f * cos(i * 0.002f), 1.5f * sin(i * 0.002f),
-        //                 1.5f * cos(i * 0.0005f), 1.f),
-        //     XMVectorSet(0.f, 0.f, 0.f, 1.f), XMVectorSet(0.f,
-        //     0.f, 1.f, 1.f));
-        auto world = XMMatrixIdentity();
-        // auto worldViewProjection = XMMatrixTranspose(world * view *
-        // projection);
-        auto worldViewProjection = XMMatrixTranspose(world * cam.GetViewProj());
-
-        XMStoreFloat4x4(&constants.WorldViewProjection, worldViewProjection);
-      }
 
       // Begin frame command list
       auto &allocator = resources.Allocator;
@@ -254,18 +278,33 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       }
 
       // Draw objects
+      for (int i =0; i < 3;i++)
+        for (int j = 0; j < 3; j++)
       {
+          auto vec = XMVectorSet(i-1, 0, j-1, 1);
+        {
+          auto world =
+              XMMatrixRotationX(XMConvertToRadians(-90.0))* XMMatrixTranslationFromVector(vec);
+
+          auto worldViewProjection =
+              XMMatrixTranspose(world * cam.GetViewProj());
+          auto worldIT = XMMatrixInverse(nullptr, world);
+
+          XMStoreFloat4x4(&constants.WorldViewProjection, worldViewProjection);
+          XMStoreFloat4x4(&constants.WorldIT, worldIT);
+        }
+      
         auto mask =
             simpleRootSignature.Set(allocator, RootSignatureUsage::Graphics);
         mask.ConstantBuffer = resources.DynamicBuffer.AddBuffer(constants);
         mask.Texture = texture;
+        mask.Heightmap = heightmap;
 
         allocator.SetRenderTargets({renderTargetView},
                                    resources.DepthBuffer.DepthStencil());
         simplePipelineState.Apply(allocator);
-        cubeMesh.Draw(allocator);
+        planeMesh.Draw(allocator);
       }
-
 
       // End frame command list
       {
@@ -292,6 +331,38 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   void SetWindow(CoreWindow const & /*window*/) {}
 };
 
+#include <fstream>
+#include <string.h>
 int __stdcall wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
-  CoreApplication::Run(make<App>());
+    try {
+        CoreApplication::Run(make<App>());
+    }
+    catch (const winrt::hresult_error& ex) {
+        // Log the error message and HRESULT
+        OutputDebugStringW(ex.message().c_str());
+        std::wstringstream ss;
+        ss << L"HRESULT: " << std::hex << ex.code() << std::endl;
+        OutputDebugStringW(ss.str().c_str());
+        // Optionally, you can display a message box
+        fstream f(
+            "E:\\Minden\\dev\\axodox-graphics\\Axodox.Graphics.Test\\out.txt");
+
+        f <<to_string(ex.message());
+    }
+    catch (const std::exception& ex) {
+        // Log the standard exception message
+        OutputDebugStringA(ex.what());
+        fstream f(
+            "E:\\Minden\\dev\\axodox-graphics\\Axodox.Graphics.Test\\out.txt");
+
+        f << ex.what();
+    }
+    catch (...) {
+        // Catch all other exceptions
+        OutputDebugStringW(L"Unknown error occurred.");
+        fstream f(
+            "E:\\Minden\\dev\\axodox-graphics\\Axodox.Graphics.Test\\out.txt");
+
+        f << "Unknown error";
+    }
 }
