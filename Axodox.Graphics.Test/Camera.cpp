@@ -140,6 +140,14 @@ void Camera::KeyboardDown(const KeyEventArgs &key) {
       m_speed /= 4.0f;
     }
     break;
+  case VirtualKey::Control:
+  case VirtualKey::RightControl:
+  case VirtualKey::LeftControl:
+    if (!m_slow2) {
+      m_slow2 = true;
+      m_speed /= 4.0f;
+    }
+    break;
   case VirtualKey::W:
     m_goForward = 1;
     break;
@@ -162,7 +170,6 @@ void Camera::KeyboardDown(const KeyEventArgs &key) {
 }
 
 void Camera::KeyboardUp(const KeyEventArgs &key) {
-  float current_speed = m_speed;
   using namespace winrt::Windows::System;
 
   switch (key.VirtualKey()) {
@@ -174,6 +181,15 @@ void Camera::KeyboardUp(const KeyEventArgs &key) {
       m_speed *= 4.0f;
     }
     break;
+  case VirtualKey::Control:
+  case VirtualKey::RightControl:
+  case VirtualKey::LeftControl:
+    if (m_slow2) {
+      m_slow2 = false;
+      m_speed *= 4.0f;
+    }
+    break;
+
   case VirtualKey::W:
   case VirtualKey::S:
     m_goForward = 0;
@@ -194,16 +210,17 @@ void Camera::MouseMove(const PointerEventArgs &mouse) {
   auto point = mouse.CurrentPoint().Position();
   static CursorPos prev = point;
   if (mouse.CurrentPoint().Properties().IsLeftButtonPressed()) {
-    UpdateUV((point.X - prev.X) / 100.0f, (point.Y - prev.Y) / 100.0f);
+    UpdateUV((point.X - prev.X) / 600.0f, (point.Y - prev.Y) / 600.0f);
   }
   prev = point;
-  if (!firstperson && mouse.CurrentPoint().Properties().IsRightButtonPressed()) {
-    UpdateDistance(mouse.CurrentPoint().Properties().YTilt() / 100.0f);
+  if (!firstperson &&
+      mouse.CurrentPoint().Properties().IsRightButtonPressed()) {
+    UpdateDistance(mouse.CurrentPoint().Properties().YTilt() / 600.0f);
   }
 }
 
 void Camera::MouseWheel(const PointerEventArgs &wheel) {
   UpdateDistance(
       static_cast<float>(wheel.CurrentPoint().Properties().MouseWheelDelta()) *
-      m_speed / -100.0f);
+      m_speed / -300.0f);
 }

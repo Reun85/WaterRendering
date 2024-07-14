@@ -59,9 +59,10 @@ private:
   void UpdateParams();
 
   //  The traversal speed of the camera
-  float m_speed = 16.0f;
+  float m_speed = 2.0f;
 
   bool m_slow = false;
+  bool m_slow2 = false;
 
   // The camera position.
   XMVECTOR m_eye;
