@@ -75,12 +75,13 @@ public:
   SmallerNeighborRatio GetSmallerNeighbor() const;
 
 private:
-  NodeID node;
   void AdjustNode();
+  void IterateTillLeaf();
+
+  NodeID node;
   // Path to get current leaf
   std::vector<ChildrenID> path;
   const QuadTree &tree;
-  void IterateTillLeaf();
 };
 // The plane must be perpendicular to the Y-axis.
 class QuadTree {
@@ -113,6 +114,7 @@ private:
   void BuildRecursively(const uint index, const float height,
                         const float3 camEye, const float distanceThreshold,
                         const Depth depth);
+
   std::vector<Node> nodes;
   NodeID count;
   Depth maxDepth;
