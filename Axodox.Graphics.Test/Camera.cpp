@@ -64,7 +64,7 @@ bool Camera::Update(float _deltaTime) {
   if (m_goForward != 0.0f || m_goRight != 0.0f || m_goUp != 0.0f) {
     XMVECTOR deltaPosition =
         (m_goForward * m_forward + m_goRight * m_right + m_goUp * m_up) *
-        m_speed * _deltaTime;
+        GetSpeed() * _deltaTime;
     m_eye += deltaPosition;
     m_at += deltaPosition;
     m_viewDirty = true;
@@ -78,7 +78,7 @@ bool Camera::Update(float _deltaTime) {
     m_matProj = XMMatrixPerspectiveFovRH(m_angle, m_aspect, m_zNear, m_zFar);
   }
   if (m_viewDirty || m_projectionDirty) {
-    // m_matViewProj = m_matProj*m_viewMatrix;
+    // m_matViewProj = m_matProj * m_viewMatrix;
     m_matViewProj = m_viewMatrix * m_matProj;
     m_viewDirty = false;
     m_projectionDirty = false;
@@ -124,6 +124,11 @@ void Camera::UpdateParams() {
   m_viewDirty = true;
 }
 
+inline float Camera::GetSpeed() const {
+  return m_speed *
+         (m_accelerated ? (m_slow ? 1. / 16. : 4.) : (m_slow ? 1. / 4. : 1));
+}
+
 void Camera::SetSpeed(float _val) { m_speed = _val; }
 
 void Camera::Resize(int _w, int _h) { SetAspect(_w / (float)_h); }
@@ -137,15 +142,13 @@ void Camera::KeyboardDown(const KeyEventArgs &key) {
   case VirtualKey::RightShift:
     if (!m_slow) {
       m_slow = true;
-      m_speed /= 4.0f;
     }
     break;
   case VirtualKey::Control:
   case VirtualKey::RightControl:
   case VirtualKey::LeftControl:
-    if (!m_slow2) {
-      m_slow2 = true;
-      m_speed /= 4.0f;
+    if (!m_accelerated) {
+      m_accelerated = true;
     }
     break;
   case VirtualKey::W:
@@ -178,15 +181,13 @@ void Camera::KeyboardUp(const KeyEventArgs &key) {
   case VirtualKey::RightShift:
     if (m_slow) {
       m_slow = false;
-      m_speed *= 4.0f;
     }
     break;
   case VirtualKey::Control:
   case VirtualKey::RightControl:
   case VirtualKey::LeftControl:
-    if (m_slow2) {
-      m_slow2 = false;
-      m_speed *= 4.0f;
+    if (m_accelerated) {
+      m_accelerated = false;
     }
     break;
 
@@ -222,5 +223,5 @@ void Camera::MouseMove(const PointerEventArgs &mouse) {
 void Camera::MouseWheel(const PointerEventArgs &wheel) {
   UpdateDistance(
       static_cast<float>(wheel.CurrentPoint().Properties().MouseWheelDelta()) *
-      m_speed / -300.0f);
+      GetSpeed() / -300.0f);
 }

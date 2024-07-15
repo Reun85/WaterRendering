@@ -24,14 +24,6 @@ ConstQuadTreeLeafIteratorDepthFirst::operator++() noexcept {
   return *this;
 }
 
-/*
-  constexpr static std::array<float2, 4> childDirections = {
-      {{-1, -1}, {1, -1}, {-1, 1}, {1, 1}}};
-
-      2 3
-      0 1
-*/
-
 using NeedToGoUp = bool;
 using NeighborDirection =
     const std::array<const std::pair<const ChildrenID, const NeedToGoUp>, 4>;
@@ -59,32 +51,49 @@ constexpr float inline IsSmaller(NeighborDirection &directions,
   }
   for (auto backitr = buff.rbegin(); backitr != buff.rend(); backitr++) {
     node = &tree.GetAt(node->children[*backitr]);
-    if (node == nullptr) {
+    if (!node->HasChildren()) {
       return 1;
     }
   };
-  return 0.5;
+  if (node->HasChildren()) {
+    return 0.5;
+  } else {
+    return 1;
+  }
 }
+
+/*
+  constexpr static std::array<float2, 4> childDirections = {
+      {{-1, -1}, {-1, 1}, {1, -1}, {1, 1}}};
+
+  /*
+
+     ^   2 3
+     |   0 1
+    xpos
+     0 zpos ->
+
+  */
 
 ConstQuadTreeLeafIteratorDepthFirst::SmallerNeighborRatio
 ConstQuadTreeLeafIteratorDepthFirst::GetSmallerNeighbor() const {
-  static constexpr NeighborDirection up = {
+  static constexpr NeighborDirection xpos = {
       {{2, false}, {3, false}, {0, true}, {1, true}}};
-  static constexpr NeighborDirection down = {
+  static constexpr NeighborDirection xneg = {
       {{2, true}, {3, true}, {0, false}, {1, false}}};
-  static constexpr NeighborDirection left = {
+  static constexpr NeighborDirection zneg = {
       {{1, true}, {0, false}, {3, true}, {2, false}}};
-  static constexpr NeighborDirection right = {
+  static constexpr NeighborDirection zpos = {
       {{1, false}, {0, true}, {3, false}, {2, true}}};
 
   std::vector<ChildrenID> buff(path.size());
   SmallerNeighborRatio res;
 
   const Node *const id = &tree.GetAt(node);
-  res.up = IsSmaller(up, tree, path, buff, id);
-  res.down = IsSmaller(down, tree, path, buff, id);
-  res.left = IsSmaller(left, tree, path, buff, id);
-  res.right = IsSmaller(right, tree, path, buff, id);
+  res.xpos = IsSmaller(xpos, tree, path, buff, id);
+  res.xneg = IsSmaller(xneg, tree, path, buff, id);
+  res.zneg = IsSmaller(zneg, tree, path, buff, id);
+  res.zpos = IsSmaller(zpos, tree, path, buff, id);
   return res;
 }
 void ConstQuadTreeLeafIteratorDepthFirst::AdjustNode() {
@@ -149,7 +158,7 @@ void QuadTree::BuildRecursively(const uint index, const float height,
       auto &curr = nodes[id];
       curr.parent = index;
       curr.size = node.size / 2;
-      curr.center = node.center + Node::childDirections[i] * curr.size / 2;
+      curr.center = node.center + Node::childDirections[i] * (curr.size / 2);
       BuildRecursively(id, height, camEye, distanceThreshold, depth + 1);
     }
   }

@@ -20,14 +20,39 @@ using namespace Axodox::Graphics::D3D12;
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
 using namespace DirectX;
+using namespace DirectX::PackedVector;
+MeshDescription CreateQuadPatch(float size) {
 
+  size = size / 2;
+
+  MeshDescription result;
+
+  result.Vertices = {
+      VertexPositionTexture{XMFLOAT3{-size, size, 0.f}, XMUSHORTN2{0.f, 0.f}},
+      VertexPositionTexture{XMFLOAT3{-size, -size, 0.f}, XMUSHORTN2{0.f, 1.f}},
+      VertexPositionTexture{XMFLOAT3{size, size, 0.f}, XMUSHORTN2{1.f, 0.f}},
+      VertexPositionTexture{XMFLOAT3{size, -size, 0.f}, XMUSHORTN2{1.f, 1.f}}};
+
+  // No indices
+  // result.Indices = {0, 1, 2, 1, 3, 2};
+  //  D3D11_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST = 36
+  //  PrimitiveTopology::PatchList4 = 36
+  // result.Topology = PrimitiveTopology::PatchList4;
+
+  result.Topology = static_cast<PrimitiveTopology>(
+      D3D11_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST);
+
+  return result;
+}
 struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
-  static struct Defaults {
-    static constexpr uint subdivisions = 50;
-    // static constexpr RasterizerFlags flags = RasterizerFlags::Wireframe;
-    static constexpr RasterizerFlags flags = RasterizerFlags::CullClockwise;
-    static constexpr XMFLOAT4 backgroundColor = {0, 1, 0, 0};
+  struct Defaults {
+    static const constexpr float planeSize = 100.0f;
+    static const constexpr float3 camStartPos = float3(-0.1, 300, 0);
+    static const constexpr RasterizerFlags flags = RasterizerFlags::Wireframe;
+    // static constexpr RasterizerFlags flags = RasterizerFlags::CullClockwise;
+    static const constexpr XMFLOAT4 backgroundColor = {0, 1, 0, 0};
+    static const constexpr bool startFirstPerson = true;
   };
 
   IFrameworkView CreateView() { return *this; }
@@ -54,7 +79,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   };
 
   struct SimpleRootDescription : public RootSignatureMask {
-    RootDescriptor<RootDescriptorType::ConstantBuffer> ConstantBuffer;
+    RootDescriptor<RootDescriptorType::ConstantBuffer> HullBuffer;
+    RootDescriptor<RootDescriptorType::ConstantBuffer> DomainBuffer;
     RootDescriptorTable<1> Texture;
     RootDescriptorTable<1> Heightmap;
     StaticSampler TextureSampler;
@@ -62,15 +88,16 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     SimpleRootDescription(const RootSignatureContext &context)
         : RootSignatureMask(context),
-          ConstantBuffer(this, {0}, ShaderVisibility::Vertex),
+          HullBuffer(this, {0}, ShaderVisibility::Hull),
+          DomainBuffer(this, {0}, ShaderVisibility::Domain),
           Texture(this, {DescriptorRangeType::ShaderResource},
                   ShaderVisibility::Pixel),
           TextureSampler(this, {0}, Filter::Linear, TextureAddressMode::Clamp,
                          ShaderVisibility::Pixel),
           Heightmap(this, {DescriptorRangeType::ShaderResource},
-                    ShaderVisibility::Vertex),
+                    ShaderVisibility::Domain),
           HeightmapSampler(this, {0}, Filter::Linear, TextureAddressMode::Clamp,
-                           ShaderVisibility::Vertex) {
+                           ShaderVisibility::Domain) {
       Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
     }
   };
@@ -90,12 +117,17 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     }
   };
 
-  struct Constants {
-    XMFLOAT4X4 WorldViewProjection;
-    XMFLOAT4X4 WorldIT;
+  struct DomainConstants {
+
     // There is no 2x2?
     XMFLOAT4X4 TextureTransform;
-    XMUINT2 subdivisions;
+    XMFLOAT4X4 WorldIT;
+  };
+
+  struct HullConstants {
+    XMFLOAT4X4 WorldViewProjection;
+    // zneg,xneg, zpos, xpos
+    XMFLOAT4 TesselationFactor;
   };
 
   D3D12_INPUT_ELEMENT_DESC InputElement(const char *semanticName,
@@ -115,11 +147,13 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     window.Activate();
 
     Camera cam;
-    cam.SetView(XMVectorSet(-1.0f, 10.0f, 0.0f, 0),
+    cam.SetView(XMVectorSet(Defaults::camStartPos.x, Defaults::camStartPos.y,
+                            Defaults::camStartPos.z, 0),
                 XMVectorSet(0.0f, 0.0f, 0.0f, 0),
                 XMVectorSet(0.0f, 1.0f, 0.0f, 0));
     bool quit = false;
-    bool firstperson = false;
+    bool firstperson = Defaults::startFirstPerson;
+    cam.SetFirstPerson(firstperson);
     // Events
 
     // If I redo the whole system, this could be handled when the callback is
@@ -165,20 +199,19 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     VertexShader simpleVertexShader{app_folder() / L"SimpleVertexShader.cso"};
     PixelShader simplePixelShader{app_folder() / L"SimplePixelShader.cso"};
+    HullShader hullShader{app_folder() / L"hullShader.cso"};
+    DomainShader domainShader{app_folder() / L"domainShader.cso"};
 
-    const D3D12_INPUT_ELEMENT_DESC VertexInputDescription[] = {
-        InputElement("POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT),
-        InputElement("NORMAL", 0, DXGI_FORMAT_R8G8B8A8_SNORM),
-        InputElement("TEXCOORD", 0, DXGI_FORMAT_R16G16_UNORM),
-        InputElement("SV_VertexID", 0, DXGI_FORMAT_R32_UINT),
-    };
     GraphicsPipelineStateDefinition simplePipelineStateDefinition{
         .RootSignature = &simpleRootSignature,
         .VertexShader = &simpleVertexShader,
+        .DomainShader = &domainShader,
+        .HullShader = &hullShader,
         .PixelShader = &simplePixelShader,
         .RasterizerState = Defaults::flags,
         .DepthStencilState = DepthStencilMode::WriteDepth,
-        .InputLayout = VertexInputDescription,
+        .InputLayout = VertexPositionTexture::Layout,
+        .TopologyType = PrimitiveTopologyType::Patch,
         .RenderTargetFormats = {Format::B8G8R8A8_UNorm},
         .DepthStencilFormat = Format::D32_Float};
     Axodox::Graphics::D3D12::PipelineState simplePipelineState =
@@ -199,8 +232,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         .DepthStencilDescriptorHeap = &depthStencilDescriptorHeap};
 
     ImmutableMesh planeMesh{immutableAllocationContext,
-                            CreatePlane(1, XMUINT2(Defaults::subdivisions,
-                                                   Defaults::subdivisions))};
+                            CreateQuadPatch(Defaults::planeSize)};
     // ImmutableTexture texture{immutableAllocationContext,
     //                          app_folder() / L"image.jpeg"};
     ImmutableTexture texture{immutableAllocationContext,
@@ -228,7 +260,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     // Frame counter
     auto i = 0u;
-    uint counter = 0;
     while (!quit) {
       // Process user input
       dispatcher.ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
@@ -272,7 +303,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       }
 
       // Update constants
-      Constants constants{};
+      HullConstants hullConstants{};
+      DomainConstants domainConstants{};
       auto resolution = swapChain.Resolution();
       cam.SetAspect(float(resolution.x) / float(resolution.y));
       cam.Update(0.01f);
@@ -299,7 +331,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       // Draw objects
       {
         float3 center = {0, 0, 0};
-        float2 fullSizeXZ = {1, 1};
+        float2 fullSizeXZ = {Defaults::planeSize, Defaults::planeSize};
         QuadTree qt;
         XMFLOAT3 cam_eye;
 
@@ -307,40 +339,62 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         qt.Build(center, fullSizeXZ, float3(cam_eye.x, cam_eye.y, cam_eye.z));
 
         auto worldBasic = XMMatrixRotationX(XMConvertToRadians(-90.0));
-        counter++;
         for (auto it = qt.begin(); it != qt.end(); ++it) {
 
-          auto res = it.GetSmallerNeighbor();
+          // if ((&*it - &qt.GetRoot()) != ((i / 60) % qt.GetSize()))
+          //   continue;
+          {
+            auto t1 = it->size;
+            auto t2 = it->center;
+            auto t3 = float3(t2.x, center.y, t2.y);
+            auto world =
+                worldBasic *
+                XMMatrixScaling(it->size.x / fullSizeXZ.x, 1,
+                                it->size.y / fullSizeXZ.y) *
+                XMMatrixTranslation(it->center.x, center.y, it->center.y);
+            // auto world =
+            //     worldBasic * XMMatrixScaling(it->size.x, 1, it->size.y) *
+            //     XMMatrixTranslation(it->center.x, center.y, it->center.y);
+            auto worldViewProjection =
+                XMMatrixTranspose(world * cam.GetViewProj());
+            auto worldIT = XMMatrixInverse(nullptr, world);
 
-          auto world =
-              worldBasic * XMMatrixScaling(it->size.x, 1, it->size.y) *
-              XMMatrixTranslation(it->center.x, center.y, it->center.y);
-          auto worldViewProjection =
-              XMMatrixTranspose(world * cam.GetViewProj());
-          auto worldIT = XMMatrixInverse(nullptr, world);
+            XMStoreFloat4x4(&hullConstants.WorldViewProjection,
+                            worldViewProjection);
+            XMStoreFloat4x4(&domainConstants.WorldIT, worldIT);
 
-          XMStoreFloat4x4(&constants.WorldViewProjection, worldViewProjection);
-          XMStoreFloat4x4(&constants.WorldIT, worldIT);
-
-          float2 uvbottomleft =
-              float2(it->center.x - center.x, it->center.y - center.y) /
-                  fullSizeXZ +
-              float2(0.5, 0.5) - it->size * 0.5;
-          auto texturetransf =
-              XMMatrixScaling(it->size.x / fullSizeXZ.x, 1,
-                              it->size.y / fullSizeXZ.y) *
-
-              XMMatrixTranslation(uvbottomleft.x, 0, uvbottomleft.y);
-          // Why no 2x2?
-
-          XMStoreFloat4x4(&constants.TextureTransform, texturetransf);
-
-          constants.subdivisions = {Defaults::subdivisions,
-                                    Defaults::subdivisions};
+            float2 uvbottomleft =
+                float2(it->center.x - center.x, it->center.y - center.y) /
+                    fullSizeXZ +
+                float2(0.5, 0.5) - (it->size / fullSizeXZ) * 0.5;
+            auto texturetransf =
+                XMMatrixScaling(it->size.x / fullSizeXZ.x, 1,
+                                it->size.y / fullSizeXZ.y) *
+                XMMatrixTranslation(uvbottomleft.x, 0, uvbottomleft.y);
+            // Why no 2x2?
+            XMStoreFloat4x4(&domainConstants.TextureTransform, texturetransf);
+          }
+          {
+            auto res = it.GetSmallerNeighbor();
+            static const constexpr auto l = [](float x) -> float {
+              if (x == 0)
+                return 1;
+              else
+                return 1 / x;
+            };
+            hullConstants.TesselationFactor = {l(res.zneg), l(res.xneg),
+                                               l(res.zpos), l(res.xpos)};
+            // hullConstants.TesselationFactor[0] = l(res.zneg);
+            // hullConstants.TesselationFactor[1] = l(res.xneg);
+            // hullConstants.TesselationFactor[2] = l(res.right);
+            // hullConstants.TesselationFactor[3] = l(res.xpos);
+          }
 
           auto mask =
               simpleRootSignature.Set(allocator, RootSignatureUsage::Graphics);
-          mask.ConstantBuffer = resources.DynamicBuffer.AddBuffer(constants);
+          mask.HullBuffer = resources.DynamicBuffer.AddBuffer(hullConstants);
+          mask.DomainBuffer =
+              resources.DynamicBuffer.AddBuffer(domainConstants);
           mask.Texture = texture;
           mask.Heightmap = heightmap;
 
@@ -350,6 +404,43 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           planeMesh.Draw(allocator);
         }
       }
+      //{
+
+      //  auto worldBasic = XMMatrixRotationX(XMConvertToRadians(-90.0));
+      //  auto world =
+
+      //      worldBasic *
+      //      XMMatrixScaling(Defaults::planeSize / 2, 1,
+      //                      Defaults::planeSize / 2) *
+      //      XMMatrixTranslation(
+      //          -Defaults::planeSize / 4 + Defaults::planeSize / 2, -0.2,
+      //          -Defaults::planeSize / 4 + Defaults::planeSize / 2);
+
+      //  auto worldViewProjection = XMMatrixTranspose(world *
+      //  cam.GetViewProj()); auto worldIT = XMMatrixInverse(nullptr, world);
+
+      //  XMStoreFloat4x4(&hullConstants.WorldViewProjection,
+      //                  worldViewProjection);
+      //  XMStoreFloat4x4(&domainConstants.WorldIT, worldIT);
+
+      //  // Why no 2x2?
+      //  XMStoreFloat4x4(&domainConstants.TextureTransform,
+      //  XMMatrixIdentity());
+
+      //  hullConstants.TesselationFactor = {1, 1, 1, 1};
+      //  auto mask =
+      //      simpleRootSignature.Set(allocator, RootSignatureUsage::Graphics);
+      //  mask.HullBuffer = resources.DynamicBuffer.AddBuffer(hullConstants);
+      //  mask.DomainBuffer =
+      //  resources.DynamicBuffer.AddBuffer(domainConstants); mask.Texture =
+      //  texture; mask.Heightmap = heightmap;
+
+      //  allocator.SetRenderTargets({renderTargetView},
+      //                             resources.DepthBuffer.DepthStencil());
+      //  simplePipelineState.Apply(allocator);
+
+      //  planeMesh.Draw(allocator);
+      //}
 
       // End frame command list
       {

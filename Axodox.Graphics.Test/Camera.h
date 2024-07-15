@@ -58,11 +58,13 @@ private:
   // Updates the underlying parameters.
   void UpdateParams();
 
+  inline float GetSpeed() const;
+
   //  The traversal speed of the camera
-  float m_speed = 2.0f;
+  float m_speed = 16.0f;
 
   bool m_slow = false;
-  bool m_slow2 = false;
+  bool m_accelerated = false;
 
   // The camera position.
   XMVECTOR m_eye;

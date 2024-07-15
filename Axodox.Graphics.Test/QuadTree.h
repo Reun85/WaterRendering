@@ -29,8 +29,17 @@ struct Node {
   constexpr bool HasChildren() const { return children[0] != 0; }
 #endif
 
-  constexpr static std::array<float2, 4> childDirections = {
-      {{-1, -1}, {1, -1}, {-1, 1}, {1, 1}}};
+  constexpr static std::array<NodeSize, 4> childDirections = {
+      {{-1.f, -1.f}, {-1.f, 1.f}, {1.f, -1.f}, {1.f, 1.f}}};
+
+  /*
+
+     ^   2 3
+     |   0 1
+    xpos
+     0 zpos ->
+
+  */
 
   const float3 GetCenter(const float height) const {
     return float3(center.x, height, center.y);
@@ -66,10 +75,16 @@ public:
   // No neighbor = 0
   // Else ratio from this to that <==> if its twice the size of this, its 0.5
   struct SmallerNeighborRatio {
-    float up;
-    float down;
-    float left;
-    float right;
+    /*
+    xpos = xpos
+    xneg = xneg
+    zneg = zneg
+    right = zpos
+    */
+    float xpos;
+    float xneg;
+    float zneg;
+    float zpos;
   };
 
   SmallerNeighborRatio GetSmallerNeighbor() const;
@@ -85,8 +100,8 @@ private:
 };
 // The plane must be perpendicular to the Y-axis.
 class QuadTree {
-  static struct Default {
-    constexpr static float distanceThreshold = 2e+2f;
+  struct Default {
+    constexpr static float distanceThreshold = 1e+1f;
     constexpr static uint allocation = 1e+5;
     constexpr static uint maxDepth = 7;
   };
