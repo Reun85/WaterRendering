@@ -48,8 +48,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   struct Defaults {
     static const constexpr float planeSize = 10.0f;
     static const constexpr float3 camStartPos = float3(-1, 300, 0);
-    // static const constexpr RasterizerFlags flags =
-    // RasterizerFlags::Wireframe;
+    //   static const constexpr RasterizerFlags flags =
+    //   RasterizerFlags::Wireframe;
+
     static constexpr RasterizerFlags flags = RasterizerFlags::CullClockwise;
     static const constexpr XMFLOAT4 clearColor = {0, 1, 0, 0};
     static const constexpr bool startFirstPerson = true;
@@ -79,6 +80,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   };
 
   struct SimpleRootDescription : public RootSignatureMask {
+    RootDescriptor<RootDescriptorType::ConstantBuffer> VertexBuffer;
     RootDescriptor<RootDescriptorType::ConstantBuffer> HullBuffer;
     RootDescriptor<RootDescriptorType::ConstantBuffer> DomainBuffer;
     RootDescriptorTable<1> Texture;
@@ -90,6 +92,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     SimpleRootDescription(const RootSignatureContext &context)
         : RootSignatureMask(context),
+          VertexBuffer(this, {0}, ShaderVisibility::Vertex),
           HullBuffer(this, {0}, ShaderVisibility::Hull),
           DomainBuffer(this, {0}, ShaderVisibility::Domain),
           Texture(this, {DescriptorRangeType::ShaderResource},
@@ -131,8 +134,11 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     XMFLOAT4X4 WorldIT;
   };
 
-  struct HullConstants {
+  struct VertexConstants {
+
     XMFLOAT4X4 WorldViewProjection;
+  };
+  struct HullConstants {
     // zneg,xneg, zpos, xpos
     XMFLOAT4 TesselationFactor;
   };
@@ -347,6 +353,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       }
 
       // Update constants
+      VertexConstants vertexConstants{};
       HullConstants hullConstants{};
       DomainConstants domainConstants{};
       auto resolution = swapChain.Resolution();
@@ -424,7 +431,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                 XMMatrixTranspose(world * cam.GetViewProj());
             auto worldIT = XMMatrixInverse(nullptr, world);
 
-            XMStoreFloat4x4(&hullConstants.WorldViewProjection,
+            XMStoreFloat4x4(&vertexConstants.WorldViewProjection,
                             worldViewProjection);
             XMStoreFloat4x4(&domainConstants.WorldIT, worldIT);
 
@@ -465,6 +472,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           auto mask =
               simpleRootSignature.Set(allocator, RootSignatureUsage::Graphics);
           mask.HullBuffer = resources.DynamicBuffer.AddBuffer(hullConstants);
+          mask.VertexBuffer =
+              resources.DynamicBuffer.AddBuffer(vertexConstants);
           mask.DomainBuffer =
               resources.DynamicBuffer.AddBuffer(domainConstants);
           mask.Texture = texture;

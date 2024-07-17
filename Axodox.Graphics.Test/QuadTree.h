@@ -101,7 +101,7 @@ private:
 // The plane must be perpendicular to the Y-axis.
 class QuadTree {
   struct Default {
-    constexpr static float distanceThreshold = 1e+1f;
+    constexpr static float distanceThreshold = 5e+0f;
     constexpr static uint allocation = 1e+5;
     constexpr static uint maxDepth = 7;
   };

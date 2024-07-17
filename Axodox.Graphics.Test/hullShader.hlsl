@@ -3,7 +3,6 @@ Texture2D _heightmap : register(t0);
 SamplerState _sampler : register(s0);
 cbuffer HullBuffer : register(b0)
 {
-    float4x4 Transformation;
     // zneg,xneg, zpos, xpos
     float4 TessellationFactor;
 };
@@ -12,17 +11,11 @@ cbuffer HullBuffer : register(b0)
 // Hull Shader
 // --------------------------------------
 
-// Output
-struct HS_CONTROL_POINT
-{
-    float3 Position : POSITION;
-    float2 TexCoord : TEXCOORD;
-};
 
 // Input
 struct HS_INPUT_PATCH
 {
-    float3 Position : POSITION;
+    float4 Position : SV_POSITION;
     float2 TexCoord : TEXCOORD;
 };
 
@@ -41,9 +34,7 @@ struct HS_OUTPUT_PATCH
 HS_OUTPUT_PATCH main(InputPatch<HS_INPUT_PATCH, 4> patch, uint i : SV_OutputControlPointID, uint PatchID : SV_PrimitiveID)
 {
     HS_OUTPUT_PATCH output;
-    output.Position = mul(float4(
-    patch[i].
-Position, 1), Transformation);
+    output.Position = patch[i].Position;
 
     
     output.TexCoord = patch[i].
@@ -52,32 +43,89 @@ TexCoord;
 output;
 }
 
+
+inline float ToNearest2Power(float u)
+{
+    return u;
+    uint v = (uint) u;
+    v--;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v++;
+    return (float)
+    v;
+}
+
+
+inline float dostuff(float4 a, float4 b)
+{
+    float u = length(float3(a.x, a.y, a.z) / a.w - float3(b.x, b.y, b.z) / b.w);
+    u = u * 32;
+    
+    if (u < 1)
+    {
+        return 1;
+    }
+    if (u < 2)
+    {
+        return 2;
+    }
+    if (u < 4)
+    {
+        return 4;
+    }
+    if (u < 8)
+    {
+        return 8;
+    }
+    if (u < 16)
+    {
+        return 16;
+    }
+    if (u < 32)
+    {
+        return 32;
+    }
+    return 64;
+}
+
 // Tessellation Factors Phase
 struct HS_CONSTANT_DATA_OUTPUT
 {
-    // zneg,xneg, zpos, xpos
+    /* zneg,xneg, zpos, xpos
+        vertex pos
+    3 2
+    1 0
+*/
     float edges[4] : SV_TessFactor;
     float inside[2] : SV_InsideTessFactor;
 };
-
 // Ran once per patch
 HS_CONSTANT_DATA_OUTPUT HSConstantFunction(InputPatch<HS_INPUT_PATCH, 4> patch, uint patchID : SV_PrimitiveID)
 {
-    
-    
+    const float mult = 0.1;
     HS_CONSTANT_DATA_OUTPUT output;
-    output.edges[0] = 4 * TessellationFactor.r;
-    output.edges[1] = 4 * TessellationFactor.g;
-    output.edges[2] = 4 * TessellationFactor.b;
-    output.edges[3] = 4 * TessellationFactor.a;
-    output.inside[0] = 4;
-    output.inside[1] = 4;
-    //output.edges[0] = 1;
-    //output.edges[1] = 1;
-    //output.edges[2] = 1;
-    //output.edges[3] = 1;
-    //output.inside[0] = 0;
-    //output.inside[1] = 0;
+    output.edges[0] = 32;
+    output.edges[1] = 32;
+    output.edges[2] = 32;
+    output.edges[3] = 32;
+
+    //output.edges[2] = dostuff(patch[1].Position, patch[0].Position);
+    //output.edges[3] = dostuff(patch[1].Position, patch[3].Position);
+    //output.edges[0] = dostuff(patch[2].Position, patch[0].Position);
+    //output.edges[1] = dostuff(patch[2].Position, patch[3].Position);
+    
+    output.edges[0] *= TessellationFactor.r;
+    output.edges[1] *= TessellationFactor.g;
+    output.edges[2] *= TessellationFactor.b;
+    output.edges[3] *= TessellationFactor.a;
+
+    output.inside[1] = (output.edges[1] + output.edges[2]) / 2;
+    output.inside[0] = (output.edges[0] + output.edges[3]) / 2;
+
     
     return output;
 }
