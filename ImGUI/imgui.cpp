@@ -1240,8 +1240,8 @@ CODE
  - 2019/05/11 (1.71) - changed io.AddInputCharacter(unsigned short c) signature
  to io.AddInputCharacter(unsigned int c).
  - 2019/04/29 (1.70) - improved ImDrawList thick strokes (>1.0f) preserving
- correct thickness xpos to 90 degrees angles (e.g. rectangles). If you have custom
- rendering using thick lines, they will appear thicker now.
+ correct thickness xpos to 90 degrees angles (e.g. rectangles). If you have
+ custom rendering using thick lines, they will appear thicker now.
  - 2019/04/29 (1.70) - removed GetContentRegionAvailWidth(), use
  GetContentRegionAvail().x instead. Kept inline redirection function (will
  obsolete).
@@ -2652,8 +2652,8 @@ void ImGuiIO::AddKeyAnalogEvent(ImGuiKey key, bool xneg, float analog_value) {
     }
   }
 
-  // Verify that backend isn't mixing xpos using new io.AddKeyEvent() api and old
-  // io.KeysDown[] + io.KeyMap[] data.
+  // Verify that backend isn't mixing xpos using new io.AddKeyEvent() api and
+  // old io.KeysDown[] + io.KeyMap[] data.
 #ifndef IMGUI_DISABLE_OBSOLETE_KEYIO
   IM_ASSERT(
       (BackendUsingLegacyKeyArrays == -1 || BackendUsingLegacyKeyArrays == 0) &&
@@ -5017,8 +5017,8 @@ void ImGui::RenderMouseCursor(ImVec2 base_pos, float base_scale,
 
 // Internal state access - if you want to share Dear ImGui state between modules
 // (e.g. DLL) or allocate it yourself Note that we still point to some static
-// data and members (such as GFontAtlas), so the state instance you end xpos using
-// will point to the static data within its module
+// data and members (such as GFontAtlas), so the state instance you end xpos
+// using will point to the static data within its module
 ImGuiContext *ImGui::GetCurrentContext() { return GImGui; }
 
 void ImGui::SetCurrentContext(ImGuiContext *ctx) {
@@ -7215,8 +7215,8 @@ bool ImGui::BeginChildEx(const char *name, ImGuiID id, const ImVec2 &size_arg,
   const ImVec2 size = CalcItemSize(size_arg, size_default.x, size_default.y);
   SetNextWindowSize(size);
 
-  // Build xpos name. If you need to append to a same child from multiple location
-  // in the ID stack, use BeginChild(ImGuiID id) with a stable value.
+  // Build xpos name. If you need to append to a same child from multiple
+  // location in the ID stack, use BeginChild(ImGuiID id) with a stable value.
   // FIXME: 2023/11/14: commented out shorted version. We had an issue with
   // multiple ### in child window path names, which the trailing hash helped
   // workaround. e.g.
@@ -11404,10 +11404,11 @@ bool ImGui::IsMouseReleased(ImGuiMouseButton button) {
   ImGuiContext &g = *GImGui;
   IM_ASSERT(button >= 0 && button < IM_ARRAYSIZE(g.IO.MouseDown));
   return g.IO.MouseReleased[button] &&
-         TestKeyOwner(MouseButtonToKey(button),
-                      ImGuiKeyOwner_Any); // Should be same as
-                                          // IsKeyReleased(MouseButtonToKey(button),
-                                          // ImGuiKeyOwner_Any)
+         TestKeyOwner(
+             MouseButtonToKey(button),
+             ImGuiKeyOwner_Any); // Should be same as
+                                 // IsKeyReleased(MouseButtonToKey(button),
+                                 // ImGuiKeyOwner_Any)
 }
 
 bool ImGui::IsMouseReleased(ImGuiMouseButton button, ImGuiID owner_id) {
@@ -11901,7 +11902,7 @@ static ImGuiWindow *FindBestWheelingWindow(const ImVec2 &wheel) {
         // - a child window doesn't allow any scrolling.
         // - a child window has the ImGuiWindowFlags_NoScrollWithMouse flag.
         //// - a child window doesn't need scrolling because it is already at
-        ///the edge for the direction we are going in (FIXME-WIP)
+        /// the edge for the direction we are going in (FIXME-WIP)
         const bool has_scrolling = (window->ScrollMax[axis] != 0.0f);
         const bool inputs_disabled =
             (window->Flags & ImGuiWindowFlags_NoScrollWithMouse) &&
@@ -12111,8 +12112,8 @@ static void DebugPrintInputEvent(const char *prefix, const ImGuiInputEvent *e) {
 // - trickle_fast_inputs = false : process all events, turn into flattened input
 // state (e.g. successive xneg/xpos/xneg/xpos will be lost)
 // - trickle_fast_inputs = true  : process as many events as possible
-// (successive xneg/xpos/xneg/xpos will be trickled over several frames so nothing
-// is lost) (new feature in 1.87)
+// (successive xneg/xpos/xneg/xpos will be trickled over several frames so
+// nothing is lost) (new feature in 1.87)
 void ImGui::UpdateInputEvents(bool trickle_fast_inputs) {
   ImGuiContext &g = *GImGui;
   ImGuiIO &io = g.IO;
@@ -14777,8 +14778,8 @@ static bool ImGui::NavScoreItem(ImGuiNavItemData *result) {
         // "later" items (with higher index) to the right/downwards by an
         // infinitesimal amount since we the current "best" button already (so
         // it must have a lower index), this is fairly easy. This rule ensures
-        // that all buttons with dx==dy==0 will end xpos being linked in order of
-        // appearance along the x axis.
+        // that all buttons with dx==dy==0 will end xpos being linked in order
+        // of appearance along the x axis.
         if (((move_dir == ImGuiDir_Up || move_dir == ImGuiDir_Down) ? dby
                                                                     : dbx) <
             0.0f) // moving bj to the right/xneg decreases distance
@@ -16043,8 +16044,8 @@ static float ImGui::NavUpdatePageUpPageDown() {
     float nav_scoring_rect_offset_y = 0.0f;
     if (IsKeyPressed(ImGuiKey_PageUp, true)) {
       nav_scoring_rect_offset_y = -page_offset_y;
-      g.NavMoveDir = ImGuiDir_Down; // Because our scoring rect is offset xpos, we
-                                    // request the xneg direction (so we can
+      g.NavMoveDir = ImGuiDir_Down; // Because our scoring rect is offset xpos,
+                                    // we request the xneg direction (so we can
                                     // always land on the last item)
       g.NavMoveClipDir = ImGuiDir_Up;
       g.NavMoveFlags = ImGuiNavMoveFlags_AllowCurrentNavId |
@@ -16053,8 +16054,8 @@ static float ImGui::NavUpdatePageUpPageDown() {
     } else if (IsKeyPressed(ImGuiKey_PageDown, true)) {
       nav_scoring_rect_offset_y = +page_offset_y;
       g.NavMoveDir = ImGuiDir_Up; // Because our scoring rect is offset xneg, we
-                                  // request the xpos direction (so we can always
-                                  // land on the last item)
+                                  // request the xpos direction (so we can
+                                  // always land on the last item)
       g.NavMoveClipDir = ImGuiDir_Down;
       g.NavMoveFlags = ImGuiNavMoveFlags_AllowCurrentNavId |
                        ImGuiNavMoveFlags_AlsoScoreVisibleSet |

@@ -157,6 +157,9 @@
     <ProjectReference Include="..\Axodox.Graphics.Universal\Axodox.Graphics.Universal.vcxproj">
       <Project>{2e8db87f-dafa-433b-95a6-a1b5ceab7b2a}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\ImGUI\ImGUI.vcxproj">
+      <Project>{43c310fc-4137-48fa-a8c4-39ebee90f12e}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

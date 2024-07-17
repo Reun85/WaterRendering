@@ -1,3 +1,6 @@
+
+Texture2D _heightmap : register(t0);
+SamplerState _sampler : register(s0);
 cbuffer HullBuffer : register(b0)
 {
     float4x4 Transformation;
@@ -60,13 +63,15 @@ struct HS_CONSTANT_DATA_OUTPUT
 // Ran once per patch
 HS_CONSTANT_DATA_OUTPUT HSConstantFunction(InputPatch<HS_INPUT_PATCH, 4> patch, uint patchID : SV_PrimitiveID)
 {
+    
+    
     HS_CONSTANT_DATA_OUTPUT output;
-    output.edges[0] = 32 * TessellationFactor.r;
-    output.edges[1] = 32 * TessellationFactor.g;
-    output.edges[2] = 32 * TessellationFactor.b;
-    output.edges[3] = 32 * TessellationFactor.a;
-    output.inside[0] = 32;
-    output.inside[1] = 32;
+    output.edges[0] = 4 * TessellationFactor.r;
+    output.edges[1] = 4 * TessellationFactor.g;
+    output.edges[2] = 4 * TessellationFactor.b;
+    output.edges[3] = 4 * TessellationFactor.a;
+    output.inside[0] = 4;
+    output.inside[1] = 4;
     //output.edges[0] = 1;
     //output.edges[1] = 1;
     //output.edges[2] = 1;

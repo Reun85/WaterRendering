@@ -5,12 +5,11 @@
 #include "QuadTree.h"
 #include <fstream>
 #include <string.h>
-
 using namespace std;
 using namespace winrt;
 
 using namespace Windows;
-using namespace Windows ::ApplicationModel::Core;
+using namespace Windows::ApplicationModel::Core;
 using namespace Windows::Foundation::Numerics;
 using namespace Windows::UI;
 using namespace Windows::UI::Core;
@@ -47,11 +46,12 @@ MeshDescription CreateQuadPatch(float size) {
 struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
   struct Defaults {
-    static const constexpr float planeSize = 100.0f;
-    static const constexpr float3 camStartPos = float3(-0.1, 300, 0);
-    static const constexpr RasterizerFlags flags = RasterizerFlags::Wireframe;
-    // static constexpr RasterizerFlags flags = RasterizerFlags::CullClockwise;
-    static const constexpr XMFLOAT4 backgroundColor = {0, 1, 0, 0};
+    static const constexpr float planeSize = 10.0f;
+    static const constexpr float3 camStartPos = float3(-1, 30, 0);
+    // static const constexpr RasterizerFlags flags =
+    // RasterizerFlags::Wireframe;
+    static constexpr RasterizerFlags flags = RasterizerFlags::CullClockwise;
+    static const constexpr XMFLOAT4 clearColor = {0, 1, 0, 0};
     static const constexpr bool startFirstPerson = true;
   };
 
@@ -82,9 +82,11 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     RootDescriptor<RootDescriptorType::ConstantBuffer> HullBuffer;
     RootDescriptor<RootDescriptorType::ConstantBuffer> DomainBuffer;
     RootDescriptorTable<1> Texture;
-    RootDescriptorTable<1> Heightmap;
     StaticSampler TextureSampler;
+    RootDescriptorTable<1> Heightmap;
     StaticSampler HeightmapSampler;
+    RootDescriptorTable<1> HeightmapForDomain;
+    StaticSampler HeightmapSamplerForDomain;
 
     SimpleRootDescription(const RootSignatureContext &context)
         : RootSignatureMask(context),
@@ -94,10 +96,15 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                   ShaderVisibility::Pixel),
           TextureSampler(this, {0}, Filter::Linear, TextureAddressMode::Clamp,
                          ShaderVisibility::Pixel),
+          HeightmapForDomain(this, {DescriptorRangeType::ShaderResource},
+                             ShaderVisibility::Domain),
+          HeightmapSamplerForDomain(this, {0}, Filter::Linear,
+                                    TextureAddressMode::Clamp,
+                                    ShaderVisibility::Domain),
           Heightmap(this, {DescriptorRangeType::ShaderResource},
-                    ShaderVisibility::Domain),
+                    ShaderVisibility::Hull),
           HeightmapSampler(this, {0}, Filter::Linear, TextureAddressMode::Clamp,
-                           ShaderVisibility::Domain) {
+                           ShaderVisibility::Hull) {
       Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
     }
   };
@@ -160,6 +167,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     // made.
     window.KeyDown([&cam, &quit, &firstperson](CoreWindow const &,
                                                KeyEventArgs const &args) {
+      if (ImGui::GetIO().WantCaptureKeyboard)
+        return;
       switch (args.VirtualKey()) {
       case Windows::System::VirtualKey::Escape:
         quit = true;
@@ -175,14 +184,20 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       }
     });
     window.KeyUp([&cam](CoreWindow const &, KeyEventArgs const &args) {
+      if (ImGui::GetIO().WantCaptureKeyboard)
+        return;
       cam.KeyboardUp(args);
     });
     window.PointerMoved(
         [&cam](CoreWindow const &, PointerEventArgs const &args) {
+          if (ImGui::GetIO().WantCaptureMouse)
+            return;
           cam.MouseMove(args);
         });
     window.PointerWheelChanged(
         [&cam](CoreWindow const &, PointerEventArgs const &args) {
+          if (ImGui::GetIO().WantCaptureMouse)
+            return;
           cam.MouseWheel(args);
         });
 
@@ -258,8 +273,37 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       commonDescriptorHeap.Clean();
     });
 
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO &io = ImGui::GetIO();
+    (void)io;
+    io.ConfigFlags |=
+        ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+    io.ConfigFlags |=
+        ImGuiConfigFlags_NavEnableGamepad; // Enable Gamepad Controls
+
+    ImGui::StyleColorsDark();
+
+    // Setup Platform/Renderer bindings
+    ImGui_ImplUwp_InitForCurrentView();
+
+    D3D12_DESCRIPTOR_HEAP_DESC ImGuiDescriptorHeapDesc = {};
+    ImGuiDescriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    ImGuiDescriptorHeapDesc.NumDescriptors = 2;
+    ImGuiDescriptorHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+
+    ID3D12DescriptorHeap *ImGuiDescriptorHeap;
+    check_hresult(device.get()->CreateDescriptorHeap(
+        &ImGuiDescriptorHeapDesc, IID_PPV_ARGS(&ImGuiDescriptorHeap)));
+    ImGui_ImplDX12_Init(
+        device.get(), frames.size(), DXGI_FORMAT_B8G8R8A8_UNORM,
+        ImGuiDescriptorHeap,
+        ImGuiDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
+        ImGuiDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+
     // Frame counter
     auto i = 0u;
+    XMFLOAT4 clearColor = Defaults::clearColor;
     while (!quit) {
       // Process user input
       dispatcher.ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
@@ -324,11 +368,12 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         commonDescriptorHeap.Set(allocator);
 
         // Clears frame with background color
-        renderTargetView->Clear(allocator, Defaults::backgroundColor);
+        renderTargetView->Clear(allocator, clearColor);
         resources.DepthBuffer.DepthStencil()->Clear(allocator);
       }
 
       // Draw objects
+      uint qtNodes;
       {
         float3 center = {0, 0, 0};
         float2 fullSizeXZ = {Defaults::planeSize, Defaults::planeSize};
@@ -337,6 +382,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
         XMStoreFloat3(&cam_eye, cam.GetEye());
         qt.Build(center, fullSizeXZ, float3(cam_eye.x, cam_eye.y, cam_eye.z));
+        qtNodes = qt.GetSize();
 
         auto worldBasic = XMMatrixRotationX(XMConvertToRadians(-90.0));
         for (auto it = qt.begin(); it != qt.end(); ++it) {
@@ -397,6 +443,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
               resources.DynamicBuffer.AddBuffer(domainConstants);
           mask.Texture = texture;
           mask.Heightmap = heightmap;
+          mask.HeightmapForDomain = heightmap;
 
           allocator.SetRenderTargets({renderTargetView},
                                      resources.DepthBuffer.DepthStencil());
@@ -404,43 +451,41 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           planeMesh.Draw(allocator);
         }
       }
-      //{
 
-      //  auto worldBasic = XMMatrixRotationX(XMConvertToRadians(-90.0));
-      //  auto world =
+      {
 
-      //      worldBasic *
-      //      XMMatrixScaling(Defaults::planeSize / 2, 1,
-      //                      Defaults::planeSize / 2) *
-      //      XMMatrixTranslation(
-      //          -Defaults::planeSize / 4 + Defaults::planeSize / 2, -0.2,
-      //          -Defaults::planeSize / 4 + Defaults::planeSize / 2);
+        // Start the Dear ImGui frame
+        ImGui_ImplDX12_NewFrame();
+        ImGui_ImplUwp_NewFrame();
+        ImGui::NewFrame();
 
-      //  auto worldViewProjection = XMMatrixTranspose(world *
-      //  cam.GetViewProj()); auto worldIT = XMMatrixInverse(nullptr, world);
+        // 1. Show the big demo window (Most of the sample code is in
+        // ImGui::ShowDemoWindow()! You can browse its code to learn more about
+        // Dear ImGui!).
 
-      //  XMStoreFloat4x4(&hullConstants.WorldViewProjection,
-      //                  worldViewProjection);
-      //  XMStoreFloat4x4(&domainConstants.WorldIT, worldIT);
+        // 2. Show a simple window that we create ourselves. We use a Begin/End
+        // pair to create a named window.
+        if (ImGui::Begin("Application")) {
+          ImGui::ColorEdit3(
+              "clear color",
+              (float *)&clearColor); // Edit 3 floats representing a color
 
-      //  // Why no 2x2?
-      //  XMStoreFloat4x4(&domainConstants.TextureTransform,
-      //  XMMatrixIdentity());
+          ImGui::Text("frameID = %d", i);
+          ImGui::Text("QuadTree Nodes = %d", qtNodes);
 
-      //  hullConstants.TesselationFactor = {1, 1, 1, 1};
-      //  auto mask =
-      //      simpleRootSignature.Set(allocator, RootSignatureUsage::Graphics);
-      //  mask.HullBuffer = resources.DynamicBuffer.AddBuffer(hullConstants);
-      //  mask.DomainBuffer =
-      //  resources.DynamicBuffer.AddBuffer(domainConstants); mask.Texture =
-      //  texture; mask.Heightmap = heightmap;
+          ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
+                      1000.0f / io.Framerate, io.Framerate);
+        }
+        ImGui::End();
 
-      //  allocator.SetRenderTargets({renderTargetView},
-      //                             resources.DepthBuffer.DepthStencil());
-      //  simplePipelineState.Apply(allocator);
+        // Rendering
+        ImGui::Render();
 
-      //  planeMesh.Draw(allocator);
-      //}
+        allocator->SetDescriptorHeaps(1, &ImGuiDescriptorHeap);
+
+        ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(),
+                                      allocator.operator->());
+      }
 
       // End frame command list
       {
@@ -461,7 +506,12 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
       // Present frame
       swapChain.Present();
+
+      // Handle ImGui viewports
     }
+    ImGui_ImplDX12_Shutdown();
+    ImGui_ImplUwp_Shutdown();
+    ImGui::DestroyContext();
   }
 
   void SetWindow(CoreWindow const & /*window*/) {}
