@@ -47,7 +47,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
   struct Defaults {
     static const constexpr float planeSize = 10.0f;
-    static const constexpr float3 camStartPos = float3(-1, 30, 0);
+    static const constexpr float3 camStartPos = float3(-1, 300, 0);
     // static const constexpr RasterizerFlags flags =
     // RasterizerFlags::Wireframe;
     static constexpr RasterizerFlags flags = RasterizerFlags::CullClockwise;
@@ -374,6 +374,12 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
       // Draw objects
       uint qtNodes;
+      using QuadTreeBuildTimeTimeFrame = std::chrono::nanoseconds;
+      long long QuadTreeBuildTime;
+
+      using NavigatingTimeFrame = std::chrono::nanoseconds;
+      long long NavigatingTheQuadTree = 0;
+
       {
         float3 center = {0, 0, 0};
         float2 fullSizeXZ = {Defaults::planeSize, Defaults::planeSize};
@@ -381,11 +387,24 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         XMFLOAT3 cam_eye;
 
         XMStoreFloat3(&cam_eye, cam.GetEye());
+        auto start = std::chrono::high_resolution_clock::now();
+
         qt.Build(center, fullSizeXZ, float3(cam_eye.x, cam_eye.y, cam_eye.z));
+
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration =
+            std::chrono::duration_cast<QuadTreeBuildTimeTimeFrame>(end - start);
+
+        QuadTreeBuildTime = duration.count();
         qtNodes = qt.GetSize();
 
         auto worldBasic = XMMatrixRotationX(XMConvertToRadians(-90.0));
+        start = std::chrono::high_resolution_clock::now();
         for (auto it = qt.begin(); it != qt.end(); ++it) {
+          NavigatingTheQuadTree +=
+              std::chrono::duration_cast<NavigatingTimeFrame>(
+                  (std::chrono::high_resolution_clock::now()) - start)
+                  .count();
 
           // if ((&*it - &qt.GetRoot()) != ((i / 60) % qt.GetSize()))
           //   continue;
@@ -421,7 +440,14 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             XMStoreFloat4x4(&domainConstants.TextureTransform, texturetransf);
           }
           {
+            start = std::chrono::high_resolution_clock::now();
+
             auto res = it.GetSmallerNeighbor();
+
+            NavigatingTheQuadTree +=
+                std::chrono::duration_cast<NavigatingTimeFrame>(
+                    (std::chrono::high_resolution_clock::now()) - start)
+                    .count();
             static const constexpr auto l = [](float x) -> float {
               if (x == 0)
                 return 1;
@@ -449,6 +475,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                                      resources.DepthBuffer.DepthStencil());
           simplePipelineState.Apply(allocator);
           planeMesh.Draw(allocator);
+
+          start = std::chrono::high_resolution_clock::now();
         }
       }
 
@@ -475,6 +503,10 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
           ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
                       1000.0f / io.Framerate, io.Framerate);
+          ImGui::Text("QuadTree buildtime %.3f ms/frame",
+                      QuadTreeBuildTime / 1e+6f);
+          ImGui::Text("Navigating %.3f ms/frame",
+                      NavigatingTheQuadTree / 1e+6f);
         }
         ImGui::End();
 
