@@ -44,7 +44,7 @@ constexpr float inline IsSmaller(NeighborDirection &directions,
       // No neighbor
       return 0;
     }
-    auto p = directions[*backitr];
+    auto &p = directions[*backitr];
     stop = !p.second;
     buff.push_back(p.first);
     node = &tree.GetAt(node->parent);
@@ -87,7 +87,7 @@ ConstQuadTreeLeafIteratorDepthFirst::GetSmallerNeighbor() const {
       {{1, false}, {0, true}, {3, false}, {2, true}}};
 
   std::vector<ChildrenID> buff(path.size());
-  SmallerNeighborRatio res;
+  SmallerNeighborRatio res{};
 
   const Node *const id = &tree.GetAt(node);
   res.xpos = IsSmaller(xpos, tree, path, buff, id);
@@ -151,7 +151,7 @@ void QuadTree::BuildRecursively(const uint index, const float yCoordinate,
       depth < minDepth) {
     for (uint i = 0; i < 4; i++) {
       uint id = count++;
-      uint size = nodes.size() - 1;
+      size_t size = nodes.size() - 1;
       if (id >= size) {
         nodes.push_back({});
       }

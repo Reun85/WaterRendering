@@ -108,10 +108,11 @@ HS_CONSTANT_DATA_OUTPUT HSConstantFunction(InputPatch<HS_INPUT_PATCH, 4> patch, 
 {
     const float mult = 0.1;
     HS_CONSTANT_DATA_OUTPUT output;
-    output.edges[0] = 32;
-    output.edges[1] = 32;
-    output.edges[2] = 32;
-    output.edges[3] = 32;
+    const float def = 32.f;
+    output.edges[0] = def;
+    output.edges[1] = def;
+    output.edges[2] = def;
+    output.edges[3] = def;
 
     //output.edges[2] = dostuff(patch[1].Position, patch[0].Position);
     //output.edges[3] = dostuff(patch[1].Position, patch[3].Position);

@@ -20,6 +20,38 @@ using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
 using namespace DirectX;
 using namespace DirectX::PackedVector;
+
+template <typename T>
+concept IsRatio = std::is_same_v<T, std::ratio<T::num, T::den>>;
+template <typename T>
+concept HasRatioPeriod =
+    requires { typename T::period; } && IsRatio<typename T::period>;
+
+template <typename TimeRep, typename PrecisionRep, typename T, typename Q>
+  requires IsRatio<TimeRep> && IsRatio<PrecisionRep> && IsRatio<Q>
+constexpr float
+GetDurationInFloatWithPrecision(const std::chrono::duration<T, Q> &inp) {
+
+  using TimeRepReciprocal = std::ratio<TimeRep::den, TimeRep::num>;
+  using Result = std::ratio_multiply<TimeRepReciprocal, PrecisionRep>;
+
+  const T count =
+      std::chrono::duration_cast<std::chrono::duration<T, PrecisionRep>>(inp)
+          .count();
+  return count * Result::num / static_cast<float>(Result::den);
+}
+template <typename TimeRepTimeFrame, typename PrecisionTimeFrame, typename T,
+          typename Q>
+  requires HasRatioPeriod<TimeRepTimeFrame> &&
+           HasRatioPeriod<PrecisionTimeFrame> && IsRatio<Q>
+constexpr float
+GetDurationInFloatWithPrecision(const std::chrono::duration<T, Q> &inp) {
+
+  return GetDurationInFloatWithPrecision<typename TimeRepTimeFrame::period,
+                                         typename PrecisionTimeFrame::period, T,
+                                         Q>(inp);
+}
+
 MeshDescription CreateQuadPatch(float size) {
 
   size = size / 2;
@@ -43,17 +75,22 @@ MeshDescription CreateQuadPatch(float size) {
 
   return result;
 }
+
 struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
   struct Defaults {
     static const constexpr float planeSize = 10.0f;
     static const constexpr float3 camStartPos = float3(-1, 300, 0);
-    //   static const constexpr RasterizerFlags flags =
-    //   RasterizerFlags::Wireframe;
+    // static const constexpr RasterizerFlags flags =
+    // RasterizerFlags::Wireframe;
 
     static constexpr RasterizerFlags flags = RasterizerFlags::CullClockwise;
     static const constexpr XMFLOAT4 clearColor = {0, 1, 0, 0};
     static const constexpr bool startFirstPerson = true;
+
+    static const constexpr uint32_t heightMapDimensions = 1024;
+    static const constexpr uint32_t computeShaderGroupsX = 16;
+    static const constexpr uint32_t computeShaderGroupsY = 16;
   };
 
   IFrameworkView CreateView() { return *this; }
@@ -70,16 +107,31 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     DynamicBufferManager DynamicBuffer;
 
     MutableTexture DepthBuffer;
-    MutableTexture PostProcessingBuffer;
     descriptor_ptr<ShaderResourceView> ScreenResourceView;
 
     FrameResources(const ResourceAllocationContext &context)
         : Allocator(*context.Device), Fence(*context.Device), Marker(),
-          DynamicBuffer(*context.Device), DepthBuffer(context),
-          PostProcessingBuffer(context) {}
+          DynamicBuffer(*context.Device), DepthBuffer(context) {}
   };
 
   struct SimpleRootDescription : public RootSignatureMask {
+
+    struct DomainConstants {
+
+      // There is no 2x2?
+      XMFLOAT4X4 TextureTransform;
+      XMFLOAT4X4 WorldIT;
+    };
+
+    struct VertexConstants {
+
+      XMFLOAT4X4 WorldViewProjection;
+    };
+    struct HullConstants {
+      // zneg,xneg, zpos, xpos
+      XMFLOAT4 TesselationFactor;
+    };
+
     RootDescriptor<RootDescriptorType::ConstantBuffer> VertexBuffer;
     RootDescriptor<RootDescriptorType::ConstantBuffer> HullBuffer;
     RootDescriptor<RootDescriptorType::ConstantBuffer> DomainBuffer;
@@ -87,7 +139,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     StaticSampler TextureSampler;
     RootDescriptorTable<1> Heightmap;
     StaticSampler HeightmapSampler;
-    RootDescriptorTable<1> HeightmapForDomain;
+    RootDescriptorTable<1> HeightMapForDomain;
     StaticSampler HeightmapSamplerForDomain;
 
     SimpleRootDescription(const RootSignatureContext &context)
@@ -99,7 +151,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                   ShaderVisibility::Pixel),
           TextureSampler(this, {0}, Filter::Linear, TextureAddressMode::Clamp,
                          ShaderVisibility::Pixel),
-          HeightmapForDomain(this, {DescriptorRangeType::ShaderResource},
+          HeightMapForDomain(this, {DescriptorRangeType::ShaderResource},
                              ShaderVisibility::Domain),
           HeightmapSamplerForDomain(this, {0}, Filter::Linear,
                                     TextureAddressMode::Clamp,
@@ -112,35 +164,19 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     }
   };
 
-  struct PostProcessingRootDescription : public RootSignatureMask {
+  struct ComputeShaderRootDescription : public RootSignatureMask {
+    struct ComputeShaderConstants {
+      float time;
+    };
     RootDescriptor<RootDescriptorType::ConstantBuffer> ConstantBuffer;
-    RootDescriptorTable<1> InputTexture;
     RootDescriptorTable<1> OutputTexture;
-    StaticSampler Sampler;
 
-    PostProcessingRootDescription(const RootSignatureContext &context)
-        : RootSignatureMask(context), ConstantBuffer(this, {0}),
-          InputTexture(this, {DescriptorRangeType::ShaderResource}),
+    ComputeShaderRootDescription(const RootSignatureContext &context)
+        : RootSignatureMask(context),
           OutputTexture(this, {DescriptorRangeType::UnorderedAccess}),
-          Sampler(this, {0}, Filter::Linear, TextureAddressMode::Clamp) {
-      Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
+          ConstantBuffer(this, {0}) {
+      Flags = RootSignatureFlags::None;
     }
-  };
-
-  struct DomainConstants {
-
-    // There is no 2x2?
-    XMFLOAT4X4 TextureTransform;
-    XMFLOAT4X4 WorldIT;
-  };
-
-  struct VertexConstants {
-
-    XMFLOAT4X4 WorldViewProjection;
-  };
-  struct HullConstants {
-    // zneg,xneg, zpos, xpos
-    XMFLOAT4 TesselationFactor;
   };
 
   D3D12_INPUT_ELEMENT_DESC InputElement(const char *semanticName,
@@ -168,44 +204,45 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     bool firstperson = Defaults::startFirstPerson;
     cam.SetFirstPerson(firstperson);
     // Events
+    {
+      // If I redo the whole system, this could be handled when the callback is
+      // made.
+      window.KeyDown([&cam, &quit, &firstperson](CoreWindow const &,
+                                                 KeyEventArgs const &args) {
+        if (ImGui::GetIO().WantCaptureKeyboard)
+          return;
+        switch (args.VirtualKey()) {
+        case Windows::System::VirtualKey::Escape:
+          quit = true;
+          break;
+        case Windows::System::VirtualKey::Space:
+          firstperson = !firstperson;
+          cam.SetFirstPerson(firstperson);
+          break;
 
-    // If I redo the whole system, this could be handled when the callback is
-    // made.
-    window.KeyDown([&cam, &quit, &firstperson](CoreWindow const &,
-                                               KeyEventArgs const &args) {
-      if (ImGui::GetIO().WantCaptureKeyboard)
-        return;
-      switch (args.VirtualKey()) {
-      case Windows::System::VirtualKey::Escape:
-        quit = true;
-        break;
-      case Windows::System::VirtualKey::Space:
-        firstperson = !firstperson;
-        cam.SetFirstPerson(firstperson);
-        break;
-
-      default:
-        cam.KeyboardDown(args);
-        break;
-      }
-    });
-    window.KeyUp([&cam](CoreWindow const &, KeyEventArgs const &args) {
-      if (ImGui::GetIO().WantCaptureKeyboard)
-        return;
-      cam.KeyboardUp(args);
-    });
-    window.PointerMoved(
-        [&cam](CoreWindow const &, PointerEventArgs const &args) {
-          if (ImGui::GetIO().WantCaptureMouse)
-            return;
-          cam.MouseMove(args);
-        });
-    window.PointerWheelChanged(
-        [&cam](CoreWindow const &, PointerEventArgs const &args) {
-          if (ImGui::GetIO().WantCaptureMouse)
-            return;
-          cam.MouseWheel(args);
-        });
+        default:
+          cam.KeyboardDown(args);
+          break;
+        }
+      });
+      window.KeyUp([&cam](CoreWindow const &, KeyEventArgs const &args) {
+        if (ImGui::GetIO().WantCaptureKeyboard)
+          return;
+        cam.KeyboardUp(args);
+      });
+      window.PointerMoved(
+          [&cam](CoreWindow const &, PointerEventArgs const &args) {
+            if (ImGui::GetIO().WantCaptureMouse)
+              return;
+            cam.MouseMove(args);
+          });
+      window.PointerWheelChanged(
+          [&cam](CoreWindow const &, PointerEventArgs const &args) {
+            if (ImGui::GetIO().WantCaptureMouse)
+              return;
+            cam.MouseWheel(args);
+          });
+    }
 
     CoreDispatcher dispatcher = window.Dispatcher();
 
@@ -216,6 +253,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     PipelineStateProvider pipelineStateProvider{device};
 
+    // Graphics pipeline
     RootSignature<SimpleRootDescription> simpleRootSignature{device};
 
     VertexShader simpleVertexShader{app_folder() / L"SimpleVertexShader.cso"};
@@ -240,6 +278,19 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             .CreatePipelineStateAsync(simplePipelineStateDefinition)
             .get();
 
+    // Compute pipeline
+
+    ComputeShader computeShader{app_folder() / L"computeShader.cso"};
+    RootSignature<ComputeShaderRootDescription> computeShaderRootSignature{
+        device};
+    ComputePipelineStateDefinition computePipelineStateDefinition{
+        .RootSignature = &computeShaderRootSignature,
+        .ComputeShader = &computeShader};
+    auto computePipelineState =
+        pipelineStateProvider
+            .CreatePipelineStateAsync(computePipelineStateDefinition)
+            .get();
+
     // Group together allocations
     GroupedResourceAllocator groupedResourceAllocator{device};
     ResourceUploader resourceUploader{device};
@@ -256,19 +307,27 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                             CreateQuadPatch(Defaults::planeSize)};
     // ImmutableTexture texture{immutableAllocationContext,
     //                          app_folder() / L"image.jpeg"};
-    ImmutableTexture texture{immutableAllocationContext,
-                             app_folder() / L"iceland_heightmap.png"};
+    // ImmutableTexture texture{immutableAllocationContext,
+    //                         app_folder() / L"iceland_heightmap.png"};
     ImmutableTexture heightmap{immutableAllocationContext,
                                app_folder() / L"iceland_heightmap.png"};
 
-    // ImmutableTexture texture{immutableAllocationContext,
-    //                          app_folder() / L"gradient.jpg"};
-    //  Acquire memory
-    groupedResourceAllocator.Build();
+    ImmutableTexture texture{immutableAllocationContext,
+                             app_folder() / L"gradient.jpg"};
 
     auto mutableAllocationContext = immutableAllocationContext;
     CommittedResourceAllocator committedResourceAllocator{device};
     mutableAllocationContext.ResourceAllocator = &committedResourceAllocator;
+
+    // Used by compute and domain shader
+    MutableTexture heightMap{mutableAllocationContext,
+                             TextureDefinition(Format::R8G8B8A8_SNorm,
+                                               Defaults::heightMapDimensions,
+                                               Defaults::heightMapDimensions, 0,
+                                               TextureFlags::UnorderedAccess)};
+
+    //  Acquire memory
+    groupedResourceAllocator.Build();
 
     array<FrameResources, 2> frames{mutableAllocationContext,
                                     mutableAllocationContext};
@@ -279,34 +338,41 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       commonDescriptorHeap.Clean();
     });
 
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
+    ID3D12DescriptorHeap *ImGuiDescriptorHeap{};
+    // Init ImGUI
+    {
+      IMGUI_CHECKVERSION();
+      ImGui::CreateContext();
+      ImGuiIO &io = ImGui::GetIO();
+      (void)io;
+      io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+      ImGui::StyleColorsDark();
+
+      // Setup Platform/Renderer bindings
+      ImGui_ImplUwp_InitForCurrentView();
+
+      D3D12_DESCRIPTOR_HEAP_DESC ImGuiDescriptorHeapDesc = {};
+      ImGuiDescriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+      ImGuiDescriptorHeapDesc.NumDescriptors = 2;
+      ImGuiDescriptorHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+
+      check_hresult(device.get()->CreateDescriptorHeap(
+          &ImGuiDescriptorHeapDesc, IID_PPV_ARGS(&ImGuiDescriptorHeap)));
+      ImGui_ImplDX12_Init(
+          device.get(), static_cast<int>(frames.size()),
+          DXGI_FORMAT_B8G8R8A8_UNORM, ImGuiDescriptorHeap,
+          ImGuiDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
+          ImGuiDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+    }
     ImGuiIO &io = ImGui::GetIO();
-    (void)io;
-    io.ConfigFlags |=
-        ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
-    io.ConfigFlags |=
-        ImGuiConfigFlags_NavEnableGamepad; // Enable Gamepad Controls
 
-    ImGui::StyleColorsDark();
-
-    // Setup Platform/Renderer bindings
-    ImGui_ImplUwp_InitForCurrentView();
-
-    D3D12_DESCRIPTOR_HEAP_DESC ImGuiDescriptorHeapDesc = {};
-    ImGuiDescriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    ImGuiDescriptorHeapDesc.NumDescriptors = 2;
-    ImGuiDescriptorHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-
-    ID3D12DescriptorHeap *ImGuiDescriptorHeap;
-    check_hresult(device.get()->CreateDescriptorHeap(
-        &ImGuiDescriptorHeapDesc, IID_PPV_ARGS(&ImGuiDescriptorHeap)));
-    ImGui_ImplDX12_Init(
-        device.get(), frames.size(), DXGI_FORMAT_B8G8R8A8_UNORM,
-        ImGuiDescriptorHeap,
-        ImGuiDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
-        ImGuiDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-
+    // Time counter
+    using SinceTimeStartTimeFrame = std::chrono::nanoseconds;
+    auto loopStartTime = std::chrono::high_resolution_clock::now();
+    auto getTimeSinceStart = [&loopStartTime]() {
+      return std::chrono::duration_cast<SinceTimeStartTimeFrame>(
+          std::chrono::high_resolution_clock::now() - loopStartTime);
+    };
     // Frame counter
     auto i = 0u;
     XMFLOAT4 clearColor = Defaults::clearColor;
@@ -341,21 +407,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             commonDescriptorHeap.CreateShaderResourceView(&screenTexture);
       }
 
-      // Ensure post processing buffer
-      if (!resources.PostProcessingBuffer ||
-          !TextureDefinition::AreSizeCompatible(
-              *resources.PostProcessingBuffer.Definition(),
-              renderTargetView->Definition())) {
-        auto postProcessingDefinition =
-            renderTargetView->Definition().MakeSizeCompatible(
-                Format::B8G8R8A8_UNorm, TextureFlags::UnorderedAccess);
-        resources.PostProcessingBuffer.Allocate(postProcessingDefinition);
-      }
-
       // Update constants
-      VertexConstants vertexConstants{};
-      HullConstants hullConstants{};
-      DomainConstants domainConstants{};
       auto resolution = swapChain.Resolution();
       cam.SetAspect(float(resolution.x) / float(resolution.y));
       cam.Update(0.01f);
@@ -379,15 +431,37 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         resources.DepthBuffer.DepthStencil()->Clear(allocator);
       }
 
+      {
+
+        ComputeShaderRootDescription::ComputeShaderConstants constant{};
+        constant.time =
+            GetDurationInFloatWithPrecision<std::chrono::seconds,
+                                            std::chrono::milliseconds>(
+                getTimeSinceStart());
+        auto mask = computeShaderRootSignature.Set(allocator,
+                                                   RootSignatureUsage::Compute);
+        mask.ConstantBuffer = resources.DynamicBuffer.AddBuffer(constant);
+        mask.OutputTexture = *heightMap.UnorderedAccess();
+
+        computePipelineState.Apply(allocator);
+
+        const auto xSize = Defaults::computeShaderGroupsX;
+        const auto ySize = Defaults::computeShaderGroupsY;
+        const auto size = Defaults::heightMapDimensions;
+        allocator.Dispatch((size + xSize - 1) / xSize,
+                           (size + ySize - 1) / ySize, 1);
+      }
+
       // Draw objects
       uint qtNodes;
-      using QuadTreeBuildTimeTimeFrame = std::chrono::nanoseconds;
-      long long QuadTreeBuildTime;
+      std::chrono::nanoseconds QuadTreeBuildTime;
 
-      using NavigatingTimeFrame = std::chrono::nanoseconds;
-      long long NavigatingTheQuadTree = 0;
+      std::chrono::nanoseconds NavigatingTheQuadTree(0);
 
       {
+        SimpleRootDescription::VertexConstants vertexConstants{};
+        SimpleRootDescription::HullConstants hullConstants{};
+        SimpleRootDescription::DomainConstants domainConstants{};
         float3 center = {0, 0, 0};
         float2 fullSizeXZ = {Defaults::planeSize, Defaults::planeSize};
         QuadTree qt;
@@ -399,22 +473,19 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         qt.Build(center, fullSizeXZ, float3(cam_eye.x, cam_eye.y, cam_eye.z));
 
         auto end = std::chrono::high_resolution_clock::now();
-        auto duration =
-            std::chrono::duration_cast<QuadTreeBuildTimeTimeFrame>(end - start);
+        QuadTreeBuildTime =
+            std::chrono::duration_cast<decltype(QuadTreeBuildTime)>(end -
+                                                                    start);
 
-        QuadTreeBuildTime = duration.count();
         qtNodes = qt.GetSize();
 
         auto worldBasic = XMMatrixRotationX(XMConvertToRadians(-90.0));
         start = std::chrono::high_resolution_clock::now();
         for (auto it = qt.begin(); it != qt.end(); ++it) {
           NavigatingTheQuadTree +=
-              std::chrono::duration_cast<NavigatingTimeFrame>(
-                  (std::chrono::high_resolution_clock::now()) - start)
-                  .count();
+              std::chrono::duration_cast<decltype(NavigatingTheQuadTree)>(
+                  (std::chrono::high_resolution_clock::now() - start));
 
-          // if ((&*it - &qt.GetRoot()) != ((i / 60) % qt.GetSize()))
-          //   continue;
           {
             auto t1 = it->size;
             auto t2 = it->center;
@@ -424,9 +495,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                 XMMatrixScaling(it->size.x / fullSizeXZ.x, 1,
                                 it->size.y / fullSizeXZ.y) *
                 XMMatrixTranslation(it->center.x, center.y, it->center.y);
-            // auto world =
-            //     worldBasic * XMMatrixScaling(it->size.x, 1, it->size.y) *
-            //     XMMatrixTranslation(it->center.x, center.y, it->center.y);
             auto worldViewProjection =
                 XMMatrixTranspose(world * cam.GetViewProj());
             auto worldIT = XMMatrixInverse(nullptr, world);
@@ -452,9 +520,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             auto res = it.GetSmallerNeighbor();
 
             NavigatingTheQuadTree +=
-                std::chrono::duration_cast<NavigatingTimeFrame>(
-                    (std::chrono::high_resolution_clock::now()) - start)
-                    .count();
+                std::chrono::duration_cast<decltype(NavigatingTheQuadTree)>(
+                    (std::chrono::high_resolution_clock::now() - start));
             static const constexpr auto l = [](float x) -> float {
               if (x == 0)
                 return 1;
@@ -463,10 +530,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             };
             hullConstants.TesselationFactor = {l(res.zneg), l(res.xneg),
                                                l(res.zpos), l(res.xpos)};
-            // hullConstants.TesselationFactor[0] = l(res.zneg);
-            // hullConstants.TesselationFactor[1] = l(res.xneg);
-            // hullConstants.TesselationFactor[2] = l(res.right);
-            // hullConstants.TesselationFactor[3] = l(res.xpos);
           }
 
           auto mask =
@@ -477,8 +540,11 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           mask.DomainBuffer =
               resources.DynamicBuffer.AddBuffer(domainConstants);
           mask.Texture = texture;
-          mask.Heightmap = heightmap;
-          mask.HeightmapForDomain = heightmap;
+          // mask.Texture = *heightMap.ShaderResource();
+          //  mask.Heightmap = heightmap;
+          //  mask.HeightMapForDomain = heightmap;
+          mask.Heightmap = *heightMap.ShaderResource();
+          mask.HeightMapForDomain = *heightMap.ShaderResource();
 
           allocator.SetRenderTargets({renderTargetView},
                                      resources.DepthBuffer.DepthStencil());
@@ -489,23 +555,15 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         }
       }
 
+      // ImGUI
       {
 
-        // Start the Dear ImGui frame
         ImGui_ImplDX12_NewFrame();
         ImGui_ImplUwp_NewFrame();
         ImGui::NewFrame();
 
-        // 1. Show the big demo window (Most of the sample code is in
-        // ImGui::ShowDemoWindow()! You can browse its code to learn more about
-        // Dear ImGui!).
-
-        // 2. Show a simple window that we create ourselves. We use a Begin/End
-        // pair to create a named window.
         if (ImGui::Begin("Application")) {
-          ImGui::ColorEdit3(
-              "clear color",
-              (float *)&clearColor); // Edit 3 floats representing a color
+          ImGui::ColorEdit3("clear color", (float *)&clearColor);
 
           ImGui::Text("frameID = %d", i);
           ImGui::Text("QuadTree Nodes = %d", qtNodes);
@@ -513,13 +571,28 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
                       1000.0f / io.Framerate, io.Framerate);
           ImGui::Text("QuadTree buildtime %.3f ms/frame",
-                      QuadTreeBuildTime / 1e+6f);
+                      GetDurationInFloatWithPrecision<std::chrono::milliseconds,
+                                                      std::chrono::nanoseconds>(
+                          QuadTreeBuildTime));
           ImGui::Text("Navigating %.3f ms/frame",
-                      NavigatingTheQuadTree / 1e+6f);
+                      GetDurationInFloatWithPrecision<std::chrono::milliseconds,
+                                                      std::chrono::nanoseconds>(
+                          NavigatingTheQuadTree));
+          ImGui::Text("Since start %.3f ms",
+                      GetDurationInFloatWithPrecision<std::chrono::milliseconds,
+                                                      std::chrono::nanoseconds>(
+                          getTimeSinceStart()));
+
+          XMVECTOR camEye = cam.GetEye();
+          if (ImGui::InputFloat3("Cam eye: ", (float *)&camEye, "%.3f")) {
+          }
+          XMVECTOR camLookAt = cam.GetAt();
+          if (ImGui::InputFloat3("Cam look at: ", (float *)&camLookAt,
+                                 "%.3f")) {
+          }
         }
         ImGui::End();
 
-        // Rendering
         ImGui::Render();
 
         allocator->SetDescriptorHeaps(1, &ImGuiDescriptorHeap);
@@ -547,8 +620,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
       // Present frame
       swapChain.Present();
-
-      // Handle ImGui viewports
     }
     ImGui_ImplDX12_Shutdown();
     ImGui_ImplUwp_Shutdown();
@@ -560,27 +631,5 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
 int __stdcall wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
 
-  try {
-    CoreApplication::Run(make<App>());
-  } catch (const winrt::hresult_error &ex) {
-    std::wstringstream ss;
-    ss << L"HRESULT: " << std::hex << ex.code() << std::endl;
-    OutputDebugStringW(ss.str().c_str());
-    ofstream f(
-        "E:\\Minden\\dev\\axodox-graphics\\Axodox.Graphics.Test\\out.txt");
-
-    f << to_string(ex.message());
-  } catch (const std::exception &ex) {
-    ofstream f(
-        "E:\\Minden\\dev\\axodox-graphics\\Axodox.Graphics.Test\\out.txt");
-
-    f << ex.what();
-  } catch (...) {
-    // Catch all other exceptions
-    OutputDebugStringW(L"Unknown error occurred.");
-    ofstream f(
-        "E:\\Minden\\dev\\axodox-graphics\\Axodox.Graphics.Test\\out.txt");
-
-    f << "Unknown error";
-  }
+  CoreApplication::Run(make<App>());
 }

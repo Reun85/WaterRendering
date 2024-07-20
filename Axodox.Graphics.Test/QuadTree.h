@@ -102,7 +102,7 @@ private:
 class QuadTree {
   struct Default {
     constexpr static float distanceThreshold = 5e+0f;
-    constexpr static uint allocation = 1e+5;
+    constexpr static uint allocation = 10000;
     constexpr static uint maxDepth = 7;
     constexpr static uint minDepth = 4;
   };

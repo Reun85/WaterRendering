@@ -34,6 +34,9 @@ public:
   inline float GetZFar() const { return m_zFar; }
   void SetZFar(const float _zf) noexcept;
 
+  void SetEye(XMVECTOR eye);
+  void SetLookAt(XMVECTOR at);
+
   void SetProj(float _angle, float _aspect, float _zn, float _zf);
 
   void SetSpeed(float _val);
@@ -48,7 +51,6 @@ public:
   void MouseWheel(const PointerEventArgs &wheel);
 
 private:
-  bool firstperson = false;
   // Updates the UV.
   void UpdateUV(float du, float dv);
 
@@ -60,11 +62,13 @@ private:
 
   inline float GetSpeed() const;
 
-  //  The traversal speed of the camera
-  float m_speed = 16.0f;
+  // projection matrix
+  XMMATRIX m_matProj;
 
-  bool m_slow = false;
-  bool m_accelerated = false;
+  // Combined view-projection matrix of the camera
+  XMMATRIX m_matViewProj;
+  // The view matrix of the camera
+  XMMATRIX m_viewMatrix;
 
   // The camera position.
   XMVECTOR m_eye;
@@ -74,6 +78,22 @@ private:
 
   // The camera look at point.
   XMVECTOR m_at;
+
+  // The unit vector pointing towards the viewing direction.
+  XMVECTOR m_forward;
+
+  // The unit vector pointing to the 'right'
+  XMVECTOR m_right;
+
+  // The vector pointing upwards
+  XMVECTOR m_up;
+
+  //  The traversal speed of the camera
+  float m_speed = 16.0f;
+  bool firstperson = false;
+
+  bool m_slow = false;
+  bool m_accelerated = false;
 
   // The u spherical coordinate of the spherical coordinate pair (u,v) denoting
   // the current viewing direction from the view position m_eye.
@@ -86,24 +106,12 @@ private:
   // The distance of the look at point from the camera.
   float m_distance;
 
-  // The unit vector pointing towards the viewing direction.
-  XMVECTOR m_forward;
-
-  // The unit vector pointing to the 'right'
-  XMVECTOR m_right;
-
-  // The vector pointing upwards
-  XMVECTOR m_up;
-
   float m_goForward = 0.0f;
   float m_goRight = 0.0f;
   float m_goUp = 0.0f;
 
   // view matrix needs recomputation
   bool m_viewDirty = true;
-
-  // The view matrix of the camera
-  XMMATRIX m_viewMatrix;
 
   // projection parameters
   float m_zNear = 0.01f;
@@ -114,10 +122,4 @@ private:
 
   // projection matrix needs recomputation
   bool m_projectionDirty = true;
-
-  // projection matrix
-  XMMATRIX m_matProj;
-
-  // Combined view-projection matrix of the camera
-  XMMATRIX m_matViewProj;
 };

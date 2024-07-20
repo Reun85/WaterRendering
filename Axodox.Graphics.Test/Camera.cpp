@@ -125,8 +125,8 @@ void Camera::UpdateParams() {
 }
 
 inline float Camera::GetSpeed() const {
-  return m_speed *
-         (m_accelerated ? (m_slow ? 1. / 16. : 4.) : (m_slow ? 1. / 4. : 1));
+  return m_speed * (m_accelerated ? (m_slow ? 1.f / 16.f : 4.f)
+                                  : (m_slow ? 1.f / 4.f : 1.f));
 }
 
 void Camera::SetSpeed(float _val) { m_speed = _val; }
