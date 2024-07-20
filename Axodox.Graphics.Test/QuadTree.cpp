@@ -129,25 +129,26 @@ void QuadTree::Build(const float3 center, const float2 fullSizeXZ,
 
   nodes[0] = {{center.x, center.z}, {fullSizeXZ.x, fullSizeXZ.y}};
   count = 1;
-  maxDepth = 0;
+  height = 0;
   BuildRecursively(0, center.y, camEye, distanceThreshold, 0);
 }
 
-void QuadTree::BuildRecursively(const uint index, const float height,
+void QuadTree::BuildRecursively(const uint index, const float yCoordinate,
                                 const float3 camEye,
                                 const float distanceThreshold,
                                 const Depth depth) {
-  if (depth > maxDepth)
-    maxDepth = depth;
-  if (depth > Default::maxDepth) {
+  if (depth > height)
+    height = depth;
+  if (depth > maxDepth) {
     return;
   }
   auto &node = nodes[index];
-  float3 diff = {node.center.x - camEye.x, height - camEye.y,
+  float3 diff = {node.center.x - camEye.x, yCoordinate - camEye.y,
                  node.center.y - camEye.z};
   double dist = sqrt(diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
   // if (dist / (node.size.x * node.size.y) < distanceThreshold) {
-  if (dist / (std::max(node.size.x, node.size.y)) < distanceThreshold) {
+  if (dist / (std::max(node.size.x, node.size.y)) < distanceThreshold ||
+      depth < minDepth) {
     for (uint i = 0; i < 4; i++) {
       uint id = count++;
       uint size = nodes.size() - 1;
@@ -159,7 +160,7 @@ void QuadTree::BuildRecursively(const uint index, const float height,
       curr.parent = index;
       curr.size = node.size / 2;
       curr.center = node.center + Node::childDirections[i] * (curr.size / 2);
-      BuildRecursively(id, height, camEye, distanceThreshold, depth + 1);
+      BuildRecursively(id, yCoordinate, camEye, distanceThreshold, depth + 1);
     }
   }
 }
