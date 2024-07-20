@@ -79,12 +79,8 @@ MeshDescription CreateQuadPatch(float size) {
 struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
   struct Defaults {
-    static const constexpr float planeSize = 10.0f;
+    static const constexpr float planeSize = 100.0f;
     static const constexpr float3 camStartPos = float3(-1, 300, 0);
-    // static const constexpr RasterizerFlags flags =
-    // RasterizerFlags::Wireframe;
-
-    static constexpr RasterizerFlags flags = RasterizerFlags::CullClockwise;
     static const constexpr XMFLOAT4 clearColor = {0, 1, 0, 0};
     static const constexpr bool startFirstPerson = true;
 
@@ -261,13 +257,15 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     HullShader hullShader{app_folder() / L"hullShader.cso"};
     DomainShader domainShader{app_folder() / L"domainShader.cso"};
 
+    RasterizerFlags rasterizerFlags = RasterizerFlags::CullClockwise;
+
     GraphicsPipelineStateDefinition simplePipelineStateDefinition{
         .RootSignature = &simpleRootSignature,
         .VertexShader = &simpleVertexShader,
         .DomainShader = &domainShader,
         .HullShader = &hullShader,
         .PixelShader = &simplePixelShader,
-        .RasterizerState = Defaults::flags,
+        .RasterizerState = rasterizerFlags,
         .DepthStencilState = DepthStencilMode::WriteDepth,
         .InputLayout = VertexPositionTexture::Layout,
         .TopologyType = PrimitiveTopologyType::Patch,
@@ -321,7 +319,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     // Used by compute and domain shader
     MutableTexture heightMap{mutableAllocationContext,
-                             TextureDefinition(Format::R8G8B8A8_SNorm,
+                             TextureDefinition(Format::R32_Float,
                                                Defaults::heightMapDimensions,
                                                Defaults::heightMapDimensions, 0,
                                                TextureFlags::UnorderedAccess)};
@@ -583,12 +581,52 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                                                       std::chrono::nanoseconds>(
                           getTimeSinceStart()));
 
-          XMVECTOR camEye = cam.GetEye();
-          if (ImGui::InputFloat3("Cam eye: ", (float *)&camEye, "%.3f")) {
+          static const char *items[] = {"CullClockwise", "CullNone",
+                                        "WireFrame"};
+          static uint itemsIndex = 0;
+
+          if (ImGui::BeginCombo("Render State", items[itemsIndex])) {
+            for (uint i = 0; i < IM_ARRAYSIZE(items); i++) {
+              bool isSelected = (itemsIndex == i);
+              if (ImGui::Selectable(items[i], isSelected)) {
+                itemsIndex = i;
+                switch (itemsIndex) {
+                case 0:
+                  rasterizerFlags = RasterizerFlags::CullClockwise;
+                  break;
+                case 1:
+                  rasterizerFlags = RasterizerFlags::CullNone;
+                  break;
+                case 2:
+                  rasterizerFlags = RasterizerFlags::Wireframe;
+                  break;
+                }
+                simplePipelineStateDefinition.RasterizerState.Flags =
+                    rasterizerFlags;
+                simplePipelineState =
+                    pipelineStateProvider
+                        .CreatePipelineStateAsync(simplePipelineStateDefinition)
+                        .get();
+              }
+              if (isSelected) {
+                ImGui::SetItemDefaultFocus();
+              }
+            }
+            ImGui::EndCombo();
           }
-          XMVECTOR camLookAt = cam.GetAt();
-          if (ImGui::InputFloat3("Cam look at: ", (float *)&camLookAt,
-                                 "%.3f")) {
+
+          if (cam.GetFirstPerson()) {
+            XMVECTOR camEye = cam.GetEye();
+            if (ImGui::InputFloat3("Cam eye ", (float *)&camEye, "%.3f")) {
+              cam.SetView(camEye, cam.GetAt(), cam.GetWorldUp());
+            }
+          } else {
+
+            XMVECTOR camLookAt = cam.GetAt();
+            if (ImGui::InputFloat3("Cam Look At ", (float *)&camLookAt,
+                                   "%.3f")) {
+              cam.SetView(cam.GetEye(), camLookAt, cam.GetWorldUp());
+            }
           }
         }
         ImGui::End();

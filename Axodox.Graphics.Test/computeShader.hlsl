@@ -1,4 +1,4 @@
-RWTexture2D<float4> outputTexture : register(u0);
+RWTexture2D<float> outputTexture : register(u0);
 
 cbuffer buff : register(b0)
 {
@@ -9,5 +9,5 @@ void main(uint3 DTid : SV_DispatchThreadID)
 {
     uint2 dims = (1024, 1024);
     float v = sin(time + (float) DTid.x / 8);
-    outputTexture[DTid.xy] = float4(v / 2, 0, 0, 1);
+    outputTexture[DTid.xy] = v / 2;
 }

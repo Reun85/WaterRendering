@@ -101,10 +101,10 @@ private:
 // The plane must be perpendicular to the Y-axis.
 class QuadTree {
   struct Default {
-    constexpr static float distanceThreshold = 5e+0f;
+    constexpr static float distanceThreshold = 5e+1f;
     constexpr static uint allocation = 10000;
-    constexpr static uint maxDepth = 7;
-    constexpr static uint minDepth = 4;
+    constexpr static uint maxDepth = 5;
+    constexpr static uint minDepth = 0;
   };
   using value_type = Node;
   using const_iterator = ConstQuadTreeLeafIteratorDepthFirst;
