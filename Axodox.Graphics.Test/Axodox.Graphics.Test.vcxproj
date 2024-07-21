@@ -100,8 +100,11 @@
   <ItemGroup>
     <ClInclude Include="Camera.h" />
     <ClInclude Include="ConstantGPUBuffer.h" />
+    <ClInclude Include="Defaults.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="QuadTree.h" />
+    <ClInclude Include="Typedefs.h" />
+    <ClInclude Include="WaterMath.h" />
   </ItemGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest">

@@ -11,7 +11,7 @@ cbuffer buff : register(b1)
 [numthreads(16, 16, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
-    uint2 dims = (1024, 1024);
+    uint2 dims = uint2(1024, 1024);
     float v = sin(time + (float) DTid.x / 8);
     outputTexture[DTid.xy] = v * mult;
 }

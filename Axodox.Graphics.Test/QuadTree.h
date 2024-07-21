@@ -1,6 +1,7 @@
 #include <pch.h>
 #include <winrt/Windows.UI.Core.h>
 #include <array>
+#include "Defaults.h"
 using namespace winrt::Windows::Foundation::Numerics;
 
 using uint = uint32_t;
@@ -100,39 +101,35 @@ private:
 };
 // The plane must be perpendicular to the Y-axis.
 class QuadTree {
-  struct Default {
-    constexpr static float distanceThreshold = 5e+1f;
-    constexpr static uint allocation = 10000;
-    constexpr static uint maxDepth = 5;
-    constexpr static uint minDepth = 0;
-  };
-  using value_type = Node;
-  using const_iterator = ConstQuadTreeLeafIteratorDepthFirst;
+  using ValueType = Node;
+  using ConstIterator = ConstQuadTreeLeafIteratorDepthFirst;
 
 public:
-  QuadTree(const uint allocation = Default::allocation)
-      : nodes(allocation), count(0), height(0), maxDepth(Default::maxDepth),
-        minDepth(Default::minDepth) {}
-  void Build(const float3 center, const float2 fullSizeXZ, const float3 camEye,
-             const float distanceThreshold = Default::distanceThreshold);
-  const Node &GetRoot() const { return nodes[0]; }
-  const_iterator begin() const {
+  QuadTree(const uint allocation = Defaults::QuadTree::allocation)
+      : nodes(allocation), count(0), height(0),
+        maxDepth(Defaults::QuadTree::maxDepth),
+        minDepth(Defaults::QuadTree::minDepth) {}
+  void
+  Build(const float3 center, const float2 fullSizeXZ, const float3 camEye,
+        const float distanceThreshold = Defaults::QuadTree::distanceThreshold);
+  const ValueType &GetRoot() const { return nodes[0]; }
+  ConstIterator begin() const {
     return ConstQuadTreeLeafIteratorDepthFirst(0, height, *this);
   }
-  const Node &GetAt(NodeID id) const { return nodes[id]; }
-  // const_iterator end() const {
+  const ValueType &GetAt(NodeID id) const { return nodes[id]; }
+  // ConstIterator end() const {
   //   return ConstQuadTreeLeafIteratorDepthFirst(&*nodes.end());
   // }
   const NodeID end() const { return GetSize(); }
   const NodeID &GetSize() const { return count; }
 
 private:
-  friend class const_iterator;
+  friend class ConstIterator;
   void BuildRecursively(const uint index, const float height,
                         const float3 camEye, const float distanceThreshold,
                         const Depth depth);
 
-  std::vector<Node> nodes;
+  std::vector<ValueType> nodes;
   NodeID count;
   Depth height;
   Depth maxDepth;

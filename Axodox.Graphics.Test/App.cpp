@@ -1,11 +1,12 @@
-#include <pch.h>
+#include "pch.h"
 #include "Camera.h"
-#include <winrt/Windows.UI.Core.h>
-#include <winrt/Windows.UI.Popups.h>
 #include "QuadTree.h"
 #include <fstream>
 #include <string.h>
 #include "ConstantGPUBuffer.h"
+#include "Defaults.h"
+#include "WaterMath.h"
+
 using namespace std;
 using namespace winrt;
 
@@ -36,7 +37,8 @@ GetDurationInFloatWithPrecision(const std::chrono::duration<T, Q> &inp) {
   using Result = std::ratio_divide<PrecisionRep, TimeRep>;
   using Precision = std::chrono::duration<T, PrecisionRep>;
   const T count = std::chrono::duration_cast<Precision>(inp).count();
-  return count * Result::num / static_cast<float>(Result::den);
+  return static_cast<float>(count) * static_cast<float>(Result::num) /
+         static_cast<float>(Result::den);
 }
 template <typename TimeRepTimeFrame, typename PrecisionTimeFrame, typename T,
           typename Q>
@@ -62,12 +64,6 @@ MeshDescription CreateQuadPatch(float size) {
       VertexPositionTexture{XMFLOAT3{size, size, 0.f}, XMUSHORTN2{1.f, 0.f}},
       VertexPositionTexture{XMFLOAT3{size, -size, 0.f}, XMUSHORTN2{1.f, 1.f}}};
 
-  // No indices
-  // result.Indices = {0, 1, 2, 1, 3, 2};
-  //  D3D11_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST = 36
-  //  PrimitiveTopology::PatchList4 = 36
-  // result.Topology = PrimitiveTopology::PatchList4;
-
   result.Topology = static_cast<PrimitiveTopology>(
       D3D11_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST);
 
@@ -76,23 +72,18 @@ MeshDescription CreateQuadPatch(float size) {
 
 struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
-  struct Defaults {
-    static const constexpr float planeSize = 100.0f;
-    static const constexpr float3 camStartPos = float3(-1, 300, 0);
-    static const constexpr XMFLOAT4 clearColor = {0, 1, 0, 0};
-    static const constexpr bool startFirstPerson = true;
+  IFrameworkView CreateView() const { return *this; }
+  void Initialize(CoreApplicationView const &) const {
+    // ?
+  }
 
-    static const constexpr uint32_t heightMapDimensions = 1024;
-    static const constexpr uint32_t computeShaderGroupsX = 16;
-    static const constexpr uint32_t computeShaderGroupsY = 16;
-  };
+  void Load(hstring const &) const {
+    // ?
+  }
 
-  IFrameworkView CreateView() { return *this; }
-  void Initialize(CoreApplicationView const &) {}
-
-  void Load(hstring const &) {}
-
-  void Uninitialize() {}
+  void Uninitialize() const {
+    // ?
+  }
 
   struct FrameResources {
     CommandAllocator Allocator;
@@ -103,8 +94,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     MutableTexture DepthBuffer;
     descriptor_ptr<ShaderResourceView> ScreenResourceView;
 
-    FrameResources(const ResourceAllocationContext &context)
-        : Allocator(*context.Device), Fence(*context.Device), Marker(),
+    explicit FrameResources(const ResourceAllocationContext &context)
+        : Allocator(*context.Device), Fence(*context.Device),
           DynamicBuffer(*context.Device), DepthBuffer(context) {}
   };
 
@@ -136,7 +127,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     RootDescriptorTable<1> HeightMapForDomain;
     StaticSampler HeightmapSamplerForDomain;
 
-    SimpleRootDescription(const RootSignatureContext &context)
+    explicit SimpleRootDescription(const RootSignatureContext &context)
         : RootSignatureMask(context),
           VertexBuffer(this, {0}, ShaderVisibility::Vertex),
           HullBuffer(this, {0}, ShaderVisibility::Hull),
@@ -145,15 +136,15 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                   ShaderVisibility::Pixel),
           TextureSampler(this, {0}, Filter::Linear, TextureAddressMode::Clamp,
                          ShaderVisibility::Pixel),
+          Heightmap(this, {DescriptorRangeType::ShaderResource},
+                    ShaderVisibility::Hull),
+          HeightmapSampler(this, {0}, Filter::Linear, TextureAddressMode::Clamp,
+                           ShaderVisibility::Hull),
           HeightMapForDomain(this, {DescriptorRangeType::ShaderResource},
                              ShaderVisibility::Domain),
           HeightmapSamplerForDomain(this, {0}, Filter::Linear,
                                     TextureAddressMode::Clamp,
-                                    ShaderVisibility::Domain),
-          Heightmap(this, {DescriptorRangeType::ShaderResource},
-                    ShaderVisibility::Hull),
-          HeightmapSampler(this, {0}, Filter::Linear, TextureAddressMode::Clamp,
-                           ShaderVisibility::Hull) {
+                                    ShaderVisibility::Domain) {
       Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
     }
   };
@@ -169,26 +160,26 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     RootDescriptor<RootDescriptorType::ConstantBuffer> InputBuffer;
     RootDescriptorTable<1> OutputTexture;
 
-    ComputeShaderRootDescription(const RootSignatureContext &context)
-        : RootSignatureMask(context),
-          OutputTexture(this, {DescriptorRangeType::UnorderedAccess}),
-          ConstantBuffer(this, {0}), InputBuffer(this, {1}) {
+    explicit ComputeShaderRootDescription(const RootSignatureContext &context)
+        : RootSignatureMask(context), ConstantBuffer(this, {0}),
+          InputBuffer(this, {1}),
+          OutputTexture(this, {DescriptorRangeType::UnorderedAccess}) {
       Flags = RootSignatureFlags::None;
     }
   };
 
-  void Run() {
+  void Run() const {
 
     CoreWindow window = CoreWindow::GetForCurrentThread();
     window.Activate();
 
     Camera cam;
-    cam.SetView(XMVectorSet(Defaults::camStartPos.x, Defaults::camStartPos.y,
-                            Defaults::camStartPos.z, 0),
-                XMVectorSet(0.0f, 0.0f, 0.0f, 0),
-                XMVectorSet(0.0f, 1.0f, 0.0f, 0));
+    cam.SetView(
+        XMVectorSet(Defaults::Cam::camStartPos.x, Defaults::Cam::camStartPos.y,
+                    Defaults::Cam::camStartPos.z, 0),
+        XMVectorSet(0.0f, 0.0f, 0.0f, 0), XMVectorSet(0.0f, 1.0f, 0.0f, 0));
     bool quit = false;
-    bool firstperson = Defaults::startFirstPerson;
+    bool firstperson = Defaults::Cam::startFirstPerson;
     cam.SetFirstPerson(firstperson);
     // Events
     {
@@ -295,14 +286,26 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     ConstantGPUBuffer computeShaderConstantBuffer{
         immutableAllocationContext,
         {ComputeShaderRootDescription::Constants{10.f}}};
+
+    auto data = Axodox::Graphics::D3D12::TextureData(
+        Format::R32G32_Float, Defaults::Simulation::N, Defaults::Simulation::M);
+    /*{
+      std::random_device rd;
+
+      using Prec = f32;
+      using Def = Defaults::Simulation;
+
+      const auto &N = Def::N;
+      const auto &M = Def::M;
+      auto tildeh0 = CalculateTildeh0FromDefaults<Prec>(rd, N, M);
+      std::span<u8> x = data.AsRawSpan();
+      memmove(x.data(), tildeh0.data(),
+              tildeh0.size() * sizeof(std::complex<Prec>));
+    }*/
+    ImmutableTexture computeTildeh0{immutableAllocationContext, data};
+
     ImmutableMesh planeMesh{immutableAllocationContext,
-                            CreateQuadPatch(Defaults::planeSize)};
-    // ImmutableTexture texture{immutableAllocationContext,
-    //                          app_folder() / L"image.jpeg"};
-    // ImmutableTexture texture{immutableAllocationContext,
-    //                         app_folder() / L"iceland_heightmap.png"};
-    ImmutableTexture heightmap{immutableAllocationContext,
-                               app_folder() / L"iceland_heightmap.png"};
+                            CreateQuadPatch(Defaults::App::planeSize)};
 
     ImmutableTexture texture{immutableAllocationContext,
                              app_folder() / L"gradient.jpg"};
@@ -312,23 +315,25 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     mutableAllocationContext.ResourceAllocator = &committedResourceAllocator;
 
     // Used by compute and domain shader
-    MutableTexture heightMap{mutableAllocationContext,
-                             TextureDefinition(Format::R32_Float,
-                                               Defaults::heightMapDimensions,
-                                               Defaults::heightMapDimensions, 0,
-                                               TextureFlags::UnorderedAccess)};
+    MutableTexture heightMap{
+        mutableAllocationContext,
+        TextureDefinition(Format::R32_Float,
+                          Defaults::ComputeShader::heightMapDimensionsX,
+                          Defaults::ComputeShader::heightMapDimensionsZ, 0,
+                          TextureFlags::UnorderedAccess)};
 
     //  Acquire memory
     groupedResourceAllocator.Build();
 
-    array<FrameResources, 2> frames{mutableAllocationContext,
-                                    mutableAllocationContext};
+    array<FrameResources, 2> frames{FrameResources(mutableAllocationContext),
+                                    FrameResources(mutableAllocationContext)};
 
-    swapChain.Resizing(no_revoke, [&](SwapChain *) {
-      for (auto &frame : frames)
-        frame.ScreenResourceView.reset();
-      commonDescriptorHeap.Clean();
-    });
+    swapChain.Resizing(no_revoke,
+                       [&frames, &commonDescriptorHeap](SwapChain const *) {
+                         for (auto &frame : frames)
+                           frame.ScreenResourceView.reset();
+                         commonDescriptorHeap.Clean();
+                       });
 
     ID3D12DescriptorHeap *ImGuiDescriptorHeap{};
     // Init ImGUI
@@ -356,7 +361,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           ImGuiDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
           ImGuiDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
     }
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO const &io = ImGui::GetIO();
 
     // Time counter
     using SinceTimeStartTimeFrame = std::chrono::nanoseconds;
@@ -366,14 +371,14 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           std::chrono::high_resolution_clock::now() - loopStartTime);
     };
     // Frame counter
-    auto i = 0u;
-    XMFLOAT4 clearColor = Defaults::clearColor;
+    auto frameCounter = 0u;
+    XMFLOAT4 clearColor = Defaults::App::clearColor;
     while (!quit) {
       // Process user input
       dispatcher.ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
 
       // Get frame resources
-      auto &resources = frames[i++ & 0x1u];
+      auto &resources = frames[frameCounter++ & 0x1u];
       auto renderTargetView = swapChain.RenderTargetView();
 
       // Wait until buffers can be reused
@@ -440,11 +445,12 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
         computePipelineState.Apply(allocator);
 
-        const auto xSize = Defaults::computeShaderGroupsX;
-        const auto ySize = Defaults::computeShaderGroupsY;
-        const auto size = Defaults::heightMapDimensions;
-        allocator.Dispatch((size + xSize - 1) / xSize,
-                           (size + ySize - 1) / ySize, 1);
+        const auto xSize = Defaults::ComputeShader::computeShaderGroupsDim1;
+        const auto ySize = Defaults::ComputeShader::computeShaderGroupsDim2;
+        const auto sizeX = Defaults::ComputeShader::heightMapDimensionsX;
+        const auto sizeY = Defaults::ComputeShader::heightMapDimensionsX;
+        allocator.Dispatch((sizeX + xSize - 1) / xSize,
+                           (sizeY + ySize - 1) / ySize, 1);
       }
 
       // Draw objects
@@ -458,7 +464,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         SimpleRootDescription::HullConstants hullConstants{};
         SimpleRootDescription::DomainConstants domainConstants{};
         float3 center = {0, 0, 0};
-        float2 fullSizeXZ = {Defaults::planeSize, Defaults::planeSize};
+        float2 fullSizeXZ = {Defaults::App::planeSize,
+                             Defaults::App::planeSize};
         QuadTree qt;
         XMFLOAT3 cam_eye;
 
@@ -482,9 +489,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                   (std::chrono::high_resolution_clock::now() - start));
 
           {
-            auto t1 = it->size;
-            auto t2 = it->center;
-            auto t3 = float3(t2.x, center.y, t2.y);
             auto world =
                 worldBasic *
                 XMMatrixScaling(it->size.x / fullSizeXZ.x, 1,
@@ -561,7 +565,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         if (ImGui::Begin("Application")) {
           ImGui::ColorEdit3("clear color", (float *)&clearColor);
 
-          ImGui::Text("frameID = %d", i);
+          ImGui::Text("frameID = %d", frameCounter);
           ImGui::Text("QuadTree Nodes = %d", qtNodes);
 
           ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
@@ -584,24 +588,24 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                                               std::chrono::milliseconds>(
                   getTimeSinceStart()));
 
-          static const char *items[] = {"CullClockwise", "CullNone",
-                                        "WireFrame"};
+          static const std::array<std::string, 3> items = {
+              "CullClockwise", "CullNone", "WireFrame"};
           static uint itemsIndex = 0;
 
-          if (ImGui::BeginCombo("Render State", items[itemsIndex])) {
-            for (uint i = 0; i < IM_ARRAYSIZE(items); i++) {
+          if (ImGui::BeginCombo("Render State", items[itemsIndex].c_str())) {
+            for (uint i = 0; i < items.size(); i++) {
               bool isSelected = (itemsIndex == i);
-              if (ImGui::Selectable(items[i], isSelected)) {
+              if (ImGui::Selectable(items[i].c_str(), isSelected)) {
                 itemsIndex = i;
                 switch (itemsIndex) {
-                case 0:
-                  rasterizerFlags = RasterizerFlags::CullClockwise;
-                  break;
                 case 1:
                   rasterizerFlags = RasterizerFlags::CullNone;
                   break;
                 case 2:
                   rasterizerFlags = RasterizerFlags::Wireframe;
+                  break;
+                default:
+                  rasterizerFlags = RasterizerFlags::CullClockwise;
                   break;
                 }
                 simplePipelineStateDefinition.RasterizerState.Flags =
@@ -666,7 +670,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     ImGui::DestroyContext();
   }
 
-  void SetWindow(CoreWindow const & /*window*/) {}
+  void SetWindow(CoreWindow const & /*window*/) const {
+    // ?
+  }
 };
 
 int __stdcall wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
