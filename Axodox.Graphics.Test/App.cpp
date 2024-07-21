@@ -287,8 +287,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         immutableAllocationContext,
         {ComputeShaderRootDescription::Constants{10.f}}};
 
-    auto data = Axodox::Graphics::D3D12::TextureData(
-        Format::R32G32_Float, Defaults::Simulation::N, Defaults::Simulation::M);
+    // auto data = Axodox::Graphics::D3D12::TextureData(
+    //     Format::R32G32_Float, Defaults::Simulation::N,
+    //     Defaults::Simulation::M);
     /*{
       std::random_device rd;
 
@@ -302,7 +303,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       memmove(x.data(), tildeh0.data(),
               tildeh0.size() * sizeof(std::complex<Prec>));
     }*/
-    ImmutableTexture computeTildeh0{immutableAllocationContext, data};
+    // ImmutableTexture computeTildeh0{immutableAllocationContext, data};
 
     ImmutableMesh planeMesh{immutableAllocationContext,
                             CreateQuadPatch(Defaults::App::planeSize)};

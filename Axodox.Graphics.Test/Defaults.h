@@ -22,7 +22,7 @@ struct Defaults {
 
 public:
   struct Cam {
-    QUALIFIER float3 camStartPos = float3(-1, 300, 0);
+    QUALIFIER float3 camStartPos = float3(0, 300, -1);
     QUALIFIER bool startFirstPerson = true;
   };
   struct App {

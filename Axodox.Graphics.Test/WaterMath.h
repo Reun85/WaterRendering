@@ -52,10 +52,11 @@ CalculateTildeh0FromDefaults(std::random_device &rd, const u32 N, const u32 M) {
   };
 
   std::vector<std::complex<Prec>> res(N * M);
-  for (i32 i = -(i32)N >> 1; i < (i32)N >> 1; i++) {
-    for (i32 j = -(i32)M >> 1; j < (i32)M >> 1; j++) {
-      const float2 k = float2(2 * std::numbers::pi_v<Prec> * i / L_x,
-                              2 * std::numbers::pi_v<Prec> * j / L_z);
+  for (u32 i = 0; i < N; i++) {
+    for (u32 j = 0; j < M; j++) {
+      const float2 k = float2(
+          2 * std::numbers::pi_v<Prec> * ((i32)i - (((i32)N) >> 1)) / L_x,
+          2 * std::numbers::pi_v<Prec> * ((i32)j - (((i32)M) >> 1)) / L_z);
       res[rowMajorIndexing(i, j)] =
           tilde_h0<Prec>(k, dis(gen), dis(gen), Amplitude,
                          WindForce * WindForce / gravity, wind);
