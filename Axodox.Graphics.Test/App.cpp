@@ -293,14 +293,16 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       std::random_device rd;
 
       using Prec = f32;
+      using CompType = std::complex<Prec>;
       using Def = Defaults::Simulation;
 
       const auto &N = Def::N;
       const auto &M = Def::M;
-      auto tildeh0 = CalculateTildeh0FromDefaults<Prec>(rd, N, M);
+      std::vector<CompType> tildeh0 =
+          CalculateTildeh0FromDefaults<Prec>(rd, N, M);
       std::span<u8> x = data.AsRawSpan();
-      memmove(x.data(), tildeh0.data(),
-              tildeh0.size() * sizeof(std::complex<Prec>));
+      assert(x.size() == tildeh0.size() * sizeof(CompType));
+      memmove(x.data(), tildeh0.data(), tildeh0.size() * sizeof(CompType));
     }
     ImmutableTexture computeTildeh0{immutableAllocationContext, data};
 
@@ -539,9 +541,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           mask.DomainBuffer =
               resources.DynamicBuffer.AddBuffer(domainConstants);
           mask.Texture = texture;
-          // mask.Texture = *heightMap.ShaderResource();
-          //  mask.Heightmap = heightmap;
-          //  mask.HeightMapForDomain = heightmap;
           mask.Heightmap = *heightMap.ShaderResource();
           mask.HeightMapForDomain = *heightMap.ShaderResource();
 
