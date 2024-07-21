@@ -5,6 +5,7 @@
 #include "QuadTree.h"
 #include <fstream>
 #include <string.h>
+#include "ConstantGPUBuffer.h"
 using namespace std;
 using namespace winrt;
 
@@ -32,12 +33,9 @@ template <typename TimeRep, typename PrecisionRep, typename T, typename Q>
 constexpr float
 GetDurationInFloatWithPrecision(const std::chrono::duration<T, Q> &inp) {
 
-  using TimeRepReciprocal = std::ratio<TimeRep::den, TimeRep::num>;
-  using Result = std::ratio_multiply<TimeRepReciprocal, PrecisionRep>;
-
-  const T count =
-      std::chrono::duration_cast<std::chrono::duration<T, PrecisionRep>>(inp)
-          .count();
+  using Result = std::ratio_divide<PrecisionRep, TimeRep>;
+  using Precision = std::chrono::duration<T, PrecisionRep>;
+  const T count = std::chrono::duration_cast<Precision>(inp).count();
   return count * Result::num / static_cast<float>(Result::den);
 }
 template <typename TimeRepTimeFrame, typename PrecisionTimeFrame, typename T,
@@ -161,31 +159,24 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   };
 
   struct ComputeShaderRootDescription : public RootSignatureMask {
-    struct ComputeShaderConstants {
+    struct Constants {
+      float mult;
+    };
+    struct InputConstants {
       float time;
     };
     RootDescriptor<RootDescriptorType::ConstantBuffer> ConstantBuffer;
+    RootDescriptor<RootDescriptorType::ConstantBuffer> InputBuffer;
     RootDescriptorTable<1> OutputTexture;
 
     ComputeShaderRootDescription(const RootSignatureContext &context)
         : RootSignatureMask(context),
           OutputTexture(this, {DescriptorRangeType::UnorderedAccess}),
-          ConstantBuffer(this, {0}) {
+          ConstantBuffer(this, {0}), InputBuffer(this, {1}) {
       Flags = RootSignatureFlags::None;
     }
   };
 
-  D3D12_INPUT_ELEMENT_DESC InputElement(const char *semanticName,
-                                        uint32_t semanticIndex,
-                                        DXGI_FORMAT format) {
-    return {.SemanticName = semanticName,
-            .SemanticIndex = semanticIndex,
-            .Format = format,
-            .InputSlot = 0,
-            .AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT,
-            .InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
-            .InstanceDataStepRate = 0};
-  }
   void Run() {
 
     CoreWindow window = CoreWindow::GetForCurrentThread();
@@ -301,6 +292,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         .CommonDescriptorHeap = &commonDescriptorHeap,
         .DepthStencilDescriptorHeap = &depthStencilDescriptorHeap};
 
+    ConstantGPUBuffer computeShaderConstantBuffer{
+        immutableAllocationContext,
+        {ComputeShaderRootDescription::Constants{10.f}}};
     ImmutableMesh planeMesh{immutableAllocationContext,
                             CreateQuadPatch(Defaults::planeSize)};
     // ImmutableTexture texture{immutableAllocationContext,
@@ -385,6 +379,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       // Wait until buffers can be reused
       if (resources.Marker)
         resources.Fence.Await(resources.Marker);
+      auto loopStart = std::chrono::high_resolution_clock::now();
 
       // Ensure depth buffer matches frame size
       if (!resources.DepthBuffer || !TextureDefinition::AreSizeCompatible(
@@ -429,16 +424,18 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         resources.DepthBuffer.DepthStencil()->Clear(allocator);
       }
 
+      // Compute shader phase
       {
 
-        ComputeShaderRootDescription::ComputeShaderConstants constant{};
+        ComputeShaderRootDescription::InputConstants constant{};
         constant.time =
             GetDurationInFloatWithPrecision<std::chrono::seconds,
                                             std::chrono::milliseconds>(
                 getTimeSinceStart());
         auto mask = computeShaderRootSignature.Set(allocator,
                                                    RootSignatureUsage::Compute);
-        mask.ConstantBuffer = resources.DynamicBuffer.AddBuffer(constant);
+        mask.ConstantBuffer = computeShaderConstantBuffer.GetView();
+        mask.InputBuffer = resources.DynamicBuffer.AddBuffer(constant);
         mask.OutputTexture = *heightMap.UnorderedAccess();
 
         computePipelineState.Apply(allocator);
@@ -452,7 +449,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
       // Draw objects
       uint qtNodes;
-      std::chrono::nanoseconds QuadTreeBuildTime;
+      std::chrono::nanoseconds QuadTreeBuildTime(0);
 
       std::chrono::nanoseconds NavigatingTheQuadTree(0);
 
@@ -553,6 +550,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         }
       }
 
+      auto CPURenderEnd = std::chrono::high_resolution_clock::now();
       // ImGUI
       {
 
@@ -572,14 +570,19 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                       GetDurationInFloatWithPrecision<std::chrono::milliseconds,
                                                       std::chrono::nanoseconds>(
                           QuadTreeBuildTime));
-          ImGui::Text("Navigating %.3f ms/frame",
+          ImGui::Text("Navigating QuadTree %.3f ms/frame",
                       GetDurationInFloatWithPrecision<std::chrono::milliseconds,
                                                       std::chrono::nanoseconds>(
                           NavigatingTheQuadTree));
-          ImGui::Text("Since start %.3f ms",
+          ImGui::Text("CPU time %.3f ms/frame",
                       GetDurationInFloatWithPrecision<std::chrono::milliseconds,
                                                       std::chrono::nanoseconds>(
-                          getTimeSinceStart()));
+                          (CPURenderEnd - loopStart)));
+          ImGui::Text(
+              "Since start %.3f s",
+              GetDurationInFloatWithPrecision<std::chrono::seconds,
+                                              std::chrono::milliseconds>(
+                  getTimeSinceStart()));
 
           static const char *items[] = {"CullClockwise", "CullNone",
                                         "WireFrame"};
@@ -621,7 +624,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
               cam.SetView(camEye, cam.GetAt(), cam.GetWorldUp());
             }
           } else {
-
             XMVECTOR camLookAt = cam.GetAt();
             if (ImGui::InputFloat3("Cam Look At ", (float *)&camLookAt,
                                    "%.3f")) {
