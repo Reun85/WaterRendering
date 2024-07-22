@@ -82,8 +82,8 @@ private:
 };
 // The plane must be perpendicular to the Y-axis.
 class QuadTree {
-  using ValueType = Node;
-  using ConstIterator = ConstQuadTreeLeafIteratorDepthFirst;
+  using value_type = Node;
+  using const_iterator = ConstQuadTreeLeafIteratorDepthFirst;
 
 public:
   explicit QuadTree(const uint allocation = Defaults::QuadTree::allocation)
@@ -91,21 +91,22 @@ public:
   void
   Build(const float3 center, const float2 fullSizeXZ, const float3 camEye,
         const float distanceThreshold = Defaults::QuadTree::distanceThreshold);
-  const ValueType &GetRoot() const { return nodes[0]; }
-  ConstIterator begin() const {
-    return ConstQuadTreeLeafIteratorDepthFirst(&nodes[0], height, *this);
+  const value_type &GetRoot() const { return nodes[0]; }
+  const value_type &GetAt(NodeID id) const { return nodes[id]; }
+
+  const_iterator begin() const {
+    return const_iterator(&nodes[0], height, *this);
   }
-  const ValueType &GetAt(NodeID id) const { return nodes[id]; }
   Node const *end() const { return &nodes[count]; }
   const NodeID &GetSize() const { return count; }
 
 private:
-  friend class ConstIterator;
+  friend class const_iterator;
   void BuildRecursively(const uint index, const float height,
                         const float3 camEye, const float distanceThreshold,
                         const Depth depth);
 
-  std::vector<ValueType> nodes;
+  std::vector<value_type> nodes;
   NodeID count = 0;
   Depth height = 0;
   Depth maxDepth = Defaults::QuadTree::maxDepth;

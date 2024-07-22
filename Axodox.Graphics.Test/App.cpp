@@ -287,24 +287,43 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         immutableAllocationContext,
         {ComputeShaderRootDescription::Constants{10.f}}};
 
-    auto data = Axodox::Graphics::D3D12::TextureData(
-        Format::R32G32_Float, Defaults::Simulation::N, Defaults::Simulation::M);
+    auto tildeh0 = TextureData(Format::R32G32_Float, Defaults::Simulation::N,
+                               Defaults::Simulation::M);
     {
       std::random_device rd;
 
       using Prec = f32;
-      using CompType = std::complex<Prec>;
+      using DataType =
+          decltype(CalculateTildeh0FromDefaults<Prec>(rd, 0, 0))::value_type;
       using Def = Defaults::Simulation;
 
       const auto &N = Def::N;
       const auto &M = Def::M;
-      std::vector<CompType> tildeh0 =
-          CalculateTildeh0FromDefaults<Prec>(rd, N, M);
-      std::span<u8> x = data.AsRawSpan();
-      assert(x.size() == tildeh0.size() * sizeof(CompType));
-      memmove(x.data(), tildeh0.data(), tildeh0.size() * sizeof(CompType));
+      auto data = CalculateTildeh0FromDefaults<Prec>(rd, N, M);
+      std::span<u8> x = tildeh0.AsRawSpan();
+      assert(x.size() == data.size() * sizeof(DataType));
+      memmove(x.data(), data.data(), data.size() * sizeof(DataType));
     }
-    ImmutableTexture computeTildeh0{immutableAllocationContext, data};
+    ImmutableTexture computeTildeh0{immutableAllocationContext, tildeh0};
+    auto frequencies = TextureData(Format::R32_Float, Defaults::Simulation::N,
+                                   Defaults::Simulation::M);
+    {
+
+      using Prec = f32;
+      using DataType =
+          decltype(CalculateFrequenciesFromDefaults<Prec>(0, 0))::value_type;
+
+      using Def = Defaults::Simulation;
+
+      const auto &N = Def::N;
+      const auto &M = Def::M;
+      auto data = CalculateFrequenciesFromDefaults<Prec>(N, M);
+      std::span<u8> x = frequencies.AsRawSpan();
+      assert(x.size() == data.size() * sizeof(DataType));
+      memmove(x.data(), data.data(), data.size() * sizeof(DataType));
+    }
+    ImmutableTexture computeFrequencies{immutableAllocationContext,
+                                        frequencies};
 
     ImmutableMesh planeMesh{immutableAllocationContext,
                             CreateQuadPatch(Defaults::App::planeSize)};

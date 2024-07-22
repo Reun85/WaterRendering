@@ -47,6 +47,7 @@ public:
     QUALIFIER u32 M = ComputeShader::heightMapDimensionsZ;
     QUALIFIER f32 L_x = App::planeSize;
     QUALIFIER f32 L_z = App::planeSize;
+    QUALIFIER f32 Depth = 5;
 
     QUALIFIER f32 gravity = 9.81f;
 
