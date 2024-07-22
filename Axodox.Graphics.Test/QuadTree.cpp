@@ -3,7 +3,7 @@
 #include <array>
 
 ConstQuadTreeLeafIteratorDepthFirst::ConstQuadTreeLeafIteratorDepthFirst(
-    const NodeID node, const Depth maxDepth, const QuadTree &_tree)
+    const Node *node, const Depth maxDepth, const QuadTree &_tree)
     : node(node), path(maxDepth), tree(_tree) {
   path.clear();
   path.push_back(-1);
@@ -11,10 +11,10 @@ ConstQuadTreeLeafIteratorDepthFirst::ConstQuadTreeLeafIteratorDepthFirst(
 }
 
 const Node &ConstQuadTreeLeafIteratorDepthFirst::operator*() const {
-  return tree.GetAt(node);
+  return *node;
 }
 const Node *ConstQuadTreeLeafIteratorDepthFirst::operator->() const {
-  return &tree.GetAt(node);
+  return node;
 }
 ConstQuadTreeLeafIteratorDepthFirst &
 ConstQuadTreeLeafIteratorDepthFirst::operator++() noexcept {
@@ -29,11 +29,9 @@ using NeighborDirection =
     const std::array<const std::pair<const ChildrenID, const NeedToGoUp>, 4>;
 
 // NodeID must be a leaf.
-constexpr float inline IsSmaller(NeighborDirection &directions,
-                                 const QuadTree &tree,
-                                 const std::vector<int> &path,
-                                 std::vector<ChildrenID> &buff,
-                                 const Node *node) {
+constexpr float IsSmaller(NeighborDirection &directions,
+                          const std::vector<int> &path,
+                          std::vector<ChildrenID> &buff, const Node *node) {
   buff.clear();
 
   // Traverse the path in reverse to backtrack
@@ -44,17 +42,17 @@ constexpr float inline IsSmaller(NeighborDirection &directions,
       // No neighbor
       return 0;
     }
-    auto &p = directions[*backitr];
-    stop = !p.second;
-    buff.push_back(p.first);
-    node = &tree.GetAt(node->parent);
+    auto &[matchingIndex, shouldGoUp] = directions[*backitr];
+    stop = !shouldGoUp;
+    buff.push_back(matchingIndex);
+    node = node->parent;
   }
   for (auto backitr = buff.rbegin(); backitr != buff.rend(); backitr++) {
-    node = &tree.GetAt(node->children[*backitr]);
+    node = node->children[*backitr];
     if (!node->HasChildren()) {
       return 1;
     }
-  };
+  }
   if (node->HasChildren()) {
     return 0.5;
   } else {
@@ -63,10 +61,7 @@ constexpr float inline IsSmaller(NeighborDirection &directions,
 }
 
 /*
-  constexpr static std::array<float2, 4> childDirections = {
-      {{-1, -1}, {-1, 1}, {1, -1}, {1, 1}}};
 
-  /*
 
      ^   2 3
      |   0 1
@@ -89,17 +84,16 @@ ConstQuadTreeLeafIteratorDepthFirst::GetSmallerNeighbor() const {
   std::vector<ChildrenID> buff(path.size());
   SmallerNeighborRatio res{};
 
-  const Node *const id = &tree.GetAt(node);
-  res.xpos = IsSmaller(xpos, tree, path, buff, id);
-  res.xneg = IsSmaller(xneg, tree, path, buff, id);
-  res.zneg = IsSmaller(zneg, tree, path, buff, id);
-  res.zpos = IsSmaller(zpos, tree, path, buff, id);
+  const Node *const id = node;
+  res.xpos = IsSmaller(xpos, path, buff, id);
+  res.xneg = IsSmaller(xneg, path, buff, id);
+  res.zneg = IsSmaller(zneg, path, buff, id);
+  res.zpos = IsSmaller(zpos, path, buff, id);
   return res;
 }
 void ConstQuadTreeLeafIteratorDepthFirst::AdjustNode() {
 
-  const auto curr_id = node;
-  if (curr_id + 1 == tree.GetAt(node).children[0]) {
+  if (node + 1 == node->children[0]) {
     // Child node
     path.push_back(0);
   } else if (path.back() != 3) {
@@ -116,7 +110,7 @@ void ConstQuadTreeLeafIteratorDepthFirst::AdjustNode() {
 }
 
 void ConstQuadTreeLeafIteratorDepthFirst::IterateTillLeaf() {
-  while (tree.GetAt(node).HasChildren()) {
+  while (node->HasChildren()) {
     AdjustNode();
   }
 }
@@ -150,14 +144,14 @@ void QuadTree::BuildRecursively(const uint index, const float yCoordinate,
   if (dist / (std::max(node.size.x, node.size.y)) < distanceThreshold ||
       depth < minDepth) {
     for (uint i = 0; i < 4; i++) {
-      uint id = count++;
-      size_t size = nodes.size() - 1;
-      if (id >= size) {
-        nodes.push_back({});
+      uint id = count;
+      count++;
+      if (id >= nodes.size() - 1) {
+        nodes.emplace_back();
       }
-      node.children[i] = id;
       auto &curr = nodes[id];
-      curr.parent = index;
+      node.children[i] = &nodes[id];
+      curr.parent = &nodes[index];
       curr.size = node.size / 2;
       curr.center = node.center + Node::childDirections[i] * (curr.size / 2);
       BuildRecursively(id, yCoordinate, camEye, distanceThreshold, depth + 1);

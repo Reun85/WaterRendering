@@ -2,7 +2,6 @@
 #include <winrt/Windows.UI.Core.h>
 #include <array>
 #include "Defaults.h"
-using namespace winrt::Windows::Foundation::Numerics;
 
 using uint = uint32_t;
 using NodeID = uint;
@@ -12,23 +11,12 @@ using NodeSize = float2;
 using ChildrenID = int;
 using Depth = uint;
 
-#define USEDIRECTPOINTERS false
-
 struct Node {
   NodeCenter center = {0, 0};
   NodeSize size = {0, 0};
-#if USEDIRECTPOINTERS
-  Node *children[4] = {nullptr, nullptr, nullptr, nullptr};
+  std::array<Node *, 4> children = {nullptr, nullptr, nullptr, nullptr};
   Node *parent = nullptr;
-#else
-  NodeID children[4] = {0, 0, 0, 0};
-  NodeID parent = 0;
-#endif
-#if USEDIRECTPOINTERS
   constexpr bool HasChildren() const { return children[0] != nullptr; }
-#else
-  constexpr bool HasChildren() const { return children[0] != 0; }
-#endif
 
   constexpr static std::array<NodeSize, 4> childDirections = {
       {{-1.f, -1.f}, {-1.f, 1.f}, {1.f, -1.f}, {1.f, 1.f}}};
@@ -42,7 +30,7 @@ struct Node {
 
   */
 
-  const float3 GetCenter(const float height) const {
+  float3 GetCenter(const float height) const {
     return float3(center.x, height, center.y);
   }
 };
@@ -51,24 +39,17 @@ class QuadTree;
 
 class ConstQuadTreeLeafIteratorDepthFirst {
 public:
-  ConstQuadTreeLeafIteratorDepthFirst(const NodeID node, const Depth maxDepth,
+  ConstQuadTreeLeafIteratorDepthFirst(const Node *node, const Depth maxDepth,
                                       const QuadTree &_tree);
 
   ConstQuadTreeLeafIteratorDepthFirst &operator++() noexcept;
   const Node &operator*() const;
   const Node *operator->() const;
   constexpr bool
-  operator!=(const ConstQuadTreeLeafIteratorDepthFirst &other) const noexcept {
-    return node != other.node;
-  }
-  constexpr bool
   operator==(const ConstQuadTreeLeafIteratorDepthFirst &other) const noexcept {
     return node == other.node;
   }
-  constexpr bool operator!=(const NodeID other) const noexcept {
-    return node != other;
-  }
-  constexpr bool operator==(const NodeID other) const noexcept {
+  constexpr bool operator==(const Node *other) const noexcept {
     return node == other;
   }
 
@@ -94,7 +75,7 @@ private:
   void AdjustNode();
   void IterateTillLeaf();
 
-  NodeID node;
+  const Node *node;
   // Path to get current leaf
   std::vector<ChildrenID> path;
   const QuadTree &tree;
@@ -105,22 +86,17 @@ class QuadTree {
   using ConstIterator = ConstQuadTreeLeafIteratorDepthFirst;
 
 public:
-  QuadTree(const uint allocation = Defaults::QuadTree::allocation)
-      : nodes(allocation), count(0), height(0),
-        maxDepth(Defaults::QuadTree::maxDepth),
-        minDepth(Defaults::QuadTree::minDepth) {}
+  explicit QuadTree(const uint allocation = Defaults::QuadTree::allocation)
+      : nodes(allocation) {}
   void
   Build(const float3 center, const float2 fullSizeXZ, const float3 camEye,
         const float distanceThreshold = Defaults::QuadTree::distanceThreshold);
   const ValueType &GetRoot() const { return nodes[0]; }
   ConstIterator begin() const {
-    return ConstQuadTreeLeafIteratorDepthFirst(0, height, *this);
+    return ConstQuadTreeLeafIteratorDepthFirst(&nodes[0], height, *this);
   }
   const ValueType &GetAt(NodeID id) const { return nodes[id]; }
-  // ConstIterator end() const {
-  //   return ConstQuadTreeLeafIteratorDepthFirst(&*nodes.end());
-  // }
-  const NodeID end() const { return GetSize(); }
+  Node const *end() const { return &nodes[count]; }
   const NodeID &GetSize() const { return count; }
 
 private:
@@ -130,8 +106,8 @@ private:
                         const Depth depth);
 
   std::vector<ValueType> nodes;
-  NodeID count;
-  Depth height;
-  Depth maxDepth;
-  Depth minDepth;
+  NodeID count = 0;
+  Depth height = 0;
+  Depth maxDepth = Defaults::QuadTree::maxDepth;
+  Depth minDepth = Defaults::QuadTree::minDepth;
 };
