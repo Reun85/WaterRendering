@@ -33,7 +33,6 @@ template <typename TimeRep, typename PrecisionRep, typename T, typename Q>
   requires IsRatio<TimeRep> && IsRatio<PrecisionRep> && IsRatio<Q>
 constexpr float
 GetDurationInFloatWithPrecision(const std::chrono::duration<T, Q> &inp) {
-
   using Result = std::ratio_divide<PrecisionRep, TimeRep>;
   using Precision = std::chrono::duration<T, PrecisionRep>;
   const T count = std::chrono::duration_cast<Precision>(inp).count();
@@ -46,14 +45,23 @@ template <typename TimeRepTimeFrame, typename PrecisionTimeFrame, typename T,
            HasRatioPeriod<PrecisionTimeFrame> && IsRatio<Q>
 constexpr float
 GetDurationInFloatWithPrecision(const std::chrono::duration<T, Q> &inp) {
-
   return GetDurationInFloatWithPrecision<typename TimeRepTimeFrame::period,
                                          typename PrecisionTimeFrame::period, T,
                                          Q>(inp);
 }
 
+template <typename DataType>
+constexpr ImmutableTexture
+ImmutableTextureFromData(ResourceAllocationContext &context, const Format &f,
+                         const u32 width, const u32 height, const u32 arraySize,
+                         std::span<const DataType> data) {
+  auto text = TextureData(f, width, Defaults::Simulation::M);
+  std::span<u8> span = text.AsRawSpan();
+  assert(span.size() == (data.size() * sizeof(DataType)));
+  memmove(span.data(), data.data(), data.size() * sizeof(DataType));
+  return ImmutableTexture{context, text};
+};
 MeshDescription CreateQuadPatch(float size) {
-
   size = size / 2;
 
   MeshDescription result;
@@ -71,7 +79,6 @@ MeshDescription CreateQuadPatch(float size) {
 }
 
 struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
-
   IFrameworkView CreateView() const { return *this; }
   void Initialize(CoreApplicationView const &) const {
     // ?
@@ -100,16 +107,13 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   };
 
   struct SimpleRootDescription : public RootSignatureMask {
-
     struct DomainConstants {
-
       // There is no 2x2?
       XMFLOAT4X4 TextureTransform;
       XMFLOAT4X4 WorldIT;
     };
 
     struct VertexConstants {
-
       XMFLOAT4X4 WorldViewProjection;
     };
     struct HullConstants {
@@ -149,6 +153,60 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     }
   };
 
+  struct SimulationStage {
+    struct SpektrumRootDescription : public RootSignatureMask {
+      // How does it know, where its binded?
+      // In
+      RootDescriptorTable<1> Tildeh0;
+      RootDescriptorTable<1> Frequencies;
+      struct InputConstants {
+        float time;
+      };
+      RootDescriptor<RootDescriptorType::ConstantBuffer> InputBuffer;
+      // Out
+      RootDescriptorTable<1> Tildeh;
+      RootDescriptorTable<1> TildeD;
+
+      explicit SpektrumRootDescription(const RootSignatureContext &context)
+          : RootSignatureMask(context),
+            Tildeh0(this, {DescriptorRangeType::ShaderResource}),
+            Frequencies(this, {DescriptorRangeType::ShaderResource}),
+            Tildeh(this, {DescriptorRangeType::UnorderedAccess}),
+            TildeD(this, {DescriptorRangeType::UnorderedAccess}),
+            InputBuffer(this, {0}) {
+        Flags = RootSignatureFlags::None;
+      }
+    };
+    struct FFTDescription : public RootSignatureMask {
+      // In
+      RootDescriptorTable<1> Input;
+      // Out
+      RootDescriptorTable<1> Output;
+
+      explicit FFTDescription(const RootSignatureContext &context)
+          : RootSignatureMask(context),
+            Input(this, {DescriptorRangeType::UnorderedAccess}),
+            Output(this, {DescriptorRangeType::UnorderedAccess}) {
+        Flags = RootSignatureFlags::None;
+      }
+    };
+    struct DisplacementDescription : public RootSignatureMask {
+      // In
+      RootDescriptorTable<1> Height;
+      RootDescriptorTable<1> Choppy;
+      // Out
+      RootDescriptorTable<1> Output;
+
+      explicit DisplacementDescription(const RootSignatureContext &context)
+          : RootSignatureMask(context),
+            Height(this, {DescriptorRangeType::UnorderedAccess, 0}),
+            Choppy(this, {DescriptorRangeType::UnorderedAccess, 1}),
+            Output(this, {DescriptorRangeType::UnorderedAccess, 2}) {
+        Flags = RootSignatureFlags::None;
+      }
+    };
+  };
+
   struct ComputeShaderRootDescription : public RootSignatureMask {
     struct Constants {
       float mult;
@@ -169,7 +227,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   };
 
   void Run() const {
-
     CoreWindow window = CoreWindow::GetForCurrentThread();
     window.Activate();
 
@@ -183,8 +240,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     cam.SetFirstPerson(firstperson);
     // Events
     {
-      // If I redo the whole system, this could be handled when the callback is
-      // made.
+      // If I redo the whole system, this could be handled when the callback
+      // is made.
       window.KeyDown([&cam, &quit, &firstperson](CoreWindow const &,
                                                  KeyEventArgs const &args) {
         if (ImGui::GetIO().WantCaptureKeyboard)
@@ -241,7 +298,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     RasterizerFlags rasterizerFlags = RasterizerFlags::CullClockwise;
 
-    GraphicsPipelineStateDefinition simplePipelineStateDefinition{
+    GraphicsPipelineStateDefinition graphicsPipelineStateDefinition{
         .RootSignature = &simpleRootSignature,
         .VertexShader = &simpleVertexShader,
         .DomainShader = &domainShader,
@@ -253,24 +310,47 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         .TopologyType = PrimitiveTopologyType::Patch,
         .RenderTargetFormats = {Format::B8G8R8A8_UNorm},
         .DepthStencilFormat = Format::D32_Float};
-    Axodox::Graphics::D3D12::PipelineState simplePipelineState =
+    Axodox::Graphics::D3D12::PipelineState graphicsPipelineState =
         pipelineStateProvider
-            .CreatePipelineStateAsync(simplePipelineStateDefinition)
+            .CreatePipelineStateAsync(graphicsPipelineStateDefinition)
             .get();
 
     // Compute pipeline
 
-    ComputeShader computeShader{app_folder() / L"computeShader.cso"};
-    RootSignature<ComputeShaderRootDescription> computeShaderRootSignature{
-        device};
-    ComputePipelineStateDefinition computePipelineStateDefinition{
-        .RootSignature = &computeShaderRootSignature,
-        .ComputeShader = &computeShader};
-    auto computePipelineState =
+    ComputeShader spektrum{app_folder() / L"Spektrums.cso"};
+
+    RootSignature<SimulationStage::SpektrumRootDescription>
+        spektrumRootDescription{device};
+    ComputePipelineStateDefinition spektrumRootStateDefinition{
+        .RootSignature = &spektrumRootDescription,
+        .ComputeShader = &spektrum,
+    };
+    auto spektrumPipelineState =
         pipelineStateProvider
-            .CreatePipelineStateAsync(computePipelineStateDefinition)
+            .CreatePipelineStateAsync(spektrumRootStateDefinition)
             .get();
 
+    ComputeShader FFT{app_folder() / L"FFT.cso"};
+    RootSignature<SimulationStage::FFTDescription> FFTDescription{device};
+    ComputePipelineStateDefinition FFTStateDefinition{
+        .RootSignature = &FFTDescription,
+        .ComputeShader = &FFT,
+    };
+    auto FFTPipelineState =
+        pipelineStateProvider.CreatePipelineStateAsync(FFTStateDefinition)
+            .get();
+
+    RootSignature<SimulationStage::DisplacementDescription>
+        displacementRootDescription{device};
+    ComputeShader displacement{app_folder() / L"displacement.cso"};
+    ComputePipelineStateDefinition displacementRootStateDefinition{
+        .RootSignature = &displacementRootDescription,
+        .ComputeShader = &displacement,
+    };
+    auto displacementPipelineState =
+        pipelineStateProvider
+            .CreatePipelineStateAsync(displacementRootStateDefinition)
+            .get();
     // Group together allocations
     GroupedResourceAllocator groupedResourceAllocator{device};
     ResourceUploader resourceUploader{device};
@@ -287,43 +367,19 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         immutableAllocationContext,
         {ComputeShaderRootDescription::Constants{10.f}}};
 
-    auto tildeh0 = TextureData(Format::R32G32_Float, Defaults::Simulation::N,
-                               Defaults::Simulation::M);
-    {
-      std::random_device rd;
+    std::random_device rd;
+    ImmutableTexture computeTildeh0 =
+        ImmutableTextureFromData<std::complex<f32>>(
+            immutableAllocationContext, Format::R32G32_Float,
+            Defaults::Simulation::N, Defaults::Simulation::M, 0u,
+            CalculateTildeh0FromDefaults<f32>(rd, Defaults::Simulation::N,
+                                              Defaults::Simulation::M));
 
-      using Prec = f32;
-      using DataType =
-          decltype(CalculateTildeh0FromDefaults<Prec>(rd, 0, 0))::value_type;
-      using Def = Defaults::Simulation;
-
-      const auto &N = Def::N;
-      const auto &M = Def::M;
-      auto data = CalculateTildeh0FromDefaults<Prec>(rd, N, M);
-      std::span<u8> x = tildeh0.AsRawSpan();
-      assert(x.size() == data.size() * sizeof(DataType));
-      memmove(x.data(), data.data(), data.size() * sizeof(DataType));
-    }
-    ImmutableTexture computeTildeh0{immutableAllocationContext, tildeh0};
-    auto frequencies = TextureData(Format::R32_Float, Defaults::Simulation::N,
-                                   Defaults::Simulation::M);
-    {
-
-      using Prec = f32;
-      using DataType =
-          decltype(CalculateFrequenciesFromDefaults<Prec>(0, 0))::value_type;
-
-      using Def = Defaults::Simulation;
-
-      const auto &N = Def::N;
-      const auto &M = Def::M;
-      auto data = CalculateFrequenciesFromDefaults<Prec>(N, M);
-      std::span<u8> x = frequencies.AsRawSpan();
-      assert(x.size() == data.size() * sizeof(DataType));
-      memmove(x.data(), data.data(), data.size() * sizeof(DataType));
-    }
-    ImmutableTexture computeFrequencies{immutableAllocationContext,
-                                        frequencies};
+    ImmutableTexture computeFrequencies = ImmutableTextureFromData<f32>(
+        immutableAllocationContext, Format::R32_Float, Defaults::Simulation::N,
+        Defaults::Simulation::M, 0u,
+        CalculateFrequenciesFromDefaults<f32>(Defaults::Simulation::N,
+                                              Defaults::Simulation::M));
 
     ImmutableMesh planeMesh{immutableAllocationContext,
                             CreateQuadPatch(Defaults::App::planeSize)};
@@ -334,14 +390,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     auto mutableAllocationContext = immutableAllocationContext;
     CommittedResourceAllocator committedResourceAllocator{device};
     mutableAllocationContext.ResourceAllocator = &committedResourceAllocator;
-
-    // Used by compute and domain shader
-    MutableTexture heightMap{
-        mutableAllocationContext,
-        TextureDefinition(Format::R32_Float,
-                          Defaults::ComputeShader::heightMapDimensionsX,
-                          Defaults::ComputeShader::heightMapDimensionsZ, 0,
-                          TextureFlags::UnorderedAccess)};
 
     //  Acquire memory
     groupedResourceAllocator.Build();
@@ -451,28 +499,27 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       }
 
       // Compute shader phase
-      {
+      //{
+      //  ComputeShaderRootDescription::InputConstants constant{};
+      //  constant.time =
+      //      GetDurationInFloatWithPrecision<std::chrono::seconds,
+      //                                      std::chrono::milliseconds>(
+      //          getTimeSinceStart());
+      //  auto mask = computeShaderRootSignature.Set(allocator,
+      //                                             RootSignatureUsage::Compute);
+      //  mask.ConstantBuffer = computeShaderConstantBuffer.GetView();
+      //  mask.InputBuffer = resources.DynamicBuffer.AddBuffer(constant);
+      //  mask.OutputTexture = *heightMap.UnorderedAccess();
 
-        ComputeShaderRootDescription::InputConstants constant{};
-        constant.time =
-            GetDurationInFloatWithPrecision<std::chrono::seconds,
-                                            std::chrono::milliseconds>(
-                getTimeSinceStart());
-        auto mask = computeShaderRootSignature.Set(allocator,
-                                                   RootSignatureUsage::Compute);
-        mask.ConstantBuffer = computeShaderConstantBuffer.GetView();
-        mask.InputBuffer = resources.DynamicBuffer.AddBuffer(constant);
-        mask.OutputTexture = *heightMap.UnorderedAccess();
+      //  computePipelineState.Apply(allocator);
 
-        computePipelineState.Apply(allocator);
-
-        const auto xSize = Defaults::ComputeShader::computeShaderGroupsDim1;
-        const auto ySize = Defaults::ComputeShader::computeShaderGroupsDim2;
-        const auto sizeX = Defaults::ComputeShader::heightMapDimensionsX;
-        const auto sizeY = Defaults::ComputeShader::heightMapDimensionsX;
-        allocator.Dispatch((sizeX + xSize - 1) / xSize,
-                           (sizeY + ySize - 1) / ySize, 1);
-      }
+      //  const auto xSize = Defaults::ComputeShader::computeShaderGroupsDim1;
+      //  const auto ySize = Defaults::ComputeShader::computeShaderGroupsDim2;
+      //  const auto sizeX = Defaults::ComputeShader::heightMapDimensionsX;
+      //  const auto sizeY = Defaults::ComputeShader::heightMapDimensionsX;
+      //  allocator.Dispatch((sizeX + xSize - 1) / xSize,
+      //                     (sizeY + ySize - 1) / ySize, 1);
+      //}
 
       // Draw objects
       uint qtNodes;
@@ -560,12 +607,12 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           mask.DomainBuffer =
               resources.DynamicBuffer.AddBuffer(domainConstants);
           mask.Texture = texture;
-          mask.Heightmap = *heightMap.ShaderResource();
-          mask.HeightMapForDomain = *heightMap.ShaderResource();
+          mask.Heightmap = computeTildeh0;
+          mask.HeightMapForDomain = computeTildeh0;
 
           allocator.SetRenderTargets({renderTargetView},
                                      resources.DepthBuffer.DepthStencil());
-          simplePipelineState.Apply(allocator);
+          graphicsPipelineState.Apply(allocator);
           planeMesh.Draw(allocator);
 
           start = std::chrono::high_resolution_clock::now();
@@ -575,7 +622,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       auto CPURenderEnd = std::chrono::high_resolution_clock::now();
       // ImGUI
       {
-
         ImGui_ImplDX12_NewFrame();
         ImGui_ImplUwp_NewFrame();
         ImGui::NewFrame();
@@ -626,12 +672,12 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                   rasterizerFlags = RasterizerFlags::CullClockwise;
                   break;
                 }
-                simplePipelineStateDefinition.RasterizerState.Flags =
+                graphicsPipelineStateDefinition.RasterizerState.Flags =
                     rasterizerFlags;
-                simplePipelineState =
-                    pipelineStateProvider
-                        .CreatePipelineStateAsync(simplePipelineStateDefinition)
-                        .get();
+                graphicsPipelineState = pipelineStateProvider
+                                            .CreatePipelineStateAsync(
+                                                graphicsPipelineStateDefinition)
+                                            .get();
               }
               if (isSelected) {
                 ImGui::SetItemDefaultFocus();
@@ -694,6 +740,5 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 };
 
 int __stdcall wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
-
   CoreApplication::Run(make<App>());
 }
