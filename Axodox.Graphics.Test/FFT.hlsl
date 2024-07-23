@@ -36,7 +36,7 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3
     int x = LTid.x;
 
     // Load row/column into shared memory
-    pingpong[1][x] = readbuff.Load(int3(z, x, 0)).rg;
+    pingpong[1][x] = readbuff[int2(z, x)].rg;
 
     GroupMemoryBarrierWithGroupSync();
 
@@ -76,4 +76,5 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3
     float2 result = pingpong[src][x];
 
     writebuff[int2(x, z)] = result;
+    //writebuff[int2(x, z)] = float2(1, 0);
 }

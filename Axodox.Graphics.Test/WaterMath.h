@@ -5,6 +5,7 @@
 #include "Defaults.h"
 #include <random>
 
+namespace Inner {
 template <typename Prec = f32>
   requires std::is_floating_point_v<Prec>
 constexpr Prec PhilipsSpektrum(const float2 &k, const Prec &Amplitude,
@@ -34,6 +35,14 @@ tilde_h0(const float2 &k, const Prec &xi_real, const Prec &xi_im,
 constexpr u32 RowMajorIndexing(const u32 i, const u32 j, const u32 M) {
   return i * M + j;
 };
+constexpr u32 ColumnMajorIndexing(const u32 i, const u32 j, const u32 N) {
+  return i + j * N;
+};
+constexpr u32 Indexing(const u32 i, const u32 j, const u32 N, const u32 M) {
+  return ColumnMajorIndexing(i, j, N);
+  // return RowMajorIndexing(i, j, M);
+};
+} // namespace Inner
 
 template <typename Prec = float>
   requires std::is_floating_point_v<Prec>
@@ -57,9 +66,9 @@ CalculateTildeh0FromDefaults(std::random_device &rd, const u32 N, const u32 M) {
       const float2 k = float2(
           2 * std::numbers::pi_v<Prec> * ((i32)i - (((i32)N) >> 1)) / L_x,
           2 * std::numbers::pi_v<Prec> * ((i32)j - (((i32)M) >> 1)) / L_z);
-      res[RowMajorIndexing(i, j, M)] =
-          tilde_h0<Prec>(k, dis(gen), dis(gen), Amplitude,
-                         WindForce * WindForce / gravity, wind);
+      res[Inner::Indexing(i, j, N, M)] =
+          Inner::tilde_h0<Prec>(k, dis(gen), dis(gen), Amplitude,
+                                WindForce * WindForce / gravity, wind);
     }
   }
   return res;
@@ -84,7 +93,7 @@ constexpr std::vector<Prec> CalculateFrequenciesFromDefaults(const u32 N,
           2 * std::numbers::pi_v<Prec> * ((i32)i - (((i32)N) >> 1)) / L_x,
           2 * std::numbers::pi_v<Prec> * ((i32)j - (((i32)M) >> 1)) / L_z);
       const float k = length(kvec);
-      res[RowMajorIndexing(i, j, M)] = gravity * k * std::tanh(k * D);
+      res[Inner::Indexing(i, j, N, M)] = gravity * k * std::tanh(k * D);
     }
   }
   return res;

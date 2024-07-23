@@ -55,10 +55,10 @@ constexpr ImmutableTexture
 ImmutableTextureFromData(ResourceAllocationContext &context, const Format &f,
                          const u32 width, const u32 height, const u32 arraySize,
                          std::span<const DataType> data) {
-  auto text = TextureData(f, width, Defaults::Simulation::M);
+  auto text = TextureData(f, width, Defaults::Simulation::M, arraySize);
   std::span<u8> span = text.AsRawSpan();
   assert(span.size() == (data.size() * sizeof(DataType)));
-  memmove(span.data(), data.data(), data.size() * sizeof(DataType));
+  memcpy(span.data(), data.data(), data.size() * sizeof(DataType));
   return ImmutableTexture{context, text};
 };
 MeshDescription CreateQuadPatch(float size) {
@@ -106,7 +106,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           DynamicBuffer(*context.Device), DepthBuffer(context) {}
   };
 
-  struct SimpleRootDescription : public RootSignatureMask {
+  struct SimpleGraphicRootDescription : public RootSignatureMask {
     struct DomainConstants {
       // There is no 2x2?
       XMFLOAT4X4 TextureTransform;
@@ -131,7 +131,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     RootDescriptorTable<1> HeightMapForDomain;
     StaticSampler HeightmapSamplerForDomain;
 
-    explicit SimpleRootDescription(const RootSignatureContext &context)
+    explicit SimpleGraphicRootDescription(const RootSignatureContext &context)
         : RootSignatureMask(context),
           VertexBuffer(this, {0}, ShaderVisibility::Vertex),
           HullBuffer(this, {0}, ShaderVisibility::Hull),
@@ -169,11 +169,11 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
       explicit SpektrumRootDescription(const RootSignatureContext &context)
           : RootSignatureMask(context),
-            Tildeh0(this, {DescriptorRangeType::ShaderResource}),
-            Frequencies(this, {DescriptorRangeType::ShaderResource}),
-            Tildeh(this, {DescriptorRangeType::UnorderedAccess}),
-            TildeD(this, {DescriptorRangeType::UnorderedAccess}),
-            InputBuffer(this, {0}) {
+            Tildeh0(this, {DescriptorRangeType::ShaderResource, 0}),
+            Frequencies(this, {DescriptorRangeType::ShaderResource, 1}),
+            InputBuffer(this, {0}),
+            Tildeh(this, {DescriptorRangeType::UnorderedAccess, 0}),
+            TildeD(this, {DescriptorRangeType::UnorderedAccess, 1}) {
         Flags = RootSignatureFlags::None;
       }
     };
@@ -185,8 +185,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
       explicit FFTDescription(const RootSignatureContext &context)
           : RootSignatureMask(context),
-            Input(this, {DescriptorRangeType::UnorderedAccess}),
-            Output(this, {DescriptorRangeType::UnorderedAccess}) {
+            Input(this, {DescriptorRangeType::ShaderResource, 0}),
+            Output(this, {DescriptorRangeType::UnorderedAccess, 0}) {
         Flags = RootSignatureFlags::None;
       }
     };
@@ -199,31 +199,51 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
       explicit DisplacementDescription(const RootSignatureContext &context)
           : RootSignatureMask(context),
-            Height(this, {DescriptorRangeType::UnorderedAccess, 0}),
-            Choppy(this, {DescriptorRangeType::UnorderedAccess, 1}),
-            Output(this, {DescriptorRangeType::UnorderedAccess, 2}) {
+            Height(this, {DescriptorRangeType::ShaderResource, 0}),
+            Choppy(this, {DescriptorRangeType::ShaderResource, 1}),
+            Output(this, {DescriptorRangeType::UnorderedAccess, 0}) {
         Flags = RootSignatureFlags::None;
       }
     };
   };
 
-  struct ComputeShaderRootDescription : public RootSignatureMask {
-    struct Constants {
-      float mult;
-    };
-    struct InputConstants {
-      float time;
-    };
-    RootDescriptor<RootDescriptorType::ConstantBuffer> ConstantBuffer;
-    RootDescriptor<RootDescriptorType::ConstantBuffer> InputBuffer;
-    RootDescriptorTable<1> OutputTexture;
+  struct SimulationResources {
 
-    explicit ComputeShaderRootDescription(const RootSignatureContext &context)
-        : RootSignatureMask(context), ConstantBuffer(this, {0}),
-          InputBuffer(this, {1}),
-          OutputTexture(this, {DescriptorRangeType::UnorderedAccess}) {
-      Flags = RootSignatureFlags::None;
-    }
+    CommandAllocator Allocator;
+    CommandFence Fence;
+    CommandFenceMarker FrameDoneMarker;
+    CommandFenceMarker SpektrumsMarker;
+    CommandFenceMarker TildeHMarker;
+    CommandFenceMarker TildeDMarker;
+    DynamicBufferManager DynamicBuffer;
+
+    MutableTexture DepthBuffer;
+
+    MutableTexture computeTildeh;
+    MutableTexture computeTildeD;
+    MutableTexture tildehBuffer;
+    MutableTexture tildeDBuffer;
+
+    explicit SimulationResources(const ResourceAllocationContext &context,
+                                 const u32 N, const u32 M)
+        : Allocator(*context.Device),
+
+          Fence(*context.Device), DynamicBuffer(*context.Device),
+          DepthBuffer(context),
+          computeTildeh(context, TextureDefinition::TextureDefinition(
+                                     Format::R32G32_Float, N, M, 0,
+                                     TextureFlags::UnorderedAccess)),
+          computeTildeD(context, TextureDefinition::TextureDefinition(
+                                     Format::R32G32_Float, N, M, 0,
+                                     TextureFlags::UnorderedAccess)),
+          tildehBuffer(context, TextureDefinition::TextureDefinition(
+                                    Format::R32G32_Float, N, M, 0,
+                                    TextureFlags::UnorderedAccess)),
+          tildeDBuffer(context, TextureDefinition::TextureDefinition(
+                                    Format::R32G32_Float, N, M, 0,
+                                    TextureFlags::UnorderedAccess))
+
+    {}
   };
 
   void Run() const {
@@ -283,13 +303,14 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     GraphicsDevice device{};
     CommandQueue directQueue{device};
+    CommandQueue computeQueue{device};
     CoreSwapChain swapChain{directQueue, window,
                             SwapChainFlags::IsShaderResource};
 
     PipelineStateProvider pipelineStateProvider{device};
 
     // Graphics pipeline
-    RootSignature<SimpleRootDescription> simpleRootSignature{device};
+    RootSignature<SimpleGraphicRootDescription> simpleRootSignature{device};
 
     VertexShader simpleVertexShader{app_folder() / L"SimpleVertexShader.cso"};
     PixelShader simplePixelShader{app_folder() / L"SimplePixelShader.cso"};
@@ -331,9 +352,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             .get();
 
     ComputeShader FFT{app_folder() / L"FFT.cso"};
-    RootSignature<SimulationStage::FFTDescription> FFTDescription{device};
+    RootSignature<SimulationStage::FFTDescription> FFTRootDescription{device};
     ComputePipelineStateDefinition FFTStateDefinition{
-        .RootSignature = &FFTDescription,
+        .RootSignature = &FFTRootDescription,
         .ComputeShader = &FFT,
     };
     auto FFTPipelineState =
@@ -363,29 +384,23 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         .CommonDescriptorHeap = &commonDescriptorHeap,
         .DepthStencilDescriptorHeap = &depthStencilDescriptorHeap};
 
-    ConstantGPUBuffer computeShaderConstantBuffer{
-        immutableAllocationContext,
-        {ComputeShaderRootDescription::Constants{10.f}}};
-
+    u32 N = Defaults::Simulation::N;
+    u32 M = Defaults::Simulation::M;
     std::random_device rd;
     ImmutableTexture computeTildeh0 =
         ImmutableTextureFromData<std::complex<f32>>(
-            immutableAllocationContext, Format::R32G32_Float,
-            Defaults::Simulation::N, Defaults::Simulation::M, 0u,
-            CalculateTildeh0FromDefaults<f32>(rd, Defaults::Simulation::N,
-                                              Defaults::Simulation::M));
+            immutableAllocationContext, Format::R32G32_Float, N, M, 0u,
+            CalculateTildeh0FromDefaults<f32>(rd, N, M));
 
     ImmutableTexture computeFrequencies = ImmutableTextureFromData<f32>(
-        immutableAllocationContext, Format::R32_Float, Defaults::Simulation::N,
-        Defaults::Simulation::M, 0u,
-        CalculateFrequenciesFromDefaults<f32>(Defaults::Simulation::N,
-                                              Defaults::Simulation::M));
+        immutableAllocationContext, Format::R32_Float, N, M, 0u,
+        CalculateFrequenciesFromDefaults<f32>(N, M));
 
     ImmutableMesh planeMesh{immutableAllocationContext,
                             CreateQuadPatch(Defaults::App::planeSize)};
 
-    ImmutableTexture texture{immutableAllocationContext,
-                             app_folder() / L"gradient.jpg"};
+    ImmutableTexture displayTexture{immutableAllocationContext,
+                                    app_folder() / L"gradient.jpg"};
 
     auto mutableAllocationContext = immutableAllocationContext;
     CommittedResourceAllocator committedResourceAllocator{device};
@@ -394,15 +409,20 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     //  Acquire memory
     groupedResourceAllocator.Build();
 
-    array<FrameResources, 2> frames{FrameResources(mutableAllocationContext),
-                                    FrameResources(mutableAllocationContext)};
+    array<FrameResources, 2> frameResources{
+        FrameResources(mutableAllocationContext),
+        FrameResources(mutableAllocationContext)};
 
-    swapChain.Resizing(no_revoke,
-                       [&frames, &commonDescriptorHeap](SwapChain const *) {
-                         for (auto &frame : frames)
-                           frame.ScreenResourceView.reset();
-                         commonDescriptorHeap.Clean();
-                       });
+    array<SimulationResources, 2> simulationResources{
+        SimulationResources(mutableAllocationContext, N, M),
+        SimulationResources(mutableAllocationContext, N, M)};
+
+    swapChain.Resizing(
+        no_revoke, [&frameResources, &commonDescriptorHeap](SwapChain const *) {
+          for (auto &frame : frameResources)
+            frame.ScreenResourceView.reset();
+          commonDescriptorHeap.Clean();
+        });
 
     ID3D12DescriptorHeap *ImGuiDescriptorHeap{};
     // Init ImGUI
@@ -425,7 +445,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       check_hresult(device.get()->CreateDescriptorHeap(
           &ImGuiDescriptorHeapDesc, IID_PPV_ARGS(&ImGuiDescriptorHeap)));
       ImGui_ImplDX12_Init(
-          device.get(), static_cast<int>(frames.size()),
+          device.get(), static_cast<int>(frameResources.size()),
           DXGI_FORMAT_B8G8R8A8_UNORM, ImGuiDescriptorHeap,
           ImGuiDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
           ImGuiDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
@@ -441,85 +461,236 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     };
     // Frame counter
     auto frameCounter = 0u;
+    std::chrono::steady_clock::time_point frameStart =
+        std::chrono::high_resolution_clock::now();
     XMFLOAT4 clearColor = Defaults::App::clearColor;
     while (!quit) {
       // Process user input
       dispatcher.ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
 
-      // Get frame resources
-      auto &resources = frames[frameCounter++ & 0x1u];
+      // Get frame frameResource
+      frameCounter++;
+      // Current frames resources
+      auto &frameResource = frameResources[frameCounter & 0x1u];
+      // Simulation resources for drawing.
+      auto &currSimResource = simulationResources[frameCounter & 0x1u];
+      // Simulation resources for calculating.
+      auto &nextSimResource = simulationResources[(frameCounter + 1) & 0x1u];
       auto renderTargetView = swapChain.RenderTargetView();
 
       // Wait until buffers can be reused
-      if (resources.Marker)
-        resources.Fence.Await(resources.Marker);
-      auto loopStart = std::chrono::high_resolution_clock::now();
+      if (frameResource.Marker)
+        frameResource.Fence.Await(frameResource.Marker);
+      if (currSimResource.FrameDoneMarker)
+        currSimResource.Fence.Await(currSimResource.FrameDoneMarker);
+      if (nextSimResource.FrameDoneMarker)
+        nextSimResource.Fence.Await(nextSimResource.FrameDoneMarker);
+
+      // Get DeltaTime
+      float deltaTime;
+      {
+        auto newFrameStart = std::chrono::high_resolution_clock::now();
+        deltaTime = GetDurationInFloatWithPrecision<std::chrono::seconds,
+                                                    std::chrono::milliseconds>(
+            newFrameStart - frameStart);
+        frameStart = newFrameStart;
+      }
 
       // Ensure depth buffer matches frame size
-      if (!resources.DepthBuffer || !TextureDefinition::AreSizeCompatible(
-                                        *resources.DepthBuffer.Definition(),
-                                        renderTargetView->Definition())) {
+      if (!frameResource.DepthBuffer ||
+          !TextureDefinition::AreSizeCompatible(
+              *frameResource.DepthBuffer.Definition(),
+              renderTargetView->Definition())) {
         auto depthDefinition =
             renderTargetView->Definition().MakeSizeCompatible(
                 Format::D32_Float, TextureFlags::DepthStencil);
-        resources.DepthBuffer.Allocate(depthDefinition);
+        frameResource.DepthBuffer.Allocate(depthDefinition);
       }
 
       // Ensure screen shader resource view
-      if (!resources.ScreenResourceView ||
-          resources.ScreenResourceView->Resource() !=
+      if (!frameResource.ScreenResourceView ||
+          frameResource.ScreenResourceView->Resource() !=
               renderTargetView->Resource()) {
         Texture screenTexture{renderTargetView->Resource()};
-        resources.ScreenResourceView =
+        frameResource.ScreenResourceView =
             commonDescriptorHeap.CreateShaderResourceView(&screenTexture);
       }
 
       // Update constants
       auto resolution = swapChain.Resolution();
       cam.SetAspect(float(resolution.x) / float(resolution.y));
-      cam.Update(0.01f);
+      cam.Update(deltaTime);
 
       // Begin frame command list
-      auto &allocator = resources.Allocator;
+      auto &allocator = frameResource.Allocator;
       {
         allocator.Reset();
         allocator.BeginList();
         allocator.TransitionResource(*renderTargetView, ResourceStates::Present,
                                      ResourceStates::RenderTarget);
-
+      }
+      {
         committedResourceAllocator.Build();
         depthStencilDescriptorHeap.Build();
 
         commonDescriptorHeap.Build();
-        commonDescriptorHeap.Set(allocator);
-
-        // Clears frame with background color
-        renderTargetView->Clear(allocator, clearColor);
-        resources.DepthBuffer.DepthStencil()->Clear(allocator);
       }
 
       // Compute shader phase
-      //{
-      //  ComputeShaderRootDescription::InputConstants constant{};
-      //  constant.time =
-      //      GetDurationInFloatWithPrecision<std::chrono::seconds,
-      //                                      std::chrono::milliseconds>(
-      //          getTimeSinceStart());
-      //  auto mask = computeShaderRootSignature.Set(allocator,
-      //                                             RootSignatureUsage::Compute);
-      //  mask.ConstantBuffer = computeShaderConstantBuffer.GetView();
-      //  mask.InputBuffer = resources.DynamicBuffer.AddBuffer(constant);
-      //  mask.OutputTexture = *heightMap.UnorderedAccess();
+      {
+        auto &simResource = nextSimResource;
+        auto &computeAllocator = simResource.Allocator;
 
-      //  computePipelineState.Apply(allocator);
+        computeAllocator.Reset();
+        using CommandsList = Axodox::Collections::object_pool_handle<
+            Axodox::Graphics::D3D12::CommandList>;
+        CommandsList spektrumCommandList;
+        CommandsList FFTTildeh0Stage1CommandList;
+        CommandsList FFTTildeDStage1CommandList;
+        CommandsList FFTTildeh0Stage2CommandList;
+        CommandsList FFTTildeDStage2CommandList;
+        CommandsList displacementCommandList;
+        // Spektrums
+        {
+          computeAllocator.BeginList();
+          commonDescriptorHeap.Set(computeAllocator);
+          SimulationStage::SpektrumRootDescription::InputConstants constant{};
+          constant.time =
+              GetDurationInFloatWithPrecision<std::chrono::seconds,
+                                              std::chrono::milliseconds>(
+                  getTimeSinceStart());
+          auto mask = spektrumRootDescription.Set(computeAllocator,
+                                                  RootSignatureUsage::Compute);
+          mask.InputBuffer = simResource.DynamicBuffer.AddBuffer(constant);
+          mask.Tildeh0 = computeTildeh0;
+          mask.Frequencies = computeFrequencies;
 
-      //  const auto xSize = Defaults::ComputeShader::computeShaderGroupsDim1;
-      //  const auto ySize = Defaults::ComputeShader::computeShaderGroupsDim2;
-      //  const auto sizeX = Defaults::ComputeShader::heightMapDimensionsX;
-      //  const auto sizeY = Defaults::ComputeShader::heightMapDimensionsX;
-      //  allocator.Dispatch((sizeX + xSize - 1) / xSize,
-      //                     (sizeY + ySize - 1) / ySize, 1);
-      //}
+          mask.Tildeh = *simResource.computeTildeh.UnorderedAccess();
+          mask.TildeD = *simResource.computeTildeD.UnorderedAccess();
+
+          spektrumPipelineState.Apply(computeAllocator);
+          const auto xGroupSize = 16;
+          const auto yGroupSize = 16;
+          const auto sizeX = N;
+          const auto sizeY = M;
+          computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
+                                    (sizeY + yGroupSize - 1) / yGroupSize, 1);
+
+          simResource.SpektrumsMarker = simResource.Fence.CreateMarker();
+          computeAllocator.AddSignaler(simResource.SpektrumsMarker);
+
+          spektrumCommandList = computeAllocator.EndList();
+        }
+        {
+
+          //  FFT
+          static const std::array<
+              std::tuple<MutableTexture &, MutableTexture &,
+                         CommandFenceMarker &, CommandsList &, CommandsList &>,
+              2>
+              InpsOuts = {
+                  {{simResource.computeTildeh, simResource.tildehBuffer,
+                    simResource.TildeHMarker, FFTTildeh0Stage1CommandList,
+                    FFTTildeh0Stage2CommandList},
+                   {simResource.computeTildeD, simResource.tildeDBuffer,
+                    simResource.TildeDMarker, FFTTildeDStage1CommandList,
+                    FFTTildeDStage2CommandList}}};
+          // Stage1
+          {
+
+            for (auto it = InpsOuts.begin(); it != InpsOuts.end(); ++it) {
+
+              computeAllocator.BeginList();
+              commonDescriptorHeap.Set(computeAllocator);
+              computeAllocator.AddAwaiter(simResource.SpektrumsMarker);
+
+              auto [input, output, marker, commandList, _] = *it;
+
+              auto mask = FFTRootDescription.Set(computeAllocator,
+                                                 RootSignatureUsage::Compute);
+
+              mask.Input = *input.ShaderResource();
+              mask.Output = *output.UnorderedAccess();
+
+              FFTPipelineState.Apply(computeAllocator);
+
+              const auto xGroupSize = 1;
+              const auto yGroupSize = 1;
+              const auto sizeX = N;
+              const auto sizeY = 1;
+              computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
+                                        (sizeY + yGroupSize - 1) / yGroupSize,
+                                        1);
+              marker = simResource.Fence.CreateMarker();
+              computeAllocator.AddSignaler(marker);
+
+              commandList = computeAllocator.EndList();
+            }
+          }
+          // FFT Stage2
+          {
+            for (auto it = InpsOuts.begin(); it != InpsOuts.end(); ++it) {
+
+              computeAllocator.BeginList();
+              commonDescriptorHeap.Set(computeAllocator);
+
+              auto [input, output, marker, _, commandList] = *it;
+
+              computeAllocator.AddAwaiter(marker);
+
+              auto mask = FFTRootDescription.Set(computeAllocator,
+                                                 RootSignatureUsage::Compute);
+
+              mask.Input = *output.ShaderResource();
+              mask.Output = *input.UnorderedAccess();
+
+              FFTPipelineState.Apply(computeAllocator);
+
+              const auto xGroupSize = 1;
+              const auto yGroupSize = 1;
+              const auto sizeX = M;
+              const auto sizeY = 1;
+              computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
+                                        (sizeY + yGroupSize - 1) / yGroupSize,
+                                        1);
+
+              computeAllocator.AddSignaler(marker);
+
+              commandList = computeAllocator.EndList();
+            }
+          }
+        }
+
+        // Upload queue
+        {
+
+          computeAllocator.BeginList();
+          simResource.DynamicBuffer.UploadResources(computeAllocator);
+          resourceUploader.UploadResourcesAsync(computeAllocator);
+          auto initCommandList = computeAllocator.EndList();
+
+          computeQueue.Execute(initCommandList);
+          computeQueue.Execute(spektrumCommandList);
+          computeQueue.Execute(FFTTildeh0Stage1CommandList);
+          computeQueue.Execute(FFTTildeDStage1CommandList);
+          computeQueue.Execute(FFTTildeh0Stage2CommandList);
+          computeQueue.Execute(FFTTildeDStage2CommandList);
+          // computeQueue.Execute( displacementCommandList);
+
+          simResource.FrameDoneMarker =
+              simResource.Fence.EnqueueSignal(computeQueue);
+        }
+      }
+
+      {
+
+        commonDescriptorHeap.Set(allocator);
+        // Clears frame with background color
+        renderTargetView->Clear(allocator, clearColor);
+        frameResource.DepthBuffer.DepthStencil()->Clear(allocator);
+      }
+
+      // Graphics Stage
 
       // Draw objects
       uint qtNodes;
@@ -528,9 +699,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       std::chrono::nanoseconds NavigatingTheQuadTree(0);
 
       {
-        SimpleRootDescription::VertexConstants vertexConstants{};
-        SimpleRootDescription::HullConstants hullConstants{};
-        SimpleRootDescription::DomainConstants domainConstants{};
+        SimpleGraphicRootDescription::VertexConstants vertexConstants{};
+        SimpleGraphicRootDescription::HullConstants hullConstants{};
+        SimpleGraphicRootDescription::DomainConstants domainConstants{};
         float3 center = {0, 0, 0};
         float2 fullSizeXZ = {Defaults::App::planeSize,
                              Defaults::App::planeSize};
@@ -542,10 +713,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
         qt.Build(center, fullSizeXZ, float3(cam_eye.x, cam_eye.y, cam_eye.z));
 
-        auto end = std::chrono::high_resolution_clock::now();
         QuadTreeBuildTime =
-            std::chrono::duration_cast<decltype(QuadTreeBuildTime)>(end -
-                                                                    start);
+            std::chrono::duration_cast<decltype(QuadTreeBuildTime)>(
+                std::chrono::high_resolution_clock::now() - start);
 
         qtNodes = qt.GetSize();
 
@@ -601,17 +771,19 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
           auto mask =
               simpleRootSignature.Set(allocator, RootSignatureUsage::Graphics);
-          mask.HullBuffer = resources.DynamicBuffer.AddBuffer(hullConstants);
+          mask.HullBuffer =
+              frameResource.DynamicBuffer.AddBuffer(hullConstants);
           mask.VertexBuffer =
-              resources.DynamicBuffer.AddBuffer(vertexConstants);
+              frameResource.DynamicBuffer.AddBuffer(vertexConstants);
           mask.DomainBuffer =
-              resources.DynamicBuffer.AddBuffer(domainConstants);
-          mask.Texture = texture;
+              frameResource.DynamicBuffer.AddBuffer(domainConstants);
+          // mask.Texture = displayTexture;
+          mask.Texture = *currSimResource.computeTildeh.ShaderResource();
           mask.Heightmap = computeTildeh0;
           mask.HeightMapForDomain = computeTildeh0;
 
           allocator.SetRenderTargets({renderTargetView},
-                                     resources.DepthBuffer.DepthStencil());
+                                     frameResource.DepthBuffer.DepthStencil());
           graphicsPipelineState.Apply(allocator);
           planeMesh.Draw(allocator);
 
@@ -645,7 +817,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           ImGui::Text("CPU time %.3f ms/frame",
                       GetDurationInFloatWithPrecision<std::chrono::milliseconds,
                                                       std::chrono::nanoseconds>(
-                          (CPURenderEnd - loopStart)));
+                          (CPURenderEnd - frameStart)));
           ImGui::Text(
               "Since start %.3f s",
               GetDurationInFloatWithPrecision<std::chrono::seconds,
@@ -717,13 +889,13 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         auto drawCommandList = allocator.EndList();
 
         allocator.BeginList();
-        resources.DynamicBuffer.UploadResources(allocator);
+        frameResource.DynamicBuffer.UploadResources(allocator);
         resourceUploader.UploadResourcesAsync(allocator);
         auto initCommandList = allocator.EndList();
 
         directQueue.Execute(initCommandList);
         directQueue.Execute(drawCommandList);
-        resources.Marker = resources.Fence.EnqueueSignal(directQueue);
+        frameResource.Marker = frameResource.Fence.EnqueueSignal(directQueue);
       }
 
       // Present frame
