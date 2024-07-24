@@ -1,4 +1,4 @@
-Texture2D _heightmap : register(t0);
+Texture2D<float4> _heightmap : register(t0);
 SamplerState _sampler : register(s0);
 
 cbuffer DomainBuffer : register(b0)
@@ -50,9 +50,10 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
     
     texCoord = mul(TextureTransform, float4(texCoord.x, 0, texCoord.y, 1)).xz;
     float4 text = _heightmap.SampleLevel(_sampler, texCoord, 0);
-    position += float4(0, text.r, 0, 0) * 2;
+    // position += float4(0, text.r, 0, 0)*2;
+    position += text;
     // This would work, but the heightmap does not contain the normals on the gba channels
-    float3 normal = mul(float4(text.gba, 1), WorldIT).xyz;
+    float3 normal = float4(0, 1, 0, 1);
     
     
     

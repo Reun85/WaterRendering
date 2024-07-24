@@ -30,9 +30,9 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3
     int2 loc2 = int2(N - loc1.x, M - loc1.y);
 
     // Load initial spectrum
-    float2 h0_k = tilde_h0.Load(int3(loc1, 0)).rg;
-    float2 h0_mk = tilde_h0.Load(int3(loc2, 0)).rg;
-    float w_k = frequencies.Load(int3(loc1, 0)).r;
+    float2 h0_k = tilde_h0[loc1].rg;
+    float2 h0_mk = tilde_h0[loc2].rg;
+    float w_k = frequencies[loc1].r;
 
     // Height spectrum
     float cos_wt = cos(w_k * time);

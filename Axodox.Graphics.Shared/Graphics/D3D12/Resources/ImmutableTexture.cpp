@@ -18,10 +18,11 @@ ImmutableTexture::ImmutableTexture(const ResourceAllocationContext &context,
 }
 ImmutableTexture::ImmutableTexture(const ResourceAllocationContext &context,
                                    const TextureData &textureData) {
-  _texture = context.ResourceAllocator->CreateTexture(textureData.Definition());
+  TextureData x = textureData;
+  _texture = context.ResourceAllocator->CreateTexture(x.Definition());
 
-  _allocatedSubscription = _texture->Allocated(
-      [this, context, data = move(textureData)](Resource *resource) {
+  _allocatedSubscription =
+      _texture->Allocated([this, context, data = move(x)](Resource *resource) {
         context.ResourceUploader->EnqueueUploadTask(resource, &data);
         _view =
             context.CommonDescriptorHeap->CreateShaderResourceView(resource);
