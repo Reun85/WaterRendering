@@ -93,7 +93,8 @@ constexpr std::vector<Prec> CalculateFrequenciesFromDefaults(const u32 N,
           2 * std::numbers::pi_v<Prec> * ((i32)i - (((i32)N) >> 1)) / L_x,
           2 * std::numbers::pi_v<Prec> * ((i32)j - (((i32)M) >> 1)) / L_z);
       const float k = length(kvec);
-      res[Inner::Indexing(i, j, N, M)] = gravity * k * std::tanh(k * D);
+      const float tmp = gravity * k * std::tanh(k * D);
+      res[Inner::Indexing(i, j, N, M)] = sqrt(tmp);
     }
   }
   return res;

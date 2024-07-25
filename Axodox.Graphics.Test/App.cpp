@@ -6,6 +6,7 @@
 #include "ConstantGPUBuffer.h"
 #include "Defaults.h"
 #include "WaterMath.h"
+#include "Helpers.h"
 
 using namespace std;
 using namespace winrt;
@@ -22,62 +23,6 @@ using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
 using namespace DirectX;
 using namespace DirectX::PackedVector;
-
-template <typename T>
-concept IsRatio = std::is_same_v<T, std::ratio<T::num, T::den>>;
-template <typename T>
-concept HasRatioPeriod =
-    requires { typename T::period; } && IsRatio<typename T::period>;
-
-template <typename TimeRep, typename PrecisionRep, typename T, typename Q>
-  requires IsRatio<TimeRep> && IsRatio<PrecisionRep> && IsRatio<Q>
-constexpr float
-GetDurationInFloatWithPrecision(const std::chrono::duration<T, Q> &inp) {
-  using Result = std::ratio_divide<PrecisionRep, TimeRep>;
-  using Precision = std::chrono::duration<T, PrecisionRep>;
-  const T count = std::chrono::duration_cast<Precision>(inp).count();
-  return static_cast<float>(count) * static_cast<float>(Result::num) /
-         static_cast<float>(Result::den);
-}
-template <typename TimeRepTimeFrame, typename PrecisionTimeFrame, typename T,
-          typename Q>
-  requires HasRatioPeriod<TimeRepTimeFrame> &&
-           HasRatioPeriod<PrecisionTimeFrame> && IsRatio<Q>
-constexpr float
-GetDurationInFloatWithPrecision(const std::chrono::duration<T, Q> &inp) {
-  return GetDurationInFloatWithPrecision<typename TimeRepTimeFrame::period,
-                                         typename PrecisionTimeFrame::period, T,
-                                         Q>(inp);
-}
-
-template <typename DataType>
-ImmutableTexture
-ImmutableTextureFromData(const ResourceAllocationContext &context,
-                         const Format &f, const u32 width, const u32 height,
-                         const u16 arraySize, std::span<const DataType> data) {
-  auto text = TextureData(f, width, height, arraySize);
-  std::span<u8> span = text.AsRawSpan();
-  assert(span.size_bytes() == data.size_bytes());
-
-  std::memcpy(span.data(), data.data(), data.size_bytes());
-  return ImmutableTexture{context, text};
-};
-MeshDescription CreateQuadPatch(float size) {
-  size = size / 2;
-
-  MeshDescription result;
-
-  result.Vertices = {
-      VertexPositionTexture{XMFLOAT3{-size, size, 0.f}, XMUSHORTN2{0.f, 0.f}},
-      VertexPositionTexture{XMFLOAT3{-size, -size, 0.f}, XMUSHORTN2{0.f, 1.f}},
-      VertexPositionTexture{XMFLOAT3{size, size, 0.f}, XMUSHORTN2{1.f, 0.f}},
-      VertexPositionTexture{XMFLOAT3{size, -size, 0.f}, XMUSHORTN2{1.f, 1.f}}};
-
-  result.Topology = static_cast<PrimitiveTopology>(
-      D3D11_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST);
-
-  return result;
-}
 
 struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   IFrameworkView CreateView() const { return *this; }
@@ -107,7 +52,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           DynamicBuffer(*context.Device), DepthBuffer(context) {}
   };
 
-  struct SimpleGraphicRootDescription : public RootSignatureMask {
+  struct SimpleGraphicsRootDescription : public RootSignatureMask {
     struct DomainConstants {
       // There is no 2x2?
       XMFLOAT4X4 TextureTransform;
@@ -132,7 +77,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     RootDescriptorTable<1> HeightMapForDomain;
     StaticSampler HeightmapSamplerForDomain;
 
-    explicit SimpleGraphicRootDescription(const RootSignatureContext &context)
+    explicit SimpleGraphicsRootDescription(const RootSignatureContext &context)
         : RootSignatureMask(context),
           VertexBuffer(this, {0}, ShaderVisibility::Vertex),
           HullBuffer(this, {0}, ShaderVisibility::Hull),
@@ -206,53 +151,53 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         Flags = RootSignatureFlags::None;
       }
     };
-  };
 
-  struct SimulationResources {
+    struct SimulationResources {
 
-    CommandAllocator Allocator;
-    CommandFence Fence;
-    CommandFenceMarker FrameDoneMarker;
-    CommandFenceMarker SpektrumsMarker;
-    CommandFenceMarker FFThMarker1;
-    CommandFenceMarker FFTDMarker1;
-    CommandFenceMarker FFTDMarker2;
-    CommandFenceMarker FFThMarker2;
-    DynamicBufferManager DynamicBuffer;
+      CommandAllocator Allocator;
+      CommandFence Fence;
+      CommandFenceMarker FrameDoneMarker;
+      CommandFenceMarker SpektrumsMarker;
+      CommandFenceMarker FFThMarker1;
+      CommandFenceMarker FFTDMarker1;
+      CommandFenceMarker FFTDMarker2;
+      CommandFenceMarker FFThMarker2;
+      DynamicBufferManager DynamicBuffer;
 
-    MutableTexture computeTildeh;
-    MutableTexture computeTildeD;
-    MutableTexture tildehBuffer;
-    MutableTexture tildeDBuffer;
+      MutableTexture computeTildeh;
+      MutableTexture computeTildeD;
+      MutableTexture tildehBuffer;
+      MutableTexture tildeDBuffer;
 
-    // Just reuse a buffer
-    /// <summary>
-    ///
-    /// </summary>
-    MutableTexture finalDisplacementMap;
+      // Just reuse a buffer
+      /// <summary>
+      ///
+      /// </summary>
+      MutableTexture finalDisplacementMap;
 
-    explicit SimulationResources(const ResourceAllocationContext &context,
-                                 const u32 N, const u32 M)
-        : Allocator(*context.Device),
+      explicit SimulationResources(const ResourceAllocationContext &context,
+                                   const u32 N, const u32 M)
+          : Allocator(*context.Device),
 
-          Fence(*context.Device), DynamicBuffer(*context.Device),
-          computeTildeh(context, TextureDefinition::TextureDefinition(
-                                     Format::R32G32_Float, N, M, 0,
-                                     TextureFlags::UnorderedAccess)),
-          computeTildeD(context, TextureDefinition::TextureDefinition(
-                                     Format::R32G32_Float, N, M, 0,
-                                     TextureFlags::UnorderedAccess)),
-          tildehBuffer(context, TextureDefinition::TextureDefinition(
-                                    Format::R32G32_Float, N, M, 0,
-                                    TextureFlags::UnorderedAccess)),
-          tildeDBuffer(context, TextureDefinition::TextureDefinition(
-                                    Format::R32G32_Float, N, M, 0,
-                                    TextureFlags::UnorderedAccess)),
-          finalDisplacementMap(context, TextureDefinition::TextureDefinition(
-                                            Format::R8G8B8A8_SNorm, N, M, 0,
-                                            TextureFlags::UnorderedAccess))
+            Fence(*context.Device), DynamicBuffer(*context.Device),
+            computeTildeh(context, TextureDefinition::TextureDefinition(
+                                       Format::R32G32_Float, N, M, 0,
+                                       TextureFlags::UnorderedAccess)),
+            computeTildeD(context, TextureDefinition::TextureDefinition(
+                                       Format::R32G32_Float, N, M, 0,
+                                       TextureFlags::UnorderedAccess)),
+            tildehBuffer(context, TextureDefinition::TextureDefinition(
+                                      Format::R32G32_Float, N, M, 0,
+                                      TextureFlags::UnorderedAccess)),
+            tildeDBuffer(context, TextureDefinition::TextureDefinition(
+                                      Format::R32G32_Float, N, M, 0,
+                                      TextureFlags::UnorderedAccess)),
+            finalDisplacementMap(context, TextureDefinition::TextureDefinition(
+                                              Format::R8G8B8A8_SNorm, N, M, 0,
+                                              TextureFlags::UnorderedAccess))
 
-    {}
+      {}
+    };
   };
 
   void Run() const {
@@ -269,8 +214,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     cam.SetFirstPerson(firstperson);
     // Events
     {
-      // If I redo the whole system, this could be handled when the callback
-      // is made.
       window.KeyDown([&cam, &quit, &firstperson](CoreWindow const &,
                                                  KeyEventArgs const &args) {
         if (ImGui::GetIO().WantCaptureKeyboard)
@@ -319,7 +262,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     PipelineStateProvider pipelineStateProvider{device};
 
     // Graphics pipeline
-    RootSignature<SimpleGraphicRootDescription> simpleRootSignature{device};
+    RootSignature<SimpleGraphicsRootDescription> simpleRootSignature{device};
 
     VertexShader simpleVertexShader{app_folder() / L"SimpleVertexShader.cso"};
     PixelShader simplePixelShader{app_folder() / L"SimplePixelShader.cso"};
@@ -424,9 +367,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         FrameResources(mutableAllocationContext),
         FrameResources(mutableAllocationContext)};
 
-    array<SimulationResources, 2> simulationResources{
-        SimulationResources(mutableAllocationContext, N, M),
-        SimulationResources(mutableAllocationContext, N, M)};
+    array<SimulationStage::SimulationResources, 2> simulationResources{
+        SimulationStage::SimulationResources(mutableAllocationContext, N, M),
+        SimulationStage::SimulationResources(mutableAllocationContext, N, M)};
 
     swapChain.Resizing(
         no_revoke, [&frameResources, &commonDescriptorHeap](SwapChain const *) {
@@ -492,8 +435,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       // Wait until buffers can be reused
       if (frameResource.Marker)
         frameResource.Fence.Await(frameResource.Marker);
-      // if (currSimResource.FrameDoneMarker)
-      //   currSimResource.Fence.Await(currSimResource.FrameDoneMarker);
+      if (currSimResource.FrameDoneMarker)
+        currSimResource.Fence.Await(currSimResource.FrameDoneMarker);
 
       // Get DeltaTime
       float deltaTime;
@@ -530,14 +473,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       cam.SetAspect(float(resolution.x) / float(resolution.y));
       cam.Update(deltaTime);
 
-      // Begin frame command list
-      auto &allocator = frameResource.Allocator;
-      {
-        allocator.Reset();
-        allocator.BeginList();
-        allocator.TransitionResource(*renderTargetView, ResourceStates::Present,
-                                     ResourceStates::RenderTarget);
-      }
+      // Frame Begin
       {
         committedResourceAllocator.Build();
         depthStencilDescriptorHeap.Build();
@@ -677,8 +613,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             }
           }
         }
-        // Calculate final displacements
 
+        // Calculate final displacements
         {
 
           computeAllocator.BeginList();
@@ -732,6 +668,13 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
       // Graphics Stage
 
+      auto &allocator = frameResource.Allocator;
+      {
+        allocator.Reset();
+        allocator.BeginList();
+        allocator.TransitionResource(*renderTargetView, ResourceStates::Present,
+                                     ResourceStates::RenderTarget);
+      }
       {
 
         commonDescriptorHeap.Set(allocator);
@@ -741,14 +684,15 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       }
       // Draw objects
       uint qtNodes;
+      uint drawnNodes = 0;
       std::chrono::nanoseconds QuadTreeBuildTime(0);
 
       std::chrono::nanoseconds NavigatingTheQuadTree(0);
 
       {
-        SimpleGraphicRootDescription::VertexConstants vertexConstants{};
-        SimpleGraphicRootDescription::HullConstants hullConstants{};
-        SimpleGraphicRootDescription::DomainConstants domainConstants{};
+        SimpleGraphicsRootDescription::VertexConstants vertexConstants{};
+        SimpleGraphicsRootDescription::HullConstants hullConstants{};
+        SimpleGraphicsRootDescription::DomainConstants domainConstants{};
         float3 center = {0, 0, 0};
         float2 fullSizeXZ = {Defaults::App::planeSize,
                              Defaults::App::planeSize};
@@ -769,6 +713,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         auto worldBasic = XMMatrixRotationX(XMConvertToRadians(-90.0));
         start = std::chrono::high_resolution_clock::now();
         for (auto it = qt.begin(); it != qt.end(); ++it) {
+          drawnNodes++;
           NavigatingTheQuadTree +=
               std::chrono::duration_cast<decltype(NavigatingTheQuadTree)>(
                   (std::chrono::high_resolution_clock::now() - start));
@@ -824,13 +769,13 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
               frameResource.DynamicBuffer.AddBuffer(vertexConstants);
           mask.DomainBuffer =
               frameResource.DynamicBuffer.AddBuffer(domainConstants);
-          mask.Texture = displayTexture;
+          // mask.Texture = displayTexture;
 
-          // mask.Texture = computeTildeh0;
+          mask.Texture = computeTildeh0;
           // mask.Texture = *currSimResource.computeTildeh.ShaderResource();
-          // mask.Texture = *currSimResource.computeTildeh.ShaderResource();
-          // mask.Texture =
-          // *currSimResource.finalDisplacementMap.ShaderResource();
+          //  mask.Texture = *currSimResource.computeTildeh.ShaderResource();
+          //  mask.Texture =
+          //  *currSimResource.finalDisplacementMap.ShaderResource();
           mask.HeightMapForDomain =
               *currSimResource.finalDisplacementMap.ShaderResource();
 
@@ -866,6 +811,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                       GetDurationInFloatWithPrecision<std::chrono::milliseconds,
                                                       std::chrono::nanoseconds>(
                           NavigatingTheQuadTree));
+          ImGui::Text("Drawn Nodes: %d", drawnNodes);
           ImGui::Text("CPU time %.3f ms/frame",
                       GetDurationInFloatWithPrecision<std::chrono::milliseconds,
                                                       std::chrono::nanoseconds>(

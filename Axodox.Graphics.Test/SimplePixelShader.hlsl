@@ -18,6 +18,5 @@ float4 main(input_t input) : SV_TARGET
     //float4 ret = float4(samp.y, 0, 0, 1);
     ret = samp;
      
-    ret = float4(1, 1, 1, 1);
     return ret;
 }
