@@ -140,9 +140,11 @@ void QuadTree::BuildRecursively(const uint index, const float yCoordinate,
   float3 diff = {node.center.x - camEye.x, yCoordinate - camEye.y,
                  node.center.y - camEye.z};
   double dist = sqrt(diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
-  // if (dist / (node.size.x * node.size.y) < distanceThreshold) {
-  if (dist / (std::max(node.size.x, node.size.y)) < distanceThreshold ||
-      depth < minDepth) {
+
+  bool cont = dist / (node.size.x * node.size.y) < distanceThreshold;
+  // bool cont = dist / (std::max(node.size.x, node.size.y)) <
+  // distanceThreshold;
+  if (cont || depth < minDepth) {
     for (uint i = 0; i < 4; i++) {
       uint id = count;
       count++;

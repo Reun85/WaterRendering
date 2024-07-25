@@ -16,12 +16,14 @@ cbuffer HullBuffer : register(b0)
 struct HS_INPUT_PATCH
 {
     float4 Position : SV_POSITION;
+    float4 localPos : POSITION;
     float2 TexCoord : TEXCOORD;
 };
 
 struct HS_OUTPUT_PATCH
 {
     float4 Position : SV_POSITION;
+    float4 localPos : POSITION;
     float2 TexCoord : TEXCOORD;
 };
 
@@ -37,6 +39,7 @@ HS_OUTPUT_PATCH main(InputPatch<HS_INPUT_PATCH, 4> patch, uint i : SV_OutputCont
     output.Position = patch[i].Position;
 
     output.TexCoord = patch[i].TexCoord;
+    output.localPos = patch[i].localPos;
     
     return
 output;
@@ -118,10 +121,10 @@ HS_CONSTANT_DATA_OUTPUT HSConstantFunction(InputPatch<HS_INPUT_PATCH, 4> patch, 
     //output.edges[0] = dostuff(patch[2].Position, patch[0].Position);
     //output.edges[1] = dostuff(patch[2].Position, patch[3].Position);
     
-    output.edges[0] *= TessellationFactor.r;
-    output.edges[1] *= TessellationFactor.g;
-    output.edges[2] *= TessellationFactor.b;
-    output.edges[3] *= TessellationFactor.a;
+    output.edges[0] *= TessellationFactor.g;
+    output.edges[1] *= TessellationFactor.b;
+    output.edges[2] *= TessellationFactor.a;
+    output.edges[3] *= TessellationFactor.r;
 
     output.inside[1] = (output.edges[1] + output.edges[2]) / 2;
     output.inside[0] = (output.edges[0] + output.edges[3]) / 2;

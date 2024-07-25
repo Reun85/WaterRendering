@@ -22,7 +22,7 @@ struct Defaults {
 
 public:
   struct Cam {
-    QUALIFIER float3 camStartPos = float3(-1, 300, 0);
+    QUALIFIER float3 camStartPos = float3(-1, 10, 0);
     QUALIFIER bool startFirstPerson = true;
   };
   struct App {
@@ -36,9 +36,9 @@ public:
     QUALIFIER u32 computeShaderGroupsDim2 = 16;
   };
   struct QuadTree {
-    QUALIFIER float distanceThreshold = 5e+1f;
+    QUALIFIER float distanceThreshold = 1e+1f;
     QUALIFIER u32 allocation = 10000;
-    QUALIFIER u32 maxDepth = 5;
+    QUALIFIER u32 maxDepth = 7;
     QUALIFIER u32 minDepth = 0;
   };
   struct Simulation {
@@ -47,13 +47,11 @@ public:
     QUALIFIER u32 M = ComputeShader::heightMapDimensionsZ;
     QUALIFIER f32 L_x = App::planeSize;
     QUALIFIER f32 L_z = App::planeSize;
-    // QUALIFIER f32 L_x = 1;
-    // QUALIFIER f32 L_z = 1;
     QUALIFIER f32 Depth = 100;
 
     QUALIFIER f32 gravity = 9.81f;
 
-    QUALIFIER f32 WindForce = 6.5;
+    QUALIFIER f32 WindForce = 4;
     QUALIFIER float2 WindDirection = float2(-0.4f, -0.9f);
 
     // A constant that scales the waves

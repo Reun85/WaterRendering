@@ -39,7 +39,12 @@ public:
 
   void SetProj(float _angle, float _aspect, float _zn, float _zf);
 
-  void SetSpeed(float _val);
+  float GetBaseSpeed() const { return m_speed; }
+  void SetBaseSpeed(float _val);
+
+  float GetDistance() const { return m_distance; }
+  void SetDistanceFromAt(float);
+
   void Resize(int _w, int _h);
 
   void SetFirstPerson(bool _firstperson);

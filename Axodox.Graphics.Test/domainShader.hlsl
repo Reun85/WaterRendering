@@ -1,4 +1,5 @@
 Texture2D<float4> _heightmap : register(t0);
+Texture2D<float4> _gradients : register(t1);
 SamplerState _sampler : register(s0);
 
 cbuffer DomainBuffer : register(b0)
@@ -13,6 +14,7 @@ cbuffer DomainBuffer : register(b0)
 struct DS_OUTPUT
 {
     float4 Position : SV_POSITION;
+    float4 localPos : POSITION;
     float2 TexCoord : TEXCOORD;
     float3 Normal : NORMAL;
 };
@@ -20,6 +22,7 @@ struct DS_OUTPUT
 struct HS_OUTPUT_PATCH
 {
     float4 Position : SV_POSITION;
+    float4 localPos : POSITION;
     float2 TexCoord : TEXCOORD;
 };
 
@@ -43,6 +46,8 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
     // Perform bilinear interpolation of the control points
     float4 position = (patch[0].Position * (1.0f - UV.x) + patch[1].Position * UV.x) * (1.0f - UV.y) +
                       (patch[2].Position * (1.0f - UV.x) + patch[3].Position * UV.x) * UV.y;
+    float4 localPos = (patch[0].localPos * (1.0f - UV.x) + patch[1].localPos * UV.x) * (1.0f - UV.y) +
+                      (patch[2].localPos * (1.0f - UV.x) + patch[3].localPos * UV.x) * UV.y;
 
     float2 texCoord = (patch[0].TexCoord * (1.0f - UV.x) + patch[1].TexCoord * UV.x) * (1.0f - UV.y) +
                       (patch[2].TexCoord * (1.0f - UV.x) + patch[3].TexCoord * UV.x) * UV.y;
@@ -50,15 +55,16 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
     
     float4 text = _heightmap.SampleLevel(_sampler, texCoord, 0);
     // position += float4(0, text.r, 0, 0)*2;
-    position += mul(FullTransform, float4(text.xyz, 1));
+    position += mul(float4(text.xyz, 1), FullTransform);
     // This would work, but the heightmap does not contain the normals on the gba channels
-    float3 normal = float3(0, 1, 0);
+    float3 normal = _gradients.SampleLevel(_sampler, texCoord, 0).xyz;
     
     
     
     output.Position = position;
     output.TexCoord = texCoord;
     output.Normal = normal;
+    output.localPos = localPos + float4(text.xyz, 0);
     
     return output;
 }

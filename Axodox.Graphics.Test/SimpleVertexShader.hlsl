@@ -13,6 +13,7 @@ struct input_t
 struct output_t
 {
     float4 Position : SV_POSITION;
+    float4 localPos : POSITION;
     float2 TexCoord : TEXCOORD;
 };
 
@@ -32,8 +33,9 @@ output_t main(input_t input)
     texCoord = ((PlaneBottomLeft.x < PlaneTopRight.x && PlaneBottomLeft.y > PlaneTopRight.y) || (PlaneBottomLeft.x > PlaneTopRight.x && PlaneBottomLeft.y < PlaneTopRight.y) ? texCoord.xy : texCoord.yx);
     
 
-    position = mul(position, ViewTransform);
-    output.Position = position;
+    float4 screenPosition = mul(position, ViewTransform);
+    output.Position = screenPosition;
+    output.localPos = position;
     output.TexCoord = texCoord;
     return output;
 }

@@ -100,8 +100,8 @@ CalculateTildeh0FromDefaults(std::random_device &rd, const u32 _N,
 
 template <typename Prec = float>
   requires std::is_floating_point_v<Prec>
-constexpr std::vector<Prec> CalculateFrequenciesFromDefaults(const u32 N,
-                                                             const u32 M) {
+constexpr std::vector<Prec> CalculateFrequenciesFromDefaults(const u32 _N,
+                                                             const u32 _M) {
 
   // w^2(k) = gktanh(kD)
   using Def = Defaults::Simulation;
@@ -110,21 +110,23 @@ constexpr std::vector<Prec> CalculateFrequenciesFromDefaults(const u32 N,
   const auto &L_x = Def::L_x;
   const auto &L_z = Def::L_z;
 
+  const i32 N = (i32)_N;
+  const i32 M = (i32)_M;
   const i32 Nx2 = N / 2;
   const i32 Mx2 = M / 2;
 
   std::vector<Prec> res(N * M);
   float2 kvec;
-  for (u32 i = 0; i < N; ++i) {
+  for (i32 i = 0; i < N; ++i) {
     kvec.x = 2 * std::numbers::pi_v<Prec> * (Nx2 - i) / L_x;
-    for (u32 j = 0; j < M; j++) {
+    for (i32 j = 0; j < M; j++) {
       kvec.y = 2 * std::numbers::pi_v<Prec> * (Mx2 - j) / L_z;
 
       const auto index = Inner::Indexing(i, j, N, M);
 
       const float k = length(kvec);
       const float tmp = gravity * k * std::tanh(k * D);
-      res[index] = sqrt(tmp);
+      res[index] = sqrtf(tmp);
     }
   }
   return res;

@@ -128,7 +128,12 @@ inline float Camera::GetSpeed() const {
                                   : (m_slow ? 1.f / 4.f : 1.f));
 }
 
-void Camera::SetSpeed(float _val) { m_speed = _val; }
+void Camera::SetBaseSpeed(float _val) { m_speed = _val; }
+
+void Camera::SetDistanceFromAt(float distance) {
+  m_distance = distance;
+  UpdateParams();
+}
 
 void Camera::Resize(int _w, int _h) { SetAspect(_w / (float)_h); }
 

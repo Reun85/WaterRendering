@@ -48,7 +48,8 @@ ImmutableTexture constexpr ImmutableTextureFromData(
   return ImmutableTexture{context, text};
 };
 
-MeshDescription CreateQuadPatch(float size) {
+MeshDescription CreateQuadPatch() {
+  float size = 1.f;
   size = size / 2;
 
   MeshDescription result;
