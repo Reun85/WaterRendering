@@ -11,14 +11,21 @@ template <typename Prec = f32>
 constexpr Prec PhilipsSpektrum(const float2 &k, const Prec &Amplitude,
                                const Prec &largestHeight, const float2 &wind) {
 
-  const double klength = length(k);
-  const double val1 = Amplitude / pow(klength, 4);
-  const double val2 =
-      std::exp(-1 / (klength * klength * largestHeight * largestHeight));
-  const double tmp = abs(dot(normalize(k), normalize(wind)));
-  const double val3 = tmp * tmp;
+  // Smaller than these waves
+  const float l = largestHeight / 1000.f;
 
-  return static_cast<Prec>(val1 * val2 * val3);
+  const float kdotw = dot(k, wind);
+  const float klengthsq = dot(k, k);
+  float P_h = Amplitude *
+              (std::expf(-1.0f / (klengthsq * largestHeight * largestHeight))) /
+              (klengthsq * klengthsq * klengthsq) * (kdotw * kdotw);
+
+  if (kdotw < 0.0f) {
+    // wave is moving against wind direction w
+    P_h *= 0.07f;
+  }
+
+  return P_h * std::expf(-klengthsq * l * l);
 }
 
 template <typename Prec = f32>
@@ -26,9 +33,19 @@ template <typename Prec = f32>
 constexpr std::complex<Prec>
 tilde_h0(const float2 &k, const Prec &xi_real, const Prec &xi_im,
          const Prec &Amplitude, const Prec &largestHeight, const float2 &wind) {
+
+  constexpr static const Prec one_over_sqrt_2 = 1 / std::numbers::sqrt2_v<Prec>;
+
   std::complex res = std::complex<Prec>(xi_real, xi_im);
-  res *= sqrt(PhilipsSpektrum<Prec>(k, Amplitude, largestHeight, wind));
-  res /= std::numbers::sqrt2_v<Prec>;
+
+  Prec sqrt_Ph = 0;
+  if (k.x != 0.f || k.y != 0.f) {
+    sqrt_Ph =
+        std::sqrtf(PhilipsSpektrum<Prec>(k, Amplitude, largestHeight, wind));
+  }
+
+  res *= sqrt_Ph;
+  res *= one_over_sqrt_2;
   return res;
 }
 
@@ -47,10 +64,13 @@ constexpr u32 Indexing(const u32 i, const u32 j, const u32 N, const u32 M) {
 template <typename Prec = float>
   requires std::is_floating_point_v<Prec>
 std::vector<std::complex<Prec>>
-CalculateTildeh0FromDefaults(std::random_device &rd, const u32 N, const u32 M) {
+CalculateTildeh0FromDefaults(std::random_device &rd, const u32 _N,
+                             const u32 _M) {
 
+  const i32 N = (i32)_N;
+  const i32 M = (i32)_M;
   using Def = Defaults::Simulation;
-  const auto &wind = Def::WindDirection;
+  const auto &wind = normalize(Def::WindDirection);
   const auto &gravity = Def::gravity;
   const auto &WindForce = Def::WindForce;
   const auto &Amplitude = Def::Amplitude;
@@ -58,17 +78,21 @@ CalculateTildeh0FromDefaults(std::random_device &rd, const u32 N, const u32 M) {
   const auto &L_z = Def::L_z;
 
   std::mt19937 gen(rd());
-  std::uniform_real_distribution<Prec> dis(0, 1);
+  std::normal_distribution<Prec> dis(0, 1);
 
+  const i32 Nx2 = N / 2;
+  const i32 Mx2 = M / 2;
   std::vector<std::complex<Prec>> res(N * M);
-  for (u32 i = 0; i < N; i++) {
-    for (u32 j = 0; j < M; j++) {
-      const float2 k = float2(
-          2 * std::numbers::pi_v<Prec> * ((i32)i - (((i32)N) >> 1)) / L_x,
-          2 * std::numbers::pi_v<Prec> * ((i32)j - (((i32)M) >> 1)) / L_z);
-      res[Inner::Indexing(i, j, N, M)] =
-          Inner::tilde_h0<Prec>(k, dis(gen), dis(gen), Amplitude,
-                                WindForce * WindForce / gravity, wind);
+  float2 k;
+  for (i32 i = 0; i < N; ++i) {
+    k.x = 2 * std::numbers::pi_v<Prec> * (Nx2 - i) / L_x;
+    for (i32 j = 0; j < M; j++) {
+      k.y = 2 * std::numbers::pi_v<Prec> * (Mx2 - j) / L_z;
+
+      const auto index = Inner::Indexing(i, j, N, M);
+
+      res[index] = Inner::tilde_h0<Prec>(k, dis(gen), dis(gen), Amplitude,
+                                         WindForce * WindForce / gravity, wind);
     }
   }
   return res;
@@ -86,15 +110,21 @@ constexpr std::vector<Prec> CalculateFrequenciesFromDefaults(const u32 N,
   const auto &L_x = Def::L_x;
   const auto &L_z = Def::L_z;
 
+  const i32 Nx2 = N / 2;
+  const i32 Mx2 = M / 2;
+
   std::vector<Prec> res(N * M);
-  for (u32 i = 0; i < N; i++) {
+  float2 kvec;
+  for (u32 i = 0; i < N; ++i) {
+    kvec.x = 2 * std::numbers::pi_v<Prec> * (Nx2 - i) / L_x;
     for (u32 j = 0; j < M; j++) {
-      const float2 kvec = float2(
-          2 * std::numbers::pi_v<Prec> * ((i32)i - (((i32)N) >> 1)) / L_x,
-          2 * std::numbers::pi_v<Prec> * ((i32)j - (((i32)M) >> 1)) / L_z);
+      kvec.y = 2 * std::numbers::pi_v<Prec> * (Mx2 - j) / L_z;
+
+      const auto index = Inner::Indexing(i, j, N, M);
+
       const float k = length(kvec);
       const float tmp = gravity * k * std::tanh(k * D);
-      res[Inner::Indexing(i, j, N, M)] = sqrt(tmp);
+      res[index] = sqrt(tmp);
     }
   }
   return res;

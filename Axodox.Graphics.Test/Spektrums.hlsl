@@ -43,7 +43,12 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3
 
     // "Choppy" 
     float2 k = float2(N / 2 - loc1.x, M / 2 - loc1.y);
-    float2 nk = normalize(k);
+    float2 nk = float2(0, 0);
+
+    
+    if (dot(k, k) > 1e-12)
+        nk = normalize(k);
+    
 
     float2 Dt_x = float2(h_tk.y * nk.x, -h_tk.x * nk.x);
     float2 iDt_z = float2(h_tk.x * nk.y, h_tk.y * nk.y);

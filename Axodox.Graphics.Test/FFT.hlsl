@@ -4,8 +4,9 @@ RWTexture2D<float2> writebuff : register(u0);
 
 #define N 1024
 #define LOG2_N 10
-#define PI 3.14159265359
-#define TWO_PI 6.28318530718
+#define PI		3.1415926535897932
+#define TWO_PI	6.2831853071795864
+
 
 groupshared float2 pingpong[2][N];
 
@@ -43,20 +44,19 @@ int ReverseBitfield(uint x)
 [numthreads(N, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3 LTid : SV_GroupID)
 {
-    uint z = GTid.x;
-    uint x = LTid.x;
+    //uint z = GTid.x;
+    //uint x = LTid.x;
+    uint x = DTid.x;
+    uint z = DTid.z;
 
-    // Load row/column into shared memory
-    pingpong[1][x] = readbuff[int2(z, x)].rg;
-
-    GroupMemoryBarrierWithGroupSync();
 
     // Rearrange array for FFT
     // We use f32 => 32
     // 
-    int nj = (ReverseBitfield(x) >> (32 - LOG2_N)) & (N - 1);
-    pingpong[0][nj] = pingpong[1][x];
+    uint nj = (ReverseBitfield(x) >> (32 - LOG2_N)) & (N - 1);
+    pingpong[0][nj] = readbuff[int2(z, x)].rg;
 
+    
     GroupMemoryBarrierWithGroupSync();
 
     // Butterfly stages
@@ -64,8 +64,7 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3
 
     for (uint s = 1; s <= LOG2_N; ++s)
     {
-        int m = 1L
-         << s; // Height of butterfly group
+        int m = 1 << s; // Height of butterfly group
         int mh = m >> 1; // Half height of butterfly group
 
         int k = (x * (N / m)) & (N - 1);
@@ -73,7 +72,7 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3
         int j = (x & (mh - 1)); // Butterfly index in group
 
         // WN-k twiddle factor
-        float theta = (TWO_PI * float(k)) / N;
+        float theta = (TWO_PI * float(k)) / float(N);
         float2 W_N_k = float2(cos(theta), sin(theta));
 
         float2 input1 = pingpong[src][i + j + mh];

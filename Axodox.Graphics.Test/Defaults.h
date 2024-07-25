@@ -22,7 +22,7 @@ struct Defaults {
 
 public:
   struct Cam {
-    QUALIFIER float3 camStartPos = float3(0, 300, -1);
+    QUALIFIER float3 camStartPos = float3(-1, 300, 0);
     QUALIFIER bool startFirstPerson = true;
   };
   struct App {
@@ -38,8 +38,8 @@ public:
   struct QuadTree {
     QUALIFIER float distanceThreshold = 5e+1f;
     QUALIFIER u32 allocation = 10000;
-    QUALIFIER u32 maxDepth = 2;
-    QUALIFIER u32 minDepth = 2;
+    QUALIFIER u32 maxDepth = 5;
+    QUALIFIER u32 minDepth = 0;
   };
   struct Simulation {
   public:
@@ -58,7 +58,7 @@ public:
 
     // A constant that scales the waves
     // QUALIFIER f32 Amplitude = 0.45e-5f;
-    QUALIFIER f32 Amplitude = 0.45e+1f;
+    QUALIFIER f32 Amplitude = 0.45e-3f;
 
     QUALIFIER f32 timeStep = 1.0f / 60.0f;
     static_assert(isPowerOfTwo(N));

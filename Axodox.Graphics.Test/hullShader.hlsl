@@ -36,9 +36,8 @@ HS_OUTPUT_PATCH main(InputPatch<HS_INPUT_PATCH, 4> patch, uint i : SV_OutputCont
     HS_OUTPUT_PATCH output;
     output.Position = patch[i].Position;
 
+    output.TexCoord = patch[i].TexCoord;
     
-    output.TexCoord = patch[i].
-TexCoord;
     return
 output;
 }

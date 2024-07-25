@@ -14,7 +14,6 @@ Camera::Camera(XMVECTOR _eye, XMVECTOR _at, XMVECTOR _worldUp) {
 Camera::~Camera() {}
 
 void Camera::SetView(XMVECTOR _eye, XMVECTOR _at, XMVECTOR _worldUp) {
-  static const float eps = 0.001f;
   m_eye = _eye;
   m_at = _at;
   m_worldUp = _worldUp;

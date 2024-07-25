@@ -54,13 +54,18 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
   struct SimpleGraphicsRootDescription : public RootSignatureMask {
     struct DomainConstants {
-      // There is no 2x2?
-      XMFLOAT4X4 TextureTransform;
+      XMFLOAT4X4 WorldViewTransform;
       XMFLOAT4X4 WorldIT;
     };
 
     struct VertexConstants {
-      XMFLOAT4X4 WorldViewProjection;
+      XMFLOAT4X4 WorldTransform;
+      XMFLOAT4X4 ViewTransform;
+      // This cannot be center and size, otherwise we could not rotate the thing
+      // But it does require that the plane perpendicular to the y axis
+      // If not, rewrite this to use float3s.
+      XMFLOAT2 PlaneBottomLeft;
+      XMFLOAT2 PlaneTopRight;
     };
     struct HullConstants {
       // zneg,xneg, zpos, xpos
@@ -164,15 +169,11 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       CommandFenceMarker FFThMarker2;
       DynamicBufferManager DynamicBuffer;
 
-      MutableTexture computeTildeh;
-      MutableTexture computeTildeD;
+      MutableTexture tildeh;
+      MutableTexture tildeD;
       MutableTexture tildehBuffer;
       MutableTexture tildeDBuffer;
 
-      // Just reuse a buffer
-      /// <summary>
-      ///
-      /// </summary>
       MutableTexture finalDisplacementMap;
 
       explicit SimulationResources(const ResourceAllocationContext &context,
@@ -180,12 +181,12 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           : Allocator(*context.Device),
 
             Fence(*context.Device), DynamicBuffer(*context.Device),
-            computeTildeh(context, TextureDefinition::TextureDefinition(
-                                       Format::R32G32_Float, N, M, 0,
-                                       TextureFlags::UnorderedAccess)),
-            computeTildeD(context, TextureDefinition::TextureDefinition(
-                                       Format::R32G32_Float, N, M, 0,
-                                       TextureFlags::UnorderedAccess)),
+            tildeh(context, TextureDefinition::TextureDefinition(
+                                Format::R32G32_Float, N, M, 0,
+                                TextureFlags::UnorderedAccess)),
+            tildeD(context, TextureDefinition::TextureDefinition(
+                                Format::R32G32_Float, N, M, 0,
+                                TextureFlags::UnorderedAccess)),
             tildehBuffer(context, TextureDefinition::TextureDefinition(
                                       Format::R32G32_Float, N, M, 0,
                                       TextureFlags::UnorderedAccess)),
@@ -193,8 +194,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                                       Format::R32G32_Float, N, M, 0,
                                       TextureFlags::UnorderedAccess)),
             finalDisplacementMap(context, TextureDefinition::TextureDefinition(
-                                              Format::R8G8B8A8_SNorm, N, M, 0,
-                                              TextureFlags::UnorderedAccess))
+                                              Format::R32G32B32A32_Float, N, M,
+                                              0, TextureFlags::UnorderedAccess))
 
       {}
     };
@@ -279,7 +280,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         .PixelShader = &simplePixelShader,
         .RasterizerState = rasterizerFlags,
         .DepthStencilState = DepthStencilMode::WriteDepth,
-        .InputLayout = VertexPositionTexture::Layout,
+        .InputLayout = VertexPosition::Layout,
         .TopologyType = PrimitiveTopologyType::Patch,
         .RenderTargetFormats = {Format::B8G8R8A8_UNorm},
         .DepthStencilFormat = Format::D32_Float};
@@ -340,15 +341,14 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     u32 M = Defaults::Simulation::M;
     std::random_device rd;
 
-    auto x = CalculateTildeh0FromDefaults<f32>(rd, N, M);
     ImmutableTexture computeTildeh0 =
         ImmutableTextureFromData<std::complex<f32>>(
-            immutableAllocationContext, Format::R32G32_Float, N, M, 0u,
-            CalculateTildeh0FromDefaults<f32>(rd, N, M));
+            immutableAllocationContext, Format::R32G32_Float, N + 1, M + 1, 0u,
+            CalculateTildeh0FromDefaults<f32>(rd, N + 1, M + 1));
 
     ImmutableTexture computeFrequencies = ImmutableTextureFromData<f32>(
-        immutableAllocationContext, Format::R32_Float, N, M, 0u,
-        CalculateFrequenciesFromDefaults<f32>(N, M));
+        immutableAllocationContext, Format::R32_Float, N + 1, M + 1, 0u,
+        CalculateFrequenciesFromDefaults<f32>(N + 1, M + 1));
 
     ImmutableMesh planeMesh{immutableAllocationContext,
                             CreateQuadPatch(Defaults::App::planeSize)};
@@ -427,16 +427,17 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       // Current frames resources
       auto &frameResource = frameResources[frameCounter & 0x1u];
       // Simulation resources for drawing.
-      auto &currSimResource = simulationResources[frameCounter & 0x1u];
+      auto &drawingSimResource = simulationResources[frameCounter & 0x1u];
       // Simulation resources for calculating.
-      auto &nextSimResource = simulationResources[(frameCounter + 1u) & 0x1u];
+      auto &calculatingSimResource =
+          simulationResources[(frameCounter + 1u) & 0x1u];
       auto renderTargetView = swapChain.RenderTargetView();
 
-      // Wait until buffers can be reused
+      // Wait until buffers can be used
       if (frameResource.Marker)
         frameResource.Fence.Await(frameResource.Marker);
-      if (currSimResource.FrameDoneMarker)
-        currSimResource.Fence.Await(currSimResource.FrameDoneMarker);
+      if (drawingSimResource.FrameDoneMarker)
+        drawingSimResource.Fence.Await(drawingSimResource.FrameDoneMarker);
 
       // Get DeltaTime
       float deltaTime;
@@ -483,7 +484,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
       // Compute shader phase
       {
-        auto &simResource = nextSimResource;
+        auto &simResource = calculatingSimResource;
         auto &computeAllocator = simResource.Allocator;
 
         computeAllocator.Reset();
@@ -495,6 +496,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         CommandsList FFTTildeh0Stage2CommandList;
         CommandsList FFTTildeDStage2CommandList;
         CommandsList displacementCommandList;
+
         // Spektrums
         {
           computeAllocator.BeginList();
@@ -510,8 +512,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           mask.Tildeh0 = computeTildeh0;
           mask.Frequencies = computeFrequencies;
 
-          mask.Tildeh = *simResource.computeTildeh.UnorderedAccess();
-          mask.TildeD = *simResource.computeTildeD.UnorderedAccess();
+          mask.Tildeh = *simResource.tildeh.UnorderedAccess();
+          mask.TildeD = *simResource.tildeD.UnorderedAccess();
 
           spektrumPipelineState.Apply(computeAllocator);
           const auto xGroupSize = 16;
@@ -529,90 +531,200 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         //  FFT
         {
 
-          struct FFTData {
-            MutableTexture &Input;
-            MutableTexture &Buffer;
-            MutableTexture &Output;
-            CommandFenceMarker &Stage1Marker;
-            CommandFenceMarker &Stage2Marker;
-            CommandsList &Stage1CommandList;
-            CommandsList &Stage2CommandList;
-          };
-          static const std::array<FFTData, 2> Data = {
-              {FFTData{.Input = simResource.computeTildeh,
+          // Stage1
+          {
+            computeAllocator.BeginList();
+            commonDescriptorHeap.Set(computeAllocator);
+            computeAllocator.AddAwaiter(simResource.SpektrumsMarker);
+            ;
+            auto mask = FFTRootDescription.Set(computeAllocator,
+                                               RootSignatureUsage::Compute);
 
-                       .Buffer = simResource.tildehBuffer,
-                       .Output = simResource.computeTildeh,
-                       .Stage1Marker = simResource.FFThMarker1,
-                       .Stage2Marker = simResource.FFThMarker2,
-                       .Stage1CommandList = FFTTildeh0Stage1CommandList,
-                       .Stage2CommandList = FFTTildeh0Stage2CommandList},
-               FFTData{.Input = simResource.computeTildeD,
-                       .Buffer = simResource.tildeDBuffer,
-                       .Output = simResource.computeTildeD,
-                       .Stage1Marker = simResource.FFTDMarker1,
-                       .Stage2Marker = simResource.FFTDMarker2,
-                       .Stage1CommandList = FFTTildeDStage1CommandList,
-                       .Stage2CommandList = FFTTildeDStage2CommandList}}};
+            mask.Input = *simResource.tildeh.ShaderResource();
+            mask.Output = *simResource.tildehBuffer.UnorderedAccess();
 
-          for (const auto &val : Data) {
+            FFTPipelineState.Apply(computeAllocator);
 
-            // Stage1
-            {
-              computeAllocator.BeginList();
-              commonDescriptorHeap.Set(computeAllocator);
-              computeAllocator.AddAwaiter(simResource.SpektrumsMarker);
-              ;
-              auto mask = FFTRootDescription.Set(computeAllocator,
-                                                 RootSignatureUsage::Compute);
+            const auto xGroupSize = 1;
+            const auto yGroupSize = 1;
+            const auto sizeX = N;
+            const auto sizeY = 1;
+            computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
+                                      (sizeY + yGroupSize - 1) / yGroupSize, 1);
+            simResource.FFThMarker1 = simResource.Fence.CreateMarker();
+            computeAllocator.AddSignaler(simResource.FFThMarker1);
 
-              mask.Input = *val.Input.ShaderResource();
-              mask.Output = *val.Buffer.UnorderedAccess();
+            FFTTildeh0Stage1CommandList = computeAllocator.EndList();
+          }
 
-              FFTPipelineState.Apply(computeAllocator);
+          // Stage2
+          {
+            computeAllocator.BeginList();
+            commonDescriptorHeap.Set(computeAllocator);
 
-              const auto xGroupSize = 1;
-              const auto yGroupSize = 1;
-              const auto sizeX = N;
-              const auto sizeY = 1;
-              computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
-                                        (sizeY + yGroupSize - 1) / yGroupSize,
-                                        1);
-              val.Stage1Marker = simResource.Fence.CreateMarker();
-              computeAllocator.AddSignaler(val.Stage1Marker);
+            computeAllocator.AddAwaiter(simResource.FFThMarker1);
 
-              val.Stage1CommandList = computeAllocator.EndList();
-            }
+            auto mask = FFTRootDescription.Set(computeAllocator,
+                                               RootSignatureUsage::Compute);
 
-            // Stage2
-            {
-              computeAllocator.BeginList();
-              commonDescriptorHeap.Set(computeAllocator);
+            mask.Input = *simResource.tildehBuffer.ShaderResource();
+            mask.Output = *simResource.tildeh.UnorderedAccess();
 
-              computeAllocator.AddAwaiter(val.Stage1Marker);
+            FFTPipelineState.Apply(computeAllocator);
 
-              auto mask = FFTRootDescription.Set(computeAllocator,
-                                                 RootSignatureUsage::Compute);
+            const auto xGroupSize = 1;
+            const auto yGroupSize = 1;
+            const auto sizeX = M;
+            const auto sizeY = 1;
+            computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
+                                      (sizeY + yGroupSize - 1) / yGroupSize, 1);
 
-              mask.Input = *val.Buffer.ShaderResource();
-              mask.Output = *val.Output.UnorderedAccess();
+            simResource.FFThMarker2 = simResource.Fence.CreateMarker();
+            computeAllocator.AddSignaler(simResource.FFThMarker2);
+            FFTTildeh0Stage2CommandList = computeAllocator.EndList();
+          }
 
-              FFTPipelineState.Apply(computeAllocator);
+          // TILDE D
 
-              const auto xGroupSize = 1;
-              const auto yGroupSize = 1;
-              const auto sizeX = M;
-              const auto sizeY = 1;
-              computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
-                                        (sizeY + yGroupSize - 1) / yGroupSize,
-                                        1);
+          // Stage1
+          {
+            computeAllocator.BeginList();
+            commonDescriptorHeap.Set(computeAllocator);
+            computeAllocator.AddAwaiter(simResource.SpektrumsMarker);
+            ;
+            auto mask = FFTRootDescription.Set(computeAllocator,
+                                               RootSignatureUsage::Compute);
 
-              computeAllocator.AddSignaler(val.Stage2Marker);
+            mask.Input = *simResource.tildeD.ShaderResource();
+            mask.Output = *simResource.tildeDBuffer.UnorderedAccess();
 
-              val.Stage2CommandList = computeAllocator.EndList();
-            }
+            FFTPipelineState.Apply(computeAllocator);
+
+            const auto xGroupSize = 1;
+            const auto yGroupSize = 1;
+            const auto sizeX = N;
+            const auto sizeY = 1;
+            computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
+                                      (sizeY + yGroupSize - 1) / yGroupSize, 1);
+            simResource.FFTDMarker1 = simResource.Fence.CreateMarker();
+            computeAllocator.AddSignaler(simResource.FFTDMarker1);
+
+            FFTTildeDStage1CommandList = computeAllocator.EndList();
+          }
+
+          // Stage2
+          {
+            computeAllocator.BeginList();
+            commonDescriptorHeap.Set(computeAllocator);
+
+            computeAllocator.AddAwaiter(simResource.FFTDMarker1);
+
+            auto mask = FFTRootDescription.Set(computeAllocator,
+                                               RootSignatureUsage::Compute);
+
+            mask.Input = *simResource.tildeDBuffer.ShaderResource();
+            mask.Output = *simResource.tildeD.UnorderedAccess();
+
+            FFTPipelineState.Apply(computeAllocator);
+
+            const auto xGroupSize = 1;
+            const auto yGroupSize = 1;
+            const auto sizeX = M;
+            const auto sizeY = 1;
+            computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
+                                      (sizeY + yGroupSize - 1) / yGroupSize, 1);
+
+            simResource.FFTDMarker2 = simResource.Fence.CreateMarker();
+            computeAllocator.AddSignaler(simResource.FFTDMarker2);
+
+            FFTTildeDStage2CommandList = computeAllocator.EndList();
           }
         }
+
+        //{
+        //  struct FFTData {
+        //    const MutableTexture &Input;
+        //    const MutableTexture &Buffer;
+        //    const MutableTexture &Output;
+        //    CommandFenceMarker &Stage1Marker;
+        //    CommandFenceMarker &Stage2Marker;
+        //    CommandsList &Stage1CommandList;
+        //    CommandsList &Stage2CommandList;
+        //  };
+        //  const std::array<const FFTData, 2> Data = {
+        //      {FFTData{.Input = simResource.tildeh,
+        //               .Buffer = simResource.tildehBuffer,
+        //               .Output = simResource.tildeh,
+        //               .Stage1Marker = simResource.FFThMarker1,
+        //               .Stage2Marker = simResource.FFThMarker2,
+        //               .Stage1CommandList = FFTTildeh0Stage1CommandList,
+        //               .Stage2CommandList = FFTTildeh0Stage2CommandList},
+        //       FFTData{.Input = simResource.tildeD,
+        //               .Buffer = simResource.tildeDBuffer,
+        //               .Output = simResource.tildeD,
+        //               .Stage1Marker = simResource.FFTDMarker1,
+        //               .Stage2Marker = simResource.FFTDMarker2,
+        //               .Stage1CommandList = FFTTildeDStage1CommandList,
+        //               .Stage2CommandList = FFTTildeDStage2CommandList}}};
+
+        //  for (const auto &val : Data) {
+        //    // Stage1
+        //    {
+        //      computeAllocator.BeginList();
+        //      commonDescriptorHeap.Set(computeAllocator);
+        //      computeAllocator.AddAwaiter(simResource.SpektrumsMarker);
+        //      ;
+        //      auto mask = FFTRootDescription.Set(computeAllocator,
+        //                                         RootSignatureUsage::Compute);
+
+        //      mask.Input = *val.Input.ShaderResource();
+        //      mask.Output = *val.Buffer.UnorderedAccess();
+
+        //      FFTPipelineState.Apply(computeAllocator);
+
+        //      const auto xGroupSize = 1;
+        //      const auto yGroupSize = 1;
+        //      const auto sizeX = N;
+        //      const auto sizeY = 1;
+        //      computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
+        //                                (sizeY + yGroupSize - 1) / yGroupSize,
+        //                                1);
+        //      val.Stage1Marker = simResource.Fence.CreateMarker();
+        //      computeAllocator.AddSignaler(val.Stage1Marker);
+
+        //      val.Stage1CommandList = computeAllocator.EndList();
+        //    }
+
+        //    // Stage2
+        //    {
+        //      computeAllocator.BeginList();
+        //      commonDescriptorHeap.Set(computeAllocator);
+
+        //      computeAllocator.AddAwaiter(val.Stage1Marker);
+
+        //      auto mask = FFTRootDescription.Set(computeAllocator,
+        //                                         RootSignatureUsage::Compute);
+
+        //      mask.Input = *val.Buffer.ShaderResource();
+        //      mask.Output = *val.Output.UnorderedAccess();
+
+        //      FFTPipelineState.Apply(computeAllocator);
+
+        //      const auto xGroupSize = 1;
+        //      const auto yGroupSize = 1;
+        //      const auto sizeX = M;
+        //      const auto sizeY = 1;
+        //      computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
+        //                                (sizeY + yGroupSize - 1) / yGroupSize,
+        //                                1);
+
+        //      val.Stage2Marker = simResource.Fence.CreateMarker();
+        //      computeAllocator.AddSignaler(val.Stage2Marker);
+
+        //      val.Stage2CommandList = computeAllocator.EndList();
+        //    }
+        //  }
+        //}
 
         // Calculate final displacements
         {
@@ -629,8 +741,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           auto mask = displacementRootDescription.Set(
               computeAllocator, RootSignatureUsage::Compute);
 
-          mask.Height = *simResource.computeTildeh.ShaderResource();
-          mask.Choppy = *simResource.computeTildeD.ShaderResource();
+          mask.Height = *simResource.tildeh.ShaderResource();
+          mask.Choppy = *simResource.tildeD.ShaderResource();
           mask.Output = *simResource.finalDisplacementMap.UnorderedAccess();
 
           displacementPipelineState.Apply(computeAllocator);
@@ -677,6 +789,10 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       }
       {
 
+        committedResourceAllocator.Build();
+        depthStencilDescriptorHeap.Build();
+
+        commonDescriptorHeap.Build();
         commonDescriptorHeap.Set(allocator);
         // Clears frame with background color
         renderTargetView->Clear(allocator, clearColor);
@@ -710,9 +826,23 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
         qtNodes = qt.GetSize();
 
-        auto worldBasic = XMMatrixRotationX(XMConvertToRadians(-90.0));
+        auto worldBasic = XMMatrixIdentity();
+        XMVECTOR planeBottomLeft =
+            XMVectorSet(-fullSizeXZ.x / 2, 0, -fullSizeXZ.y / 2, 1);
+        XMVECTOR planeTopRight =
+            XMVectorSet(fullSizeXZ.x / 2, 0, fullSizeXZ.y / 2, 1);
+        planeBottomLeft = XMVector3TransformCoord(planeBottomLeft, worldBasic);
+        planeTopRight = XMVector3TransformCoord(planeTopRight, worldBasic);
+        // Reorder to float2
+        planeBottomLeft = XMVectorSwizzle(planeBottomLeft, 0, 2, 1, 3);
+        planeTopRight = XMVectorSwizzle(planeTopRight, 0, 2, 1, 3);
+
         start = std::chrono::high_resolution_clock::now();
+        int c = 0;
         for (auto it = qt.begin(); it != qt.end(); ++it) {
+          c++;
+          // if (c != 1 || frameCounter % 2 == 0)
+          //   continue;
           drawnNodes++;
           NavigatingTheQuadTree +=
               std::chrono::duration_cast<decltype(NavigatingTheQuadTree)>(
@@ -724,24 +854,21 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                 XMMatrixScaling(it->size.x / fullSizeXZ.x, 1,
                                 it->size.y / fullSizeXZ.y) *
                 XMMatrixTranslation(it->center.x, center.y, it->center.y);
-            auto worldViewProjection =
-                XMMatrixTranspose(world * cam.GetViewProj());
+            auto ViewProjection = cam.GetViewProj();
             auto worldIT = XMMatrixInverse(nullptr, world);
 
-            XMStoreFloat4x4(&vertexConstants.WorldViewProjection,
-                            worldViewProjection);
-            XMStoreFloat4x4(&domainConstants.WorldIT, worldIT);
+            XMStoreFloat4x4(&vertexConstants.WorldTransform,
+                            XMMatrixTranspose(world));
+            XMStoreFloat4x4(&vertexConstants.ViewTransform,
+                            XMMatrixTranspose(ViewProjection));
 
-            float2 uvbottomleft =
-                float2(it->center.x - center.x, it->center.y - center.y) /
-                    fullSizeXZ +
-                float2(0.5, 0.5) - (it->size / fullSizeXZ) * 0.5;
-            auto texturetransf =
-                XMMatrixScaling(it->size.x / fullSizeXZ.x, 1,
-                                it->size.y / fullSizeXZ.y) *
-                XMMatrixTranslation(uvbottomleft.x, 0, uvbottomleft.y);
+            XMStoreFloat4x4(&domainConstants.WorldIT, worldIT);
+            XMStoreFloat4x4(&domainConstants.WorldViewTransform,
+                            XMMatrixTranspose(ViewProjection));
+
             // Why no 2x2?
-            XMStoreFloat4x4(&domainConstants.TextureTransform, texturetransf);
+            XMStoreFloat2(&vertexConstants.PlaneBottomLeft, planeBottomLeft);
+            XMStoreFloat2(&vertexConstants.PlaneTopRight, planeTopRight);
           }
           {
             start = std::chrono::high_resolution_clock::now();
@@ -751,7 +878,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             NavigatingTheQuadTree +=
                 std::chrono::duration_cast<decltype(NavigatingTheQuadTree)>(
                     (std::chrono::high_resolution_clock::now() - start));
-            static const constexpr auto l = [](float x) -> float {
+            static const constexpr auto l = [](const float x) -> float {
               if (x == 0)
                 return 1;
               else
@@ -769,15 +896,16 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
               frameResource.DynamicBuffer.AddBuffer(vertexConstants);
           mask.DomainBuffer =
               frameResource.DynamicBuffer.AddBuffer(domainConstants);
-          // mask.Texture = displayTexture;
+          mask.Texture = displayTexture;
 
-          mask.Texture = computeTildeh0;
-          // mask.Texture = *currSimResource.computeTildeh.ShaderResource();
-          //  mask.Texture = *currSimResource.computeTildeh.ShaderResource();
-          //  mask.Texture =
-          //  *currSimResource.finalDisplacementMap.ShaderResource();
+          // mask.Texture = computeTildeh0;
+          mask.Texture = *drawingSimResource.tildeh.ShaderResource();
+
+          // mask.Texture = *drawingSimResource.tildehBuffer.ShaderResource();
+          //  mask.Texture
+          //     = *drawingSimResource.finalDisplacementMap.ShaderResource();
           mask.HeightMapForDomain =
-              *currSimResource.finalDisplacementMap.ShaderResource();
+              *drawingSimResource.finalDisplacementMap.ShaderResource();
 
           allocator.SetRenderTargets({renderTargetView},
                                      frameResource.DepthBuffer.DepthStencil());

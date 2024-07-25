@@ -53,11 +53,14 @@ MeshDescription CreateQuadPatch(float size) {
 
   MeshDescription result;
 
-  result.Vertices = {
-      VertexPositionTexture{XMFLOAT3{-size, size, 0.f}, XMUSHORTN2{0.f, 0.f}},
-      VertexPositionTexture{XMFLOAT3{-size, -size, 0.f}, XMUSHORTN2{0.f, 1.f}},
-      VertexPositionTexture{XMFLOAT3{size, size, 0.f}, XMUSHORTN2{1.f, 0.f}},
-      VertexPositionTexture{XMFLOAT3{size, -size, 0.f}, XMUSHORTN2{1.f, 1.f}}};
+  // result.Vertices = {VertexPosition{XMFLOAT3{-size, size, 0.f}},
+  //                    VertexPosition{XMFLOAT3{-size, -size, 0.f}},
+  //                    VertexPosition{XMFLOAT3{size, size, 0.f}},
+  //                    VertexPosition{XMFLOAT3{size, -size, 0.f}}};
+  result.Vertices = {VertexPosition{XMFLOAT3{-size, 0.f, size}},
+                     VertexPosition{XMFLOAT3{size, 0, size}},
+                     VertexPosition{XMFLOAT3{-size, 0.f, -size}},
+                     VertexPosition{XMFLOAT3{size, 0.f, -size}}};
 
   result.Topology = static_cast<PrimitiveTopology>(
       D3D11_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST);
