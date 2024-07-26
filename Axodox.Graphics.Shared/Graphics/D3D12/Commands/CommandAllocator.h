@@ -7,50 +7,56 @@
 #include "../Descriptors/DepthStencilView.h"
 #include "../Resources/ResourceArgument.h"
 
-namespace Axodox::Graphics::D3D12
-{
-  class GraphicsDevice;
-  class PipelineState;
+namespace Axodox::Graphics::D3D12 {
+class GraphicsDevice;
+class PipelineState;
 
-  struct AXODOX_GRAPHICS_API ResourceTransition
-  {
-    ResourceArgument Resource;
-    ResourceStates From, To;
-  };
+struct AXODOX_GRAPHICS_API ResourceTransition {
+  ResourceArgument Resource;
+  ResourceStates From, To;
+};
 
-  class AXODOX_GRAPHICS_API CommandAllocator
-  {
-  public:
-    CommandAllocator(const GraphicsDevice& device, CommandKind type = CommandKind::Direct);
+class AXODOX_GRAPHICS_API CommandAllocator {
+public:
+  CommandAllocator(const GraphicsDevice &device,
+                   CommandKind type = CommandKind::Direct);
 
-    CommandAllocator(const CommandAllocator&) = delete;
-    CommandAllocator& operator=(const CommandAllocator&) = delete;
+  CommandAllocator(const CommandAllocator &) = delete;
+  CommandAllocator &operator=(const CommandAllocator &) = delete;
 
-    ID3D12GraphicsCommandListT* operator->();
+  ID3D12GraphicsCommandListT *operator->();
 
-    void BeginList(PipelineState* pipelineState = nullptr);
-    [[nodiscard]] Collections::object_pool_handle<CommandList> EndList();
+  void BeginList(PipelineState *pipelineState = nullptr);
+  [[nodiscard]] Collections::object_pool_handle<CommandList> EndList();
 
-    CommandKind Type() const;
+  CommandKind Type() const;
 
-    void AddAwaiter(CommandFenceMarker marker);
-    void AddSignaler(CommandFenceMarker marker);
+  void AddAwaiter(CommandFenceMarker marker);
+  void AddSignaler(CommandFenceMarker marker);
 
-    void TransitionResource(ResourceArgument resource, ResourceStates from, ResourceStates to);
-    void TransitionResources(std::initializer_list<ResourceTransition> resources);
-    
-    void CopyResource(ResourceArgument source, ResourceArgument destination);
+  /// <summary>
+  /// Ensures that previous commands writing to the resource are completed
+  /// </summary>
+  /// <param name="resource"></param>
+  void AddUAVBarrier(ResourceArgument resource);
+  void TransitionResource(ResourceArgument resource, ResourceStates from,
+                          ResourceStates to);
+  void TransitionResources(std::initializer_list<ResourceTransition> resources);
 
-    void SetRenderTargets(std::initializer_list<const RenderTargetView*> renderTargets, const DepthStencilView* depthStencilView = nullptr);
-    void Dispatch(uint32_t x = 1, uint32_t y = 1, uint32_t z = 1);
+  void CopyResource(ResourceArgument source, ResourceArgument destination);
 
-    void Reset();
+  void SetRenderTargets(
+      std::initializer_list<const RenderTargetView *> renderTargets,
+      const DepthStencilView *depthStencilView = nullptr);
+  void Dispatch(uint32_t x = 1, uint32_t y = 1, uint32_t z = 1);
 
-  private:
-    GraphicsDevice _device;
-    CommandKind _type;
-    winrt::com_ptr<ID3D12CommandAllocator> _allocator;
-    Collections::object_pool<CommandList> _lists;
-    Collections::object_pool_handle<CommandList> _recorder;
-  };
-}
+  void Reset();
+
+private:
+  GraphicsDevice _device;
+  CommandKind _type;
+  winrt::com_ptr<ID3D12CommandAllocator> _allocator;
+  Collections::object_pool<CommandList> _lists;
+  Collections::object_pool_handle<CommandList> _recorder;
+};
+} // namespace Axodox::Graphics::D3D12
