@@ -7,9 +7,9 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
 
     // Define constants
-    uint2 DISP_MAP_SIZE = 1024; // Define as per your requirement
+    uint DISP_MAP_SIZE = 1024; // Define as per your requirement
 
-    float PATCH_SIZE = 100.f;
+    float PATCH_SIZE = 20.f;
     float TILE_SIZE_X2 = PATCH_SIZE * 2.0f / DISP_MAP_SIZE; // Define as per your requirement
     float INV_TILE_SIZE = DISP_MAP_SIZE / PATCH_SIZE; // Define as per your requirement
 

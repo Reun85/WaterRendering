@@ -172,7 +172,7 @@
     <FxCompile Include="PostProcessingComputeShader.hlsl">
       <ShaderType>Compute</ShaderType>
     </FxCompile>
-    <FxCompile Include="SimplePixelShader.hlsl">
+    <FxCompile Include="PixelShader.hlsl">
       <ShaderType>Pixel</ShaderType>
     </FxCompile>
     <FxCompile Include="SimpleVertexShader.hlsl">

@@ -31,6 +31,7 @@ output_t main(input_t input)
     float2 texCoord = (position.xz - PlaneBottomLeft) / (PlaneTopRight - PlaneBottomLeft);
     // If the quad is rotated
     texCoord = ((PlaneBottomLeft.x < PlaneTopRight.x && PlaneBottomLeft.y > PlaneTopRight.y) || (PlaneBottomLeft.x > PlaneTopRight.x && PlaneBottomLeft.y < PlaneTopRight.y) ? texCoord.xy : texCoord.yx);
+    // For normal images
     
 
     float4 screenPosition = mul(position, ViewTransform);

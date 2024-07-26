@@ -6,7 +6,6 @@ RWTexture2D<float2> tilde_D : register(u1);
 
 
 #define N 1024
-#define M N
 
 cbuffer Constants : register(b0)
 {
@@ -27,9 +26,10 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3
 {
  // SV_DISPATCHTHREADID is the globalPos 
     int2 loc1 = int2(DTid.xy);
-    int2 loc2 = int2(N - loc1.x, M - loc1.y);
+    int2 loc2 = int2(N - loc1.x, N - loc1.y);
 
     // Load initial spectrum
+    // These should probably be a sampler?
     float2 h0_k = tilde_h0[loc1].rg;
     float2 h0_mk = tilde_h0[loc2].rg;
     float w_k = frequencies[loc1].r;
@@ -42,7 +42,7 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3
     
 
     // "Choppy" 
-    float2 k = float2(N / 2 - loc1.x, M / 2 - loc1.y);
+    float2 k = float2(N / 2 - loc1.x, N / 2 - loc1.y);
     float2 nk = float2(0, 0);
 
     

@@ -5,7 +5,9 @@ SamplerState _sampler : register(s0);
 
 cbuffer Constants : register(b0)
 {
-    float3 cameraPos;
+    float4 cameraPos;
+    float4 mult;
+    bool useTexture;
 }
 
 struct input_t
@@ -19,6 +21,10 @@ struct input_t
 float4 main(input_t input) : SV_TARGET
 {
 
+    if (useTexture)
+    {
+        return _texture.Sample(_sampler, input.TextureCoord) * float4(mult.xyz, 1);
+    }
 
     
     float3 La = float3(0.0, 0.0, 0.0);
@@ -35,7 +41,6 @@ float4 main(input_t input) : SV_TARGET
     float3 Ks = float3(1.0, 1, 1);
 
     float Shininess = 1.0;
-    
     
     
     const float3 sunColor = float3(1.0, 1.0, 0.47);
@@ -64,7 +69,8 @@ float4 main(input_t input) : SV_TARGET
     float DiffuseFactor = max(dot(ToLight, normal), 0.0) * Attenuation;
     float3 Diffuse = DiffuseFactor * Ld * Kd;
 
-    float3 viewDir = normalize(cameraPos - input.localPos.xyz / input.localPos.w);
+    float3 viewDir = normalize(cameraPos.xyz - input.localPos.xyz / input.localPos.w);
+    //float3 viewDir = normalize(float3(0, 0, 0) - input.localPos.xyz / input.localPos.w);
     float3 reflectDir = reflect(-ToLight, normal);
 	
     float SpecularFactor = pow(max(dot(viewDir, reflectDir), 0.0), Shininess) * Attenuation;
@@ -72,6 +78,7 @@ float4 main(input_t input) : SV_TARGET
 
     ret *= float4(Ambient + Diffuse + Specular, 1.0);
     
-    
+
+
     return ret;
 }

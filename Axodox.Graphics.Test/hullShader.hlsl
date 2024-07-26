@@ -1,6 +1,4 @@
 
-Texture2D _heightmap : register(t0);
-SamplerState _sampler : register(s0);
 cbuffer HullBuffer : register(b0)
 {
     // zneg,xneg, zpos, xpos

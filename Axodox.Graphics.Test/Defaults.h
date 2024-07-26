@@ -26,12 +26,11 @@ public:
     QUALIFIER bool startFirstPerson = true;
   };
   struct App {
-    QUALIFIER float planeSize = 100.0f;
+    QUALIFIER float planeSize = 20.0f;
     QUALIFIER XMFLOAT4 clearColor = {0, 1, 0, 0};
   };
   struct ComputeShader {
-    QUALIFIER u32 heightMapDimensionsX = 1024;
-    QUALIFIER u32 heightMapDimensionsZ = 1024;
+    QUALIFIER u32 heightMapDimensions = 1024;
     QUALIFIER u32 computeShaderGroupsDim1 = 16;
     QUALIFIER u32 computeShaderGroupsDim2 = 16;
   };
@@ -43,8 +42,7 @@ public:
   };
   struct Simulation {
   public:
-    QUALIFIER u32 N = ComputeShader::heightMapDimensionsX;
-    QUALIFIER u32 M = ComputeShader::heightMapDimensionsZ;
+    QUALIFIER u32 N = ComputeShader::heightMapDimensions;
     QUALIFIER f32 L_x = App::planeSize;
     QUALIFIER f32 L_z = App::planeSize;
     QUALIFIER f32 Depth = 100;
@@ -56,10 +54,9 @@ public:
 
     // A constant that scales the waves
     // QUALIFIER f32 Amplitude = 0.45e-5f;
-    QUALIFIER f32 Amplitude = 0.45e-3f;
+    QUALIFIER f32 Amplitude = 0.45e+3f;
 
     QUALIFIER f32 timeStep = 1.0f / 60.0f;
     static_assert(isPowerOfTwo(N));
-    static_assert(isPowerOfTwo(M));
   };
 };

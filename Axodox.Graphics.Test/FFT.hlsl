@@ -17,19 +17,20 @@ inline float2 ComplexMul(float2 a, float2 b)
 
 
 /* Should be called as:
-    text = the input and the output as well
+    text = the input
     buff = buffer for this shader
+output
+
 
 1. pass: text = readbuff, buff = writebuff
-2. pass: text = writebuff, buff = readbuff
+2. pass: text = writebuff, buff = output
 
-the output is in text
 
 */
 
 
 // Reverse bits in a number
-int ReverseBitfield(uint x)
+int ReverseBitfield(int x)
 {
     x = ((x >> 1) & 0x55555555) | ((x & 0x55555555) << 1);
     x = ((x >> 2) & 0x33333333) | ((x & 0x33333333) << 2);
@@ -39,22 +40,23 @@ int ReverseBitfield(uint x)
     return x;
 }
 
+
 // LocalGroupSize=N
 // WorkGroupCount=1 ?
 [numthreads(N, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3 LTid : SV_GroupID)
 {
-    //uint z = GTid.x;
-    //uint x = LTid.x;
-    uint x = DTid.x;
-    uint z = DTid.z;
+    int z = GTid.x;
+    int x = LTid.x;
+    //uint x = DTid.x;
+    //uint z = DTid.y;
 
 
     // Rearrange array for FFT
     // We use f32 => 32
     // 
-    uint nj = (ReverseBitfield(x) >> (32 - LOG2_N)) & (N - 1);
-    pingpong[0][nj] = readbuff[int2(z, x)].rg;
+    int nj = (ReverseBitfield(x) >> (32 - LOG2_N)) & (N - 1);
+    pingpong[0][nj] = readbuff[int2(z, x)];
 
     
     GroupMemoryBarrierWithGroupSync();
@@ -62,9 +64,9 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3
     // Butterfly stages
     int src = 0;
 
-    for (uint s = 1; s <= LOG2_N; ++s)
+    for (int s = 1; s <= LOG2_N; ++s)
     {
-        int m = 1 << s; // Height of butterfly group
+        int m = 1L << s; // Height of butterfly group
         int mh = m >> 1; // Half height of butterfly group
 
         int k = (x * (N / m)) & (N - 1);
@@ -86,6 +88,5 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3
 
     float2 result = pingpong[src][x];
 
-    writebuff[int2(x, z)] = result;
-    //writebuff[int2(x, z)] = float2(1, 0);
+    writebuff[uint2(x, z)] = result;
 }

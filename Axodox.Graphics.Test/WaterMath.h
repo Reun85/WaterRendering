@@ -67,8 +67,8 @@ std::vector<std::complex<Prec>>
 CalculateTildeh0FromDefaults(std::random_device &rd, const u32 _N,
                              const u32 _M) {
 
-  const i32 N = (i32)_N;
-  const i32 M = (i32)_M;
+  const auto N = (i32)_N;
+  const auto M = (i32)_M;
   using Def = Defaults::Simulation;
   const auto &wind = normalize(Def::WindDirection);
   const auto &gravity = Def::gravity;
@@ -83,7 +83,7 @@ CalculateTildeh0FromDefaults(std::random_device &rd, const u32 _N,
   const i32 Nx2 = N / 2;
   const i32 Mx2 = M / 2;
   std::vector<std::complex<Prec>> res(N * M);
-  float2 k;
+  float2 k(0, 0);
   for (i32 i = 0; i < N; ++i) {
     k.x = 2 * std::numbers::pi_v<Prec> * (Nx2 - i) / L_x;
     for (i32 j = 0; j < M; j++) {
@@ -95,6 +95,7 @@ CalculateTildeh0FromDefaults(std::random_device &rd, const u32 _N,
                                          WindForce * WindForce / gravity, wind);
     }
   }
+
   return res;
 }
 
@@ -116,7 +117,7 @@ constexpr std::vector<Prec> CalculateFrequenciesFromDefaults(const u32 _N,
   const i32 Mx2 = M / 2;
 
   std::vector<Prec> res(N * M);
-  float2 kvec;
+  float2 kvec(0, 0);
   for (i32 i = 0; i < N; ++i) {
     kvec.x = 2 * std::numbers::pi_v<Prec> * (Nx2 - i) / L_x;
     for (i32 j = 0; j < M; j++) {

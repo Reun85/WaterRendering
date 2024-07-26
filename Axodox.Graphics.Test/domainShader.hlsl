@@ -4,8 +4,7 @@ SamplerState _sampler : register(s0);
 
 cbuffer DomainBuffer : register(b0)
 {
-    float4x4 FullTransform;
-    float4x4 WorldIT;
+    float4x4 ViewProjTransform;
 };
 // --------------------------------------
 // Domain Shader
@@ -54,9 +53,8 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
 
     
     float4 text = _heightmap.SampleLevel(_sampler, texCoord, 0);
-    // position += float4(0, text.r, 0, 0)*2;
-    position += mul(float4(text.xyz, 1), FullTransform);
-    // This would work, but the heightmap does not contain the normals on the gba channels
+    position += mul(float4(text.xyz, 1), ViewProjTransform);
+
     float3 normal = _gradients.SampleLevel(_sampler, texCoord, 0).xyz;
     
     
