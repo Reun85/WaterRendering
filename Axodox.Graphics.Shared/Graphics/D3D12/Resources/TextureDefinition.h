@@ -58,6 +58,9 @@ public:
   TextureData(Format format, uint32_t width, uint32_t height,
               uint16_t arraySize = 0);
 
+  TextureData(Format format, uint32_t width, uint32_t height,
+              uint16_t arraySize, std::span<const uint8_t> data);
+
   TextureData(const TextureData &) = default;
   TextureData &operator=(const TextureData &) = default;
 

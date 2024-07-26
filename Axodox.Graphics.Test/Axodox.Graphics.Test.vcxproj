@@ -137,7 +137,7 @@
     <None Include="..\..\..\ELTE\GPGPU\GPGPU-Assignment\src\imgui.ini" />
     <None Include="packages.config" />
     <None Include="PropertySheet.props" />
-    <Text Include="readme.txt">
+    <Text Include="readme.cpp">
       <DeploymentContent>false</DeploymentContent>
     </Text>
   </ItemGroup>

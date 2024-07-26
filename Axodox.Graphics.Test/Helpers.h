@@ -39,25 +39,29 @@ GetDurationInFloatWithPrecision(const std::chrono::duration<T, Q> &inp) {
 template <typename DataType>
 ImmutableTexture constexpr ImmutableTextureFromData(
     const ResourceAllocationContext &context, const Format &f, const u32 width,
-    const u32 height, const u16 arraySize, std::span<const DataType> data) {
-  auto text = TextureData(f, width, height, arraySize);
-  std::span<u8> span = text.AsRawSpan();
-  assert(span.size_bytes() == data.size_bytes());
+    const u32 height, const u16 arraySize, const std::vector<DataType> &data) {
+  const u8 *dataPtr = reinterpret_cast<const u8 *>(data.data());
 
-  std::memcpy(span.data(), data.data(), data.size_bytes());
-  return ImmutableTexture{context, text};
-};
+  std::size_t byteSize = data.size() * sizeof(DataType);
+
+  const auto span = std::span<const u8>(dataPtr, byteSize);
+  return ImmutableTexture(context,
+                          TextureData(f, width, height, arraySize, span));
+}
+
+template <typename DataType>
+ImmutableTexture constexpr ImmutableTextureFromData(
+    const ResourceAllocationContext &context, const Format &f, const u32 width,
+    const u32 height, const u16 arraySize, std::span<const u8> span) {
+  return ImmutableTexture(context,
+                          TextureData(f, width, height, arraySize, span));
+}
 
 MeshDescription CreateQuadPatch() {
-  float size = 1.f;
-  size = size / 2;
 
+  float size = 0.5f;
   MeshDescription result;
 
-  // result.Vertices = {VertexPosition{XMFLOAT3{-size, size, 0.f}},
-  //                    VertexPosition{XMFLOAT3{-size, -size, 0.f}},
-  //                    VertexPosition{XMFLOAT3{size, size, 0.f}},
-  //                    VertexPosition{XMFLOAT3{size, -size, 0.f}}};
   result.Vertices = {VertexPosition{XMFLOAT3{-size, 0.f, size}},
                      VertexPosition{XMFLOAT3{size, 0, size}},
                      VertexPosition{XMFLOAT3{-size, 0.f, -size}},
@@ -68,3 +72,65 @@ MeshDescription CreateQuadPatch() {
 
   return result;
 }
+
+static ResourceStates GetResourceStateFromFlags(const TextureFlags &flags) {
+  if (has_flag(flags, TextureFlags::RenderTarget)) {
+    return ResourceStates::RenderTarget;
+  } else if (has_flag(flags, TextureFlags::DepthStencil)) {
+    return ResourceStates::DepthWrite;
+  } else if (has_flag(flags, TextureFlags::UnorderedAccess)) {
+    return ResourceStates::UnorderedAccess;
+  } else {
+    return ResourceStates::Common;
+  }
+}
+
+class MutableTextureWithState
+    : private Axodox::Graphics::D3D12::MutableTexture {
+
+  ResourceStates _state;
+
+public:
+  MutableTextureWithState(const ResourceAllocationContext &context,
+                          const TextureDefinition &definition)
+      : MutableTexture(context, definition),
+        _state(GetResourceStateFromFlags(definition.Flags)) {}
+
+  // On the GPU this will happen when the queue reaches this command,
+  // on the CPU this will happen when this function is executed.
+  // Therefore if this resource is only used linearly this is fine,
+  // but if multiple CPU threads or GPU queues use this function the state
+  // will not be correct.
+  void Transition(CommandAllocator &allocator, const ResourceStates &newState) {
+    if (_state == newState)
+      return;
+    allocator.TransitionResource(
+        this->operator Axodox::Graphics::D3D12::ResourceArgument(), _state,
+        newState);
+    _state = newState;
+  }
+
+  // On the GPU this will happen when the queue reaches this command,
+  // on the CPU this will happen when this function is executed.
+  // Therefore if this resource is only used linearly this is fine,
+  // but if multiple CPU threads or GPU queues use this function the state
+  // will not be correct.
+  ShaderResourceView *ShaderResource(CommandAllocator &allocator) {
+    Transition(allocator, ResourceStates::AllShaderResource);
+    return MutableTexture::ShaderResource();
+  };
+
+  // On the GPU this will happen when the queue reaches this command,
+  // on the CPU this will happen when this function is executed.
+  // Therefore if this resource is only used linearly this is fine,
+  // but if multiple CPU threads or GPU queues use this function the state
+  // will not be correct.
+
+  UnorderedAccessView *UnorderedAccess(CommandAllocator &allocator) {
+
+    Transition(allocator, ResourceStates::UnorderedAccess);
+    return MutableTexture::UnorderedAccess();
+  };
+
+  MutableTexture &getInnerUnsafe() { return *this; }
+};
