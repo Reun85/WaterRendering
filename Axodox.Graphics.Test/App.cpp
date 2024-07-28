@@ -583,6 +583,10 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           const auto sizeY = N;
           computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
                                     (sizeY + yGroupSize - 1) / yGroupSize, 1);
+          computeAllocator.AddUAVBarrier(
+              *simResource.tildeh.UnorderedAccess(computeAllocator));
+          computeAllocator.AddUAVBarrier(
+              *simResource.tildeD.UnorderedAccess(computeAllocator));
         }
         //  FFT
         {
