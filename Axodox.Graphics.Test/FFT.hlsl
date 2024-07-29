@@ -44,10 +44,10 @@ int ReverseBitfield(int x)
 // LocalGroupSize=N
 // WorkGroupCount=1 ?
 [numthreads(N, 1, 1)]
-void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3 LTid : SV_GroupID)
+void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3 GTid : SV_GroupID)
 {
-    int z = LTid.x;
-    int x = GTid.x;
+    int z = GTid.x;
+    int x = LTid.x;
     //uint x = DTid.x;
     //uint z = DTid.y;
 

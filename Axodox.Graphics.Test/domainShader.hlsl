@@ -55,9 +55,9 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
     
     float4 text = _heightmap.SampleLevel(_sampler, texCoord, 0);
     if(apply_disp)
-    //position += mul(ViewProjTransform, float4(text.xyz, 1));
-    position += mul(float4(text.xyz, 1),ViewTransform);
-    //    position += float4(text.xyz, 1);
+        //position += mul(ViewTransform, float4(text.xyz, 1));
+    //position += mul(float4(text.xyz, 1),ViewTransform);
+        position += float4(text.xyz, 1)*0.01;
 
     float3 normal = _gradients.SampleLevel(_sampler, texCoord, 0).xyz;
     
