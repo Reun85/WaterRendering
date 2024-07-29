@@ -40,7 +40,7 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
                                const OutputPatch<HS_OUTPUT_PATCH, 4> patch,
                                float2 UV : SV_DomainLocation)
 {
-    const bool apply_disp = false;
+    const bool apply_disp = true;
     DS_OUTPUT output;
     
     // Perform bilinear interpolation of the control points
@@ -55,9 +55,9 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
     
     float4 text = _heightmap.SampleLevel(_sampler, texCoord, 0);
     if(apply_disp)
-        //position += mul(ViewTransform, float4(text.xyz, 1));
-    //position += mul(float4(text.xyz, 1),ViewTransform);
-        position += float4(text.xyz, 1)*0.01;
+        //position += mul(ViewTransform, float4(text.xyz, 0));
+        //position += mul(float4(text.xyz, 0), ViewTransform);
+    position += float4(text.xyz, 0) * 0.01;
 
     float3 normal = _gradients.SampleLevel(_sampler, texCoord, 0).xyz;
     
