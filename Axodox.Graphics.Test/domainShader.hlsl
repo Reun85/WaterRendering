@@ -4,7 +4,7 @@ SamplerState _sampler : register(s0);
 
 cbuffer DomainBuffer : register(b0)
 {
-    float4x4 ViewProjTransform;
+    float4x4 ViewTransform;
 };
 // --------------------------------------
 // Domain Shader
@@ -40,6 +40,7 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
                                const OutputPatch<HS_OUTPUT_PATCH, 4> patch,
                                float2 UV : SV_DomainLocation)
 {
+    const bool apply_disp = false;
     DS_OUTPUT output;
     
     // Perform bilinear interpolation of the control points
@@ -53,7 +54,10 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
 
     
     float4 text = _heightmap.SampleLevel(_sampler, texCoord, 0);
-    position += mul(ViewProjTransform, float4(text.xyz, 1));
+    if(apply_disp)
+    //position += mul(ViewProjTransform, float4(text.xyz, 1));
+    position += mul(float4(text.xyz, 1),ViewTransform);
+    //    position += float4(text.xyz, 1);
 
     float3 normal = _gradients.SampleLevel(_sampler, texCoord, 0).xyz;
     

@@ -21,7 +21,8 @@ struct input_t
 float4 main(input_t input) : SV_TARGET
 {
 
-    if (useTexture)
+    const bool actually = true;
+    if (useTexture && actually)
     {
         return _texture.Sample(_sampler, input.TextureCoord) * float4(mult.xyz, 1);
     }

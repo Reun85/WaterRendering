@@ -175,7 +175,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     };
 
     struct SimulationResources {
-
       CommandAllocator Allocator;
       CommandFence Fence;
       CommandFenceMarker FrameDoneMarker;
@@ -249,7 +248,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       Gradients,
       TildehBuffer,
       TildeDBuffer
-
     };
     bool firstPerson = Defaults::Cam::startFirstPerson;
     XMFLOAT4 clearColor = Defaults::App::clearColor;
@@ -583,10 +581,10 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           const auto sizeY = N;
           computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
                                     (sizeY + yGroupSize - 1) / yGroupSize, 1);
-          computeAllocator.AddUAVBarrier(
-              *simResource.tildeh.UnorderedAccess(computeAllocator));
-          computeAllocator.AddUAVBarrier(
-              *simResource.tildeD.UnorderedAccess(computeAllocator));
+          // computeAllocator.AddUAVBarrier(
+          //     *simResource.tildeh.UnorderedAccess(computeAllocator));
+          // computeAllocator.AddUAVBarrier(
+          //     *simResource.tildeD.UnorderedAccess(computeAllocator));
         }
         //  FFT
         {
@@ -594,7 +592,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           {
             // Stage1
             {
-
               FFTPipelineState.Apply(computeAllocator);
               auto mask = FFTRootDescription.Set(computeAllocator,
                                                  RootSignatureUsage::Compute);
@@ -610,17 +607,19 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
               computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
                                         (sizeY + yGroupSize - 1) / yGroupSize,
                                         1);
+              // computeAllocator.AddUAVBarrier(
+              //     *simResource.tildehBuffer.UnorderedAccess(computeAllocator));
             }
 
             // TILDE h
             // Stage2
             {
-
               FFTPipelineState.Apply(computeAllocator);
               auto mask = FFTRootDescription.Set(computeAllocator,
                                                  RootSignatureUsage::Compute);
 
-              mask.Input = *simResource.tildeh.ShaderResource(computeAllocator);
+              mask.Input =
+                  *simResource.tildehBuffer.ShaderResource(computeAllocator);
               mask.Output =
                   *simResource.FFTTildeh.UnorderedAccess(computeAllocator);
 
@@ -686,7 +685,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
         // Calculate final displacements
         {
-
           displacementPipelineState.Apply(computeAllocator);
           auto mask = displacementRootDescription.Set(
               computeAllocator, RootSignatureUsage::Compute);
@@ -709,7 +707,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
         // Calculate gradients
         {
-
           gradientPipelineState.Apply(computeAllocator);
           auto mask = gradientRootDescription.Set(computeAllocator,
                                                   RootSignatureUsage::Compute);
@@ -731,7 +728,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         }
         // Upload queue
         {
-
           auto commandList = computeAllocator.EndList();
           computeAllocator.BeginList();
           simResource.DynamicBuffer.UploadResources(computeAllocator);
@@ -987,7 +983,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             ImGui::EndCombo();
           }
           if (settings.mode != RuntimeSettings::Mode::Full) {
-
             ImGui::InputFloat3("Pixel Mult", (float *)&settings.pixelMult);
           }
 
