@@ -812,7 +812,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                 worldBasic * XMMatrixScaling(it->size.x, 1, it->size.y) *
                 XMMatrixTranslation(it->center.x, center.y, it->center.y);
             auto ViewProjection = cam.GetViewProj();
-            auto worldIT = XMMatrixInverse(nullptr, world);
+            // auto worldIT = XMMatrixInverse(nullptr, world);
 
             XMStoreFloat4x4(&vertexConstants.WorldTransform,
                             XMMatrixTranspose(world));

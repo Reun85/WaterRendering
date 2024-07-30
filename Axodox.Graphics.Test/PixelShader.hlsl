@@ -28,7 +28,11 @@ float4 main(input_t input) : SV_TARGET
     }
 
     
-    float3 La = float3(0.0, 0.0, 0.0);
+    
+    
+
+    
+    float3 La = float3(1.0, 1.0, 1.0);
     float3 Ld = float3(1.0, 1.0, 1.0);
     float3 Ls = float3(1.0, 1.0, 1.0);
 
@@ -45,15 +49,10 @@ float4 main(input_t input) : SV_TARGET
     
     
     const float3 sunColor = float3(1.0, 1.0, 0.47);
-    const float3 sundir = float3(0, 1, 0);
+    const float3 sundir = float3(0.45, 0.7, 0);
     
-    //float4 samp = _texture.Sample(_sampler, input.TextureCoord);
-    float4 samp = float4(0.1812f,
+    float4 ret = float4(0.1812f,
     0.4678f, 0.5520f, 1);
-    
-    float4 ret;
-    //float4 ret = float4(samp.y, 0, 0, 1);
-    ret = samp / 1;
      
 
     float3 normal = normalize(input.normal.xzy);
@@ -62,20 +61,22 @@ float4 main(input_t input) : SV_TARGET
 	
 
     float3 ToLight = normalize(sundir);
+    float3 Attenuation = 0;
+    float3 Diffuse = 0;
+    float3 Specular = 0;
 	
-    float Attenuation = 1.0 / (lightConstantAttenuation + lightLinearAttenuation * LightDistance + lightQuadraticAttenuation * LightDistance * LightDistance);
+    Attenuation = 1.0 / (lightConstantAttenuation + lightLinearAttenuation * LightDistance + lightQuadraticAttenuation * LightDistance * LightDistance);
 	
     float3 Ambient = La * Ka;
 
     float DiffuseFactor = max(dot(ToLight, normal), 0.0) * Attenuation;
-    float3 Diffuse = DiffuseFactor * Ld * Kd;
+    Diffuse = DiffuseFactor * Ld * Kd;
 
     float3 viewDir = normalize(cameraPos.xyz - input.localPos.xyz / input.localPos.w);
-    //float3 viewDir = normalize(float3(0, 0, 0) - input.localPos.xyz / input.localPos.w);
     float3 reflectDir = reflect(-ToLight, normal);
 	
     float SpecularFactor = pow(max(dot(viewDir, reflectDir), 0.0), Shininess) * Attenuation;
-    float3 Specular = SpecularFactor * Ls * Ks;
+    Specular = SpecularFactor * Ls * Ks;
 
     ret *= float4(Ambient + Diffuse + Specular, 1.0);
     
