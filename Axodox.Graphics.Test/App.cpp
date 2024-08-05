@@ -74,7 +74,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     struct PixelConstants {
       XMFLOAT4 cameraPos;
       XMFLOAT4 mult;
-      bool useTexture = false;
+      bool useTexture;
     };
 
     RootDescriptor<RootDescriptorType::ConstantBuffer> VertexBuffer;
@@ -581,10 +581,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           const auto sizeY = N;
           computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
                                     (sizeY + yGroupSize - 1) / yGroupSize, 1);
-          // computeAllocator.AddUAVBarrier(
-          //     *simResource.tildeh.UnorderedAccess(computeAllocator));
-          // computeAllocator.AddUAVBarrier(
-          //     *simResource.tildeD.UnorderedAccess(computeAllocator));
         }
         //  FFT
         {
@@ -607,8 +603,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
               computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
                                         (sizeY + yGroupSize - 1) / yGroupSize,
                                         1);
-              // computeAllocator.AddUAVBarrier(
-              //     *simResource.tildehBuffer.UnorderedAccess(computeAllocator));
             }
 
             // TILDE h
@@ -630,8 +624,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
               computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
                                         (sizeY + yGroupSize - 1) / yGroupSize,
                                         1);
-              // computeAllocator.AddUAVBarrier(
-              //     *simResource.FFTTildeh.UnorderedAccess());
             }
           }
 
@@ -654,8 +646,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
               computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
                                         (sizeY + yGroupSize - 1) / yGroupSize,
                                         1);
-              // computeAllocator.AddUAVBarrier(
-              //     *simResource.tildeDBuffer.UnorderedAccess());
             }
 
             // TILDE D
@@ -677,8 +667,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
               computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
                                         (sizeY + yGroupSize - 1) / yGroupSize,
                                         1);
-              // computeAllocator.AddUAVBarrier(
-              //     *simResource.FFTTildeD.UnorderedAccess());
             }
           }
         }
@@ -700,9 +688,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           const auto sizeY = N;
           computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
                                     (sizeY + yGroupSize - 1) / yGroupSize, 1);
-
-          // computeAllocator.AddUAVBarrier(
-          //     *simResource.finalDisplacementMap.UnorderedAccess());
         }
 
         // Calculate gradients
@@ -722,9 +707,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           const auto sizeY = N;
           computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
                                     (sizeY + yGroupSize - 1) / yGroupSize, 1);
-
-          // computeAllocator.AddUAVBarrier(
-          //     *simResource.gradients.UnorderedAccess());
         }
         // Upload queue
         {
@@ -856,9 +838,10 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
               frameResource.DynamicBuffer.AddBuffer(vertexConstants);
           mask.DomainBuffer =
               frameResource.DynamicBuffer.AddBuffer(domainConstants);
+
+          pixelConstants.useTexture = false;
           switch (settings.mode) {
           case RuntimeSettings::Mode::Full:
-            pixelConstants.useTexture = false;
             mask.HeightMapForDomain =
                 *drawingSimResource.finalDisplacementMap.ShaderResource(
                     allocator);

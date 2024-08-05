@@ -13,7 +13,7 @@ struct input_t
 struct output_t
 {
     float4 Position : SV_POSITION;
-    float4 localPos : POSITION;
+    float3 localPos : POSITION;
     float2 TexCoord : TEXCOORD;
 };
 
@@ -36,7 +36,7 @@ output_t main(input_t input)
 
     float4 screenPosition = mul(position, ViewTransform);
     output.Position = screenPosition;
-    output.localPos = position;
+    output.localPos = position.xyz;
     output.TexCoord = texCoord;
     return output;
 }

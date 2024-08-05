@@ -13,16 +13,16 @@ cbuffer Constants : register(b0)
 struct input_t
 {
     float4 Screen : SV_Position;
-    float4 localPos : POSITION;
+    float3 localPos : POSITION;
     float2 TextureCoord : TEXCOORD;
-    float3 normal : NORMAL;
+    float4 normal : Variable;
 };
 
 float4 main(input_t input) : SV_TARGET
 {
 
-    const bool actually = false;
-    if (useTexture && actually)
+
+    if (useTexture)
     {
         return _texture.Sample(_sampler, input.TextureCoord) * float4(mult.xyz, 1);
     }
@@ -30,57 +30,89 @@ float4 main(input_t input) : SV_TARGET
     
     
     
-
-    
-    float3 La = float3(1.0, 1.0, 1.0);
-    float3 Ld = float3(1.0, 1.0, 1.0);
-    float3 Ls = float3(1.0, 1.0, 1.0);
-
-    float lightConstantAttenuation = 1.0;
-    float lightLinearAttenuation = 0.0;
-    float lightQuadraticAttenuation = 0.0;
-
-
-    float3 Ka = float3(1.0, 1.0, 1.0f);
-    float3 Kd = float3(1.0, 1, 1);
-    float3 Ks = float3(1.0, 1, 1);
-
-    float Shininess = 1.0;
-    
-    
+// Colors
     const float3 sunColor = float3(1.0, 1.0, 0.47);
-    const float3 sundir = float3(0.45, 0.7, 0);
+    const float3 sunDir = float3(0.45, 0.4, 0.45);
+    const float3 waterColor = float3(0.1812f, 0.4678f, 0.5520f);
+
     
-    float4 ret = float4(0.1812f,
-    0.4678f, 0.5520f, 1);
+    // Light
+    float3 La = float3(0.3, 0.3, 0.4); // Ambient light from the sky
+    float3 Ld = float3(1.0, 0.95, 0.8);
+    float3 Ls = float3(1.0, 1.0, 1.0);
+    const float lightConstantAttenuation = 1.0;
+// These are for point lights
+    const float lightLinearAttenuation = 0.0;
+    const float lightQuadraticAttenuation = 0.0;
+
+    // Water
+
+    float3 Ka = waterColor * 5;
+    float3 Kd = float3(0.2, 0.2, 0.2);
+    float3 Ks = float3(0.9, 0.9, 0.9);
+    float Shininess = 100.0;
+
+//    float3 La = float3(1.0, 1.0, 1.0);
+//    float3 Ld = float3(1.0, 1.0, 1.0);
+//    float3 Ls = float3(1.0, 1.0, 1.0);
+
+//    const float lightConstantAttenuation = 1.0;
+//// These dont matter since its a directional light.
+//    const float lightLinearAttenuation = 0.0;
+//    const float lightQuadraticAttenuation = 0.0;
+
+
+//    float3 Ka = float3(1.0, 1.0, 1.0f);
+//    float3 Kd = float3(1.0, 1, 1) * 2;
+//    float3 Ks = float3(1.0, 1, 1) * 2;
+
+//    float Shininess = 1.0;
+
+
+//    const float3 sunColor = float3(1.0, 1.0, 0.47);
+//    const float3 sundir = float3(0.45, 0.1, 0.45);
+//    const float3 waterColor = float3(0.1812f,
+//0.4678f, 0.5520f);
+    
+    
      
 
-    float3 normal = normalize(input.normal.xzy);
+    float3 normal = normalize(input.normal.xyz);
+    //return float4(input.normal.zzz, 1);
 	
     float LightDistance = 0.0;
 	
 
-    float3 ToLight = normalize(sundir);
-    float3 Attenuation = 0;
-    float3 Diffuse = 0;
-    float3 Specular = 0;
+    float3 ToLight = normalize(sunDir);
 	
-    Attenuation = 1.0 / (lightConstantAttenuation + lightLinearAttenuation * LightDistance + lightQuadraticAttenuation * LightDistance * LightDistance);
+    // Will be 1
+    float Attenuation = 1.0 / (lightConstantAttenuation + lightLinearAttenuation * LightDistance + lightQuadraticAttenuation * LightDistance * LightDistance);
 	
     float3 Ambient = La * Ka;
 
     float DiffuseFactor = max(dot(ToLight, normal), 0.0) * Attenuation;
-    Diffuse = DiffuseFactor * Ld * Kd;
+    float3 Diffuse = DiffuseFactor * Ld * Kd;
 
-    float3 viewDir = normalize(cameraPos.xyz - input.localPos.xyz / input.localPos.w);
-    float3 reflectDir = reflect(-ToLight, normal);
+    float3 viewDir = normalize(cameraPos.xyz - (input.localPos.xyz));
+    // This should be -ToLight????
+    float3 reflectDir = reflect(ToLight, normal);
 	
     float SpecularFactor = pow(max(dot(viewDir, reflectDir), 0.0), Shininess) * Attenuation;
-    Specular = SpecularFactor * Ls * Ks;
+    float3 Specular = SpecularFactor * Ls * Ks;
 
-    ret *= float4(Ambient + Diffuse + Specular, 1.0);
+    //return float4(reflectDir, 1);
+    
+    
+    //return
+    //float4(SpecularFactor.xxx, 1);
+
+
+    
+    
+    float3 lighting = Ambient + Diffuse + Specular;
+    float3 ret = waterColor * lighting;
     
 
 
-    return ret;
+    return float4(ret, 1);
 }

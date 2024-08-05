@@ -14,14 +14,14 @@ cbuffer HullBuffer : register(b0)
 struct HS_INPUT_PATCH
 {
     float4 Position : SV_POSITION;
-    float4 localPos : POSITION;
+    float3 localPos : POSITION;
     float2 TexCoord : TEXCOORD;
 };
 
 struct HS_OUTPUT_PATCH
 {
-    float4 Position : SV_POSITION;
-    float4 localPos : POSITION;
+    // The domain shader recalculates the screen position
+    float3 localPos : POSITION;
     float2 TexCoord : TEXCOORD;
 };
 
@@ -34,7 +34,6 @@ struct HS_OUTPUT_PATCH
 HS_OUTPUT_PATCH main(InputPatch<HS_INPUT_PATCH, 4> patch, uint i : SV_OutputControlPointID, uint PatchID : SV_PrimitiveID)
 {
     HS_OUTPUT_PATCH output;
-    output.Position = patch[i].Position;
 
     output.TexCoord = patch[i].TexCoord;
     output.localPos = patch[i].localPos;

@@ -26,10 +26,13 @@ public:
     QUALIFIER bool startFirstPerson = true;
   };
   struct App {
+    /// Have to change in gradients.hlsl as well
     QUALIFIER float planeSize = 20.0f;
-    QUALIFIER XMFLOAT4 clearColor = {0, 1, 0, 0};
+    QUALIFIER XMFLOAT4 clearColor = {37.f / 255.f, 37.f / 255.f, 37.f / 255.f,
+                                     0};
   };
   struct ComputeShader {
+    /// Have to change in gradients.hlsl as well
     QUALIFIER u32 heightMapDimensions = 1024;
     QUALIFIER u32 computeShaderGroupsDim1 = 16;
     QUALIFIER u32 computeShaderGroupsDim2 = 16;

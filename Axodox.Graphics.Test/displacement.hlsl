@@ -17,5 +17,6 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3
     float h = sign_correction * heightfield[loc].x;
     float2 D = sign_correction * choppyfield[loc].xy;
 
+    // Why are we using float4?
     displacement[loc] = float4(D.x * lambda, h, D.y * lambda, 0.0);
 }
