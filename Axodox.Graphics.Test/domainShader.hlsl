@@ -50,7 +50,7 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
                       (patch[2].TexCoord * (1.0f - UV.x) + patch[3].TexCoord * UV.x) * UV.y;
 
     
-    float4 disp = _heightmap.SampleLevel(_sampler, texCoord, 0) * 0.001;
+    float4 disp = _heightmap.SampleLevel(_sampler, texCoord, 0);
     localPos += disp.xyz;
 
     float4 normal = _gradients.SampleLevel(_sampler, texCoord, 0);

@@ -771,143 +771,156 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
         qtNodes = qt.GetSize();
 
-        auto worldBasic = XMMatrixIdentity();
-        XMVECTOR planeBottomLeft =
-            XMVectorSet(-fullSizeXZ.x / 2, 0, -fullSizeXZ.y / 2, 1);
-        XMVECTOR planeTopRight =
-            XMVectorSet(fullSizeXZ.x / 2, 0, fullSizeXZ.y / 2, 1);
-        planeBottomLeft = XMVector3TransformCoord(planeBottomLeft, worldBasic);
-        planeTopRight = XMVector3TransformCoord(planeTopRight, worldBasic);
-        // Reorder to float2
-        planeBottomLeft = XMVectorSwizzle(planeBottomLeft, 0, 2, 1, 3);
-        planeTopRight = XMVectorSwizzle(planeTopRight, 0, 2, 1, 3);
+        const i32 displaycount = 1;
+        for (i32 idc = -(displaycount - 1); idc <= displaycount / 2; ++idc) {
+          for (i32 jdc = -(displaycount - 1); jdc <= displaycount / 2; ++jdc) {
+            auto worldBasic =
+                XMMatrixTranslation(idc * Defaults::App::planeSize, 0,
+                                    jdc * Defaults::App::planeSize);
 
-        start = std::chrono::high_resolution_clock::now();
-        for (auto it = qt.begin(); it != qt.end(); ++it) {
-          drawnNodes++;
-          NavigatingTheQuadTree +=
-              std::chrono::duration_cast<decltype(NavigatingTheQuadTree)>(
-                  (std::chrono::high_resolution_clock::now() - start));
+            XMVECTOR planeBottomLeft =
+                XMVectorSet(-fullSizeXZ.x / 2, 0, -fullSizeXZ.y / 2, 1);
+            XMVECTOR planeTopRight =
+                XMVectorSet(fullSizeXZ.x / 2, 0, fullSizeXZ.y / 2, 1);
+            planeBottomLeft =
+                XMVector3TransformCoord(planeBottomLeft, worldBasic);
+            planeTopRight = XMVector3TransformCoord(planeTopRight, worldBasic);
+            // Reorder to float2
+            planeBottomLeft = XMVectorSwizzle(planeBottomLeft, 0, 2, 1, 3);
+            planeTopRight = XMVectorSwizzle(planeTopRight, 0, 2, 1, 3);
 
-          {
-            auto world =
-                worldBasic * XMMatrixScaling(it->size.x, 1, it->size.y) *
-                XMMatrixTranslation(it->center.x, center.y, it->center.y);
-            auto ViewProjection = cam.GetViewProj();
-            // auto worldIT = XMMatrixInverse(nullptr, world);
-
-            XMStoreFloat4x4(&vertexConstants.WorldTransform,
-                            XMMatrixTranspose(world));
-            XMStoreFloat4x4(&vertexConstants.ViewTransform,
-                            XMMatrixTranspose(ViewProjection));
-
-            XMStoreFloat4x4(&domainConstants.ViewProjTransform,
-                            XMMatrixTranspose(ViewProjection));
-
-            // Why no 2x2?
-            XMStoreFloat2(&vertexConstants.PlaneBottomLeft, planeBottomLeft);
-            XMStoreFloat2(&vertexConstants.PlaneTopRight, planeTopRight);
-
-            XMStoreFloat4(&pixelConstants.cameraPos, cam.GetEye());
-            pixelConstants.mult = settings.pixelMult;
-          }
-          {
             start = std::chrono::high_resolution_clock::now();
+            for (auto it = qt.begin(); it != qt.end(); ++it) {
+              drawnNodes++;
+              NavigatingTheQuadTree +=
+                  std::chrono::duration_cast<decltype(NavigatingTheQuadTree)>(
+                      (std::chrono::high_resolution_clock::now() - start));
 
-            auto res = it.GetSmallerNeighbor();
+              {
+                auto world =
+                    XMMatrixScaling(it->size.x, 1, it->size.y) *
+                    XMMatrixTranslation(it->center.x, center.y, it->center.y) *
+                    worldBasic;
+                auto ViewProjection = cam.GetViewProj();
+                // auto worldIT = XMMatrixInverse(nullptr, world);
 
-            NavigatingTheQuadTree +=
-                std::chrono::duration_cast<decltype(NavigatingTheQuadTree)>(
-                    (std::chrono::high_resolution_clock::now() - start));
-            static const constexpr auto l = [](const float x) -> float {
-              if (x == 0)
-                return 1;
-              else
-                return 1 / x;
-            };
-            hullConstants.TesselationFactor = {l(res.zneg), l(res.xneg),
-                                               l(res.zpos), l(res.xpos)};
+                XMStoreFloat4x4(&vertexConstants.WorldTransform,
+                                XMMatrixTranspose(world));
+                XMStoreFloat4x4(&vertexConstants.ViewTransform,
+                                XMMatrixTranspose(ViewProjection));
+
+                XMStoreFloat4x4(&domainConstants.ViewProjTransform,
+                                XMMatrixTranspose(ViewProjection));
+
+                // Why no 2x2?
+                XMStoreFloat2(&vertexConstants.PlaneBottomLeft,
+                              planeBottomLeft);
+                XMStoreFloat2(&vertexConstants.PlaneTopRight, planeTopRight);
+
+                XMStoreFloat4(&pixelConstants.cameraPos, cam.GetEye());
+                pixelConstants.mult = settings.pixelMult;
+              }
+              {
+                start = std::chrono::high_resolution_clock::now();
+
+                auto res = it.GetSmallerNeighbor();
+
+                NavigatingTheQuadTree +=
+                    std::chrono::duration_cast<decltype(NavigatingTheQuadTree)>(
+                        (std::chrono::high_resolution_clock::now() - start));
+                static const constexpr auto l = [](const float x) -> float {
+                  if (x == 0)
+                    return 1;
+                  else
+                    return 1 / x;
+                };
+                hullConstants.TesselationFactor = {l(res.zneg), l(res.xneg),
+                                                   l(res.zpos), l(res.xpos)};
+              }
+
+              auto mask = simpleRootSignature.Set(allocator,
+                                                  RootSignatureUsage::Graphics);
+
+              mask.HullBuffer =
+                  frameResource.DynamicBuffer.AddBuffer(hullConstants);
+              mask.VertexBuffer =
+                  frameResource.DynamicBuffer.AddBuffer(vertexConstants);
+              mask.DomainBuffer =
+                  frameResource.DynamicBuffer.AddBuffer(domainConstants);
+
+              pixelConstants.useTexture = false;
+              switch (settings.mode) {
+              case RuntimeSettings::Mode::Full:
+                mask.HeightMapForDomain =
+                    *drawingSimResource.finalDisplacementMap.ShaderResource(
+                        allocator);
+                break;
+
+              case RuntimeSettings::Mode::Tildeh0:
+                pixelConstants.useTexture = true;
+                mask.Texture = computeTildeh0;
+                break;
+              case RuntimeSettings::Mode::Frequencies:
+                pixelConstants.useTexture = true;
+                mask.Texture = computeFrequencies;
+                break;
+              case RuntimeSettings::Mode::Tildeh:
+                pixelConstants.useTexture = true;
+                mask.Texture =
+                    *drawingSimResource.tildeh.ShaderResource(allocator);
+                break;
+
+              case RuntimeSettings::Mode::TildeD:
+                pixelConstants.useTexture = true;
+                mask.Texture =
+                    *drawingSimResource.tildeD.ShaderResource(allocator);
+                break;
+              case RuntimeSettings::Mode::FFTTildeh:
+                pixelConstants.useTexture = true;
+                mask.Texture =
+                    *drawingSimResource.FFTTildeh.ShaderResource(allocator);
+                break;
+              case RuntimeSettings::Mode::FFTTildeD:
+                pixelConstants.useTexture = true;
+                mask.Texture =
+                    *drawingSimResource.FFTTildeD.ShaderResource(allocator);
+                break;
+              case RuntimeSettings::Mode::Displacement:
+                pixelConstants.useTexture = true;
+                mask.Texture =
+                    *drawingSimResource.finalDisplacementMap.ShaderResource(
+                        allocator);
+                break;
+              case RuntimeSettings::Mode::Gradients:
+                pixelConstants.useTexture = true;
+                mask.Texture =
+                    *drawingSimResource.gradients.ShaderResource(allocator);
+                break;
+              case RuntimeSettings::Mode::TildehBuffer:
+                pixelConstants.useTexture = true;
+                mask.Texture =
+                    *drawingSimResource.tildehBuffer.ShaderResource(allocator);
+                break;
+              case RuntimeSettings::Mode::TildeDBuffer:
+                pixelConstants.useTexture = true;
+                mask.Texture =
+                    *drawingSimResource.tildeDBuffer.ShaderResource(allocator);
+                break;
+              }
+
+              mask.PixelBuffer =
+                  frameResource.DynamicBuffer.AddBuffer(pixelConstants);
+              mask.GradientsForDomain =
+                  *drawingSimResource.gradients.ShaderResource(allocator);
+
+              allocator.SetRenderTargets(
+                  {renderTargetView}, frameResource.DepthBuffer.DepthStencil());
+              graphicsPipelineState.Apply(allocator);
+              planeMesh.Draw(allocator);
+
+              start = std::chrono::high_resolution_clock::now();
+            }
           }
-
-          auto mask =
-              simpleRootSignature.Set(allocator, RootSignatureUsage::Graphics);
-
-          mask.HullBuffer =
-              frameResource.DynamicBuffer.AddBuffer(hullConstants);
-          mask.VertexBuffer =
-              frameResource.DynamicBuffer.AddBuffer(vertexConstants);
-          mask.DomainBuffer =
-              frameResource.DynamicBuffer.AddBuffer(domainConstants);
-
-          pixelConstants.useTexture = false;
-          switch (settings.mode) {
-          case RuntimeSettings::Mode::Full:
-            mask.HeightMapForDomain =
-                *drawingSimResource.finalDisplacementMap.ShaderResource(
-                    allocator);
-            break;
-
-          case RuntimeSettings::Mode::Tildeh0:
-            pixelConstants.useTexture = true;
-            mask.Texture = computeTildeh0;
-            break;
-          case RuntimeSettings::Mode::Frequencies:
-            pixelConstants.useTexture = true;
-            mask.Texture = computeFrequencies;
-            break;
-          case RuntimeSettings::Mode::Tildeh:
-            pixelConstants.useTexture = true;
-            mask.Texture = *drawingSimResource.tildeh.ShaderResource(allocator);
-            break;
-
-          case RuntimeSettings::Mode::TildeD:
-            pixelConstants.useTexture = true;
-            mask.Texture = *drawingSimResource.tildeD.ShaderResource(allocator);
-            break;
-          case RuntimeSettings::Mode::FFTTildeh:
-            pixelConstants.useTexture = true;
-            mask.Texture =
-                *drawingSimResource.FFTTildeh.ShaderResource(allocator);
-            break;
-          case RuntimeSettings::Mode::FFTTildeD:
-            pixelConstants.useTexture = true;
-            mask.Texture =
-                *drawingSimResource.FFTTildeD.ShaderResource(allocator);
-            break;
-          case RuntimeSettings::Mode::Displacement:
-            pixelConstants.useTexture = true;
-            mask.Texture =
-                *drawingSimResource.finalDisplacementMap.ShaderResource(
-                    allocator);
-            break;
-          case RuntimeSettings::Mode::Gradients:
-            pixelConstants.useTexture = true;
-            mask.Texture =
-                *drawingSimResource.gradients.ShaderResource(allocator);
-            break;
-          case RuntimeSettings::Mode::TildehBuffer:
-            pixelConstants.useTexture = true;
-            mask.Texture =
-                *drawingSimResource.tildehBuffer.ShaderResource(allocator);
-            break;
-          case RuntimeSettings::Mode::TildeDBuffer:
-            pixelConstants.useTexture = true;
-            mask.Texture =
-                *drawingSimResource.tildeDBuffer.ShaderResource(allocator);
-            break;
-          }
-
-          mask.PixelBuffer =
-              frameResource.DynamicBuffer.AddBuffer(pixelConstants);
-          mask.GradientsForDomain =
-              *drawingSimResource.gradients.ShaderResource(allocator);
-
-          allocator.SetRenderTargets({renderTargetView},
-                                     frameResource.DepthBuffer.DepthStencil());
-          graphicsPipelineState.Apply(allocator);
-          planeMesh.Draw(allocator);
-
-          start = std::chrono::high_resolution_clock::now();
         }
       }
 

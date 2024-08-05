@@ -28,18 +28,20 @@ float4 main(input_t input) : SV_TARGET
     }
 
     
+
+    
     
     
 // Colors
     const float3 sunColor = float3(1.0, 1.0, 0.47);
-    const float3 sunDir = float3(0.45, 0.4, 0.45);
+    const float3 sunDir = float3(0.45, 0.1, -0.45);
     const float3 waterColor = float3(0.1812f, 0.4678f, 0.5520f);
 
     
     // Light
     float3 La = float3(0.3, 0.3, 0.4); // Ambient light from the sky
     float3 Ld = float3(1.0, 0.95, 0.8);
-    float3 Ls = float3(1.0, 1.0, 1.0);
+    float3 Ls = float3(1.0, 1.0, 0.3);
     const float lightConstantAttenuation = 1.0;
 // These are for point lights
     const float lightLinearAttenuation = 0.0;
@@ -47,38 +49,21 @@ float4 main(input_t input) : SV_TARGET
 
     // Water
 
-    float3 Ka = waterColor * 5;
-    float3 Kd = float3(0.2, 0.2, 0.2);
-    float3 Ks = float3(0.9, 0.9, 0.9);
-    float Shininess = 100.0;
+    float3 Ka = waterColor * 3;
+    float3 Kd = float3(0.2, 0.2, 0.2) * 4;
+    float3 Ks = float3(0.9, 0.9, 0.9) * 2;
+    float Shininess = 64.0;
 
-//    float3 La = float3(1.0, 1.0, 1.0);
-//    float3 Ld = float3(1.0, 1.0, 1.0);
-//    float3 Ls = float3(1.0, 1.0, 1.0);
-
-//    const float lightConstantAttenuation = 1.0;
-//// These dont matter since its a directional light.
-//    const float lightLinearAttenuation = 0.0;
-//    const float lightQuadraticAttenuation = 0.0;
-
-
-//    float3 Ka = float3(1.0, 1.0, 1.0f);
-//    float3 Kd = float3(1.0, 1, 1) * 2;
-//    float3 Ks = float3(1.0, 1, 1) * 2;
-
-//    float Shininess = 1.0;
-
-
-//    const float3 sunColor = float3(1.0, 1.0, 0.47);
-//    const float3 sundir = float3(0.45, 0.1, 0.45);
-//    const float3 waterColor = float3(0.1812f,
-//0.4678f, 0.5520f);
     
     
+    //if (cameraPos.x < 0.0 == input.localPos.x < 0 && cameraPos.z < 0 == input.localPos.z < 0)
+    //if (input.localPos.x < 0 == sunDir.x < 0 && input.localPos.z < 0 == sunDir.z < 0)
+    //{
+    //    return float4(1, 0, 0, 1);
+    //}
      
 
     float3 normal = normalize(input.normal.xyz);
-    //return float4(input.normal.zzz, 1);
 	
     float LightDistance = 0.0;
 	
@@ -94,18 +79,10 @@ float4 main(input_t input) : SV_TARGET
     float3 Diffuse = DiffuseFactor * Ld * Kd;
 
     float3 viewDir = normalize(cameraPos.xyz - (input.localPos.xyz));
-    // This should be -ToLight????
-    float3 reflectDir = reflect(ToLight, normal);
+    float3 reflectDir = reflect(-ToLight, normal);
 	
     float SpecularFactor = pow(max(dot(viewDir, reflectDir), 0.0), Shininess) * Attenuation;
     float3 Specular = SpecularFactor * Ls * Ks;
-
-    //return float4(reflectDir, 1);
-    
-    
-    //return
-    //float4(SpecularFactor.xxx, 1);
-
 
     
     
