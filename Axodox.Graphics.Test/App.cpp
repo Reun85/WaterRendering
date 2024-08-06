@@ -74,6 +74,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     struct PixelConstants {
       XMFLOAT4 cameraPos;
       XMFLOAT4 mult;
+      XMUINT4 swizzleorder;
       bool useTexture;
     };
 
@@ -110,7 +111,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
   struct SimulationStage {
     struct SpektrumRootDescription : public RootSignatureMask {
-      // How does it know, where its binded?
       // In
       RootDescriptorTable<1> Tildeh0;
       RootDescriptorTable<1> Frequencies;
@@ -250,9 +250,11 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       TildeDBuffer
     };
     bool firstPerson = Defaults::Cam::startFirstPerson;
+    bool timeRunning = true;
     XMFLOAT4 clearColor = Defaults::App::clearColor;
-    XMFLOAT4 pixelMult = XMFLOAT4(100000, 100000, 100000, 1);
-    Mode mode = Mode::Full;
+    XMFLOAT4 pixelMult = XMFLOAT4(1, 1, 1, 1);
+    Mode mode = Mode::Tildeh0;
+    XMUINT4 swizzleorder = XMUINT4(0, 1, 2, 3);
   };
 
   void Run() const {
@@ -270,9 +272,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     cam.SetFirstPerson(settings.firstPerson);
     // Events
 
-    bool &firstperson = settings.firstPerson;
+    bool &timerunning = settings.timeRunning;
     {
-      window.KeyDown([&cam, &quit, &firstperson](CoreWindow const &,
+      window.KeyDown([&cam, &quit, &timerunning](CoreWindow const &,
                                                  KeyEventArgs const &args) {
         if (ImGui::GetIO().WantCaptureKeyboard)
           return;
@@ -281,8 +283,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           quit = true;
           break;
         case Windows::System::VirtualKey::Space:
-          firstperson = !firstperson;
-          cam.SetFirstPerson(firstperson);
+          timerunning = !timerunning;
           break;
 
         default:
@@ -481,6 +482,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       return std::chrono::duration_cast<SinceTimeStartTimeFrame>(
           std::chrono::high_resolution_clock::now() - loopStartTime);
     };
+    float gameTime = 0;
     // Frame counter
     auto frameCounter = 0u;
     std::chrono::steady_clock::time_point frameStart =
@@ -514,6 +516,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                                                     std::chrono::milliseconds>(
             newFrameStart - frameStart);
         frameStart = newFrameStart;
+        if (timerunning) {
+          gameTime += deltaTime;
+        }
       }
 
       // Ensure depth buffer matches frame size
@@ -558,10 +563,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         // Spektrums
         {
           SimulationStage::SpektrumRootDescription::InputConstants constant{};
-          constant.time =
-              GetDurationInFloatWithPrecision<std::chrono::seconds,
-                                              std::chrono::milliseconds>(
-                  getTimeSinceStart());
+          constant.time = gameTime;
 
           spektrumPipelineState.Apply(computeAllocator);
           auto mask = spektrumRootDescription.Set(computeAllocator,
@@ -848,6 +850,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
               mask.DomainBuffer =
                   frameResource.DynamicBuffer.AddBuffer(domainConstants);
 
+              pixelConstants.swizzleorder = settings.swizzleorder;
+
               pixelConstants.useTexture = false;
               switch (settings.mode) {
               case RuntimeSettings::Mode::Full:
@@ -933,8 +937,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
         if (ImGui::Begin("Application")) {
           ImGui::Text("Press ESC to quit");
-          ImGui::Text("Press Space to toggle between first person and third "
-                      "person camera");
+          ImGui::Text("Press Space to stop time");
           ImGui::ColorEdit3("clear color", (float *)&settings.clearColor);
 
           ImGui::Text("frameID = %d", frameCounter);
@@ -971,6 +974,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
               bool isSelected = ((u32)(settings.mode) == i);
               if (ImGui::Selectable(modeitems[i].c_str(), isSelected)) {
                 settings.mode = RuntimeSettings::Mode(i);
+                settings.swizzleorder = XMUINT4(0, 1, 2, 3);
               }
               if (isSelected) {
                 ImGui::SetItemDefaultFocus();
@@ -980,6 +984,33 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           }
           if (settings.mode != RuntimeSettings::Mode::Full) {
             ImGui::InputFloat3("Pixel Mult", (float *)&settings.pixelMult);
+
+            static const std::array<std::string, 4> swizzleitems = {"r", "g",
+                                                                    "b", "a"};
+
+            const std::array<u32 *const, 4> vals = {
+                &settings.swizzleorder.x, &settings.swizzleorder.y,
+                &settings.swizzleorder.z, &settings.swizzleorder.w};
+            ImGui::Text("Swizzle");
+            for (int i = 0; i < 4; i++) {
+              const string id = "##Swizzle" + swizzleitems[i];
+              ImGui::Text("%s", swizzleitems[i].c_str());
+              ImGui::SameLine();
+
+              if (ImGui::BeginCombo(id.c_str(),
+                                    swizzleitems[*vals[i]].c_str())) {
+                for (size_t j = 0; j < swizzleitems.size(); j++) {
+                  bool isSelected = (*(vals[i]) == j);
+                  if (ImGui::Selectable(swizzleitems[j].c_str(), isSelected)) {
+                    *vals[i] = j;
+                  }
+                  if (isSelected) {
+                    ImGui::SetItemDefaultFocus();
+                  }
+                }
+                ImGui::EndCombo();
+              }
+            }
           }
 
           static const std::array<std::string, 3> items = {
@@ -1019,6 +1050,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           if (ImGui::Checkbox("Firstperson", &settings.firstPerson))
             cam.SetFirstPerson(settings.firstPerson);
 
+          ImGui::Checkbox("Time running", &settings.timeRunning);
+
           XMVECTOR camEye = cam.GetEye();
           if (ImGui::InputFloat3("Cam eye ", (float *)&camEye, "%.3f"))
             cam.SetView(camEye, cam.GetAt(), cam.GetWorldUp());
@@ -1033,8 +1066,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
               cam.SetView(cam.GetEye(), camLookAt, cam.GetWorldUp());
 
             float distance = cam.GetDistance();
-            if (ImGui::SliderFloat("Cam distance from look at", &distance, 0,
-                                   100))
+            if (ImGui::SliderFloat("Cam distance", &distance, 0, 100))
               cam.SetDistanceFromAt(distance);
           }
         }

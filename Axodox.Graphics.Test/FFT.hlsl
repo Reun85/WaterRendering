@@ -48,20 +48,12 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3
 {
     int z = GTid.x;
     int x = LTid.x;
-    //uint x = DTid.x;
-    //uint z = DTid.y;
 
 
     // Rearrange array for FFT
     // We use f32 => 32
-    // 
-    //int nj = (ReverseBitfield(x) >> (32 - LOG2_N)) & (N - 1);
-    //pingpong[1][x] = readbuff[int2(z, x)];
-    //GroupMemoryBarrierWithGroupSync();
-    
 
     int nj = (reversebits(x) >> (32 - LOG2_N)) & (N - 1);
-    //pingpong[0][nj] = pingpong[1][x];
     pingpong[0][nj] = readbuff[int2(z, x)];
 
 
@@ -95,5 +87,5 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3
 
     float2 result = pingpong[src][x];
 
-    writebuff[uint2(x,z)] = result;
+    writebuff[uint2(x, z)] = result;
 }

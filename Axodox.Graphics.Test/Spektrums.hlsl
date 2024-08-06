@@ -26,7 +26,7 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3
 {
  // SV_DISPATCHTHREADID is the globalPos 
     int2 loc1 = int2(DTid.xy);
-    int2 loc2 = int2(N - loc1.x, N - loc1.y);
+    int2 loc2 = int2(N - 1 - loc1.x, N - 1 - loc1.y);
 
     // Load initial spectrum
     // These should probably be a sampler?

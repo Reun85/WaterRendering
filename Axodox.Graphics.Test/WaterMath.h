@@ -56,8 +56,8 @@ constexpr u32 ColumnMajorIndexing(const u32 i, const u32 j, const u32 N) {
   return i + j * N;
 };
 constexpr u32 Indexing(const u32 i, const u32 j, const u32 N, const u32 M) {
-  return ColumnMajorIndexing(i, j, N);
-  // return RowMajorIndexing(i, j, M);
+  // return ColumnMajorIndexing(i, j, N);
+  return RowMajorIndexing(i, j, M);
 };
 } // namespace Inner
 

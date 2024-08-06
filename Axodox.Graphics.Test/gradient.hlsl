@@ -30,5 +30,6 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     float J = (1.0 + dDx.x) * (1.0 + dDy.y) - dDx.y * dDy.x;
 
-    gradients[loc] = float4(gradient.y, TILE_SIZE_X2, gradient.x, J);
+    float3 grad = float3(gradient.y, TILE_SIZE_X2, gradient.x);
+    gradients[loc] = float4(normalize(grad), J);
 }

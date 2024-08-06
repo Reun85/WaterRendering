@@ -56,7 +56,7 @@ public:
 
     QUALIFIER f32 gravity = 9.81f;
 
-    QUALIFIER f32 WindForce = 10;
+    QUALIFIER f32 WindForce = 1 * 4;
     QUALIFIER float2 WindDirection = float2(-0.4f, -0.9f);
 
     // A constant that scales the waves

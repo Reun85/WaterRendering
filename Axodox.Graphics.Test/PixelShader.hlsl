@@ -7,6 +7,7 @@ cbuffer Constants : register(b0)
 {
     float4 cameraPos;
     float4 mult;
+    uint4 swizzleorder;
     bool useTexture;
 }
 
@@ -18,13 +19,39 @@ struct input_t
     float4 normal : Variable;
 };
 
+float GetComponentByIndex(float4 vec, uint index)
+{
+    if (index == 0)
+        return vec.x;
+    if (index == 1)
+        return vec.y;
+    if (index == 2)
+        return vec.z;
+    if (index == 3)
+        return vec.w;
+    return 0.0; // Default case, should not occur if indices are valid
+}
+
+float4 Swizzle(float4 vec, uint4 order)
+{
+    return float4(
+        GetComponentByIndex(vec, order.x),
+        GetComponentByIndex(vec, order.y),
+        GetComponentByIndex(vec, order.z),
+        GetComponentByIndex(vec, order.w)
+    );
+}
+
+
+
 float4 main(input_t input) : SV_TARGET
 {
 
 
     if (useTexture)
     {
-        return _texture.Sample(_sampler, input.TextureCoord) * float4(mult.xyz, 1);
+        float4 text = _texture.Sample(_sampler, input.TextureCoord) * float4(mult.xyz, 1);
+        return Swizzle(text, swizzleorder);
     }
 
     
@@ -60,7 +87,7 @@ float4 main(input_t input) : SV_TARGET
     //if (input.localPos.x < 0 == sunDir.x < 0 && input.localPos.z < 0 == sunDir.z < 0)
     //{
     //    return float4(1, 0, 0, 1);
-    //}
+    //}n
      
 
     float3 normal = normalize(input.normal.xyz);
