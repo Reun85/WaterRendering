@@ -55,6 +55,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   struct SimpleGraphicsRootDescription : public RootSignatureMask {
     struct DomainConstants {
       XMFLOAT4X4 ViewProjTransform;
+      int useDisplacement;
     };
 
     struct VertexConstants {
@@ -75,7 +76,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       XMFLOAT4 cameraPos;
       XMFLOAT4 mult;
       XMUINT4 swizzleorder;
-      bool useTexture;
+      int useTexture;
     };
 
     RootDescriptor<RootDescriptorType::ConstantBuffer> VertexBuffer;
@@ -842,6 +843,61 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
               auto mask = simpleRootSignature.Set(allocator,
                                                   RootSignatureUsage::Graphics);
+              mask.HeightMapForDomain =
+                  *drawingSimResource.finalDisplacementMap.ShaderResource(
+                      allocator);
+
+              pixelConstants.swizzleorder = settings.swizzleorder;
+
+              domainConstants.useDisplacement = 1;
+              pixelConstants.useTexture = 0;
+              switch (settings.mode) {
+              case RuntimeSettings::Mode::Full:
+                pixelConstants.useTexture = 1;
+                domainConstants.useDisplacement = 0;
+                break;
+
+              case RuntimeSettings::Mode::Tildeh0:
+                mask.Texture = computeTildeh0;
+                break;
+              case RuntimeSettings::Mode::Frequencies:
+                mask.Texture = computeFrequencies;
+                break;
+              case RuntimeSettings::Mode::Tildeh:
+                mask.Texture =
+                    *drawingSimResource.tildeh.ShaderResource(allocator);
+                break;
+
+              case RuntimeSettings::Mode::TildeD:
+                mask.Texture =
+                    *drawingSimResource.tildeD.ShaderResource(allocator);
+                break;
+              case RuntimeSettings::Mode::FFTTildeh:
+                mask.Texture =
+                    *drawingSimResource.FFTTildeh.ShaderResource(allocator);
+                break;
+              case RuntimeSettings::Mode::FFTTildeD:
+                mask.Texture =
+                    *drawingSimResource.FFTTildeD.ShaderResource(allocator);
+                break;
+              case RuntimeSettings::Mode::Displacement:
+                mask.Texture =
+                    *drawingSimResource.finalDisplacementMap.ShaderResource(
+                        allocator);
+                break;
+              case RuntimeSettings::Mode::Gradients:
+                mask.Texture =
+                    *drawingSimResource.gradients.ShaderResource(allocator);
+                break;
+              case RuntimeSettings::Mode::TildehBuffer:
+                mask.Texture =
+                    *drawingSimResource.tildehBuffer.ShaderResource(allocator);
+                break;
+              case RuntimeSettings::Mode::TildeDBuffer:
+                mask.Texture =
+                    *drawingSimResource.tildeDBuffer.ShaderResource(allocator);
+                break;
+              }
 
               mask.HullBuffer =
                   frameResource.DynamicBuffer.AddBuffer(hullConstants);
@@ -849,69 +905,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                   frameResource.DynamicBuffer.AddBuffer(vertexConstants);
               mask.DomainBuffer =
                   frameResource.DynamicBuffer.AddBuffer(domainConstants);
-
-              pixelConstants.swizzleorder = settings.swizzleorder;
-
-              pixelConstants.useTexture = false;
-              switch (settings.mode) {
-              case RuntimeSettings::Mode::Full:
-                mask.HeightMapForDomain =
-                    *drawingSimResource.finalDisplacementMap.ShaderResource(
-                        allocator);
-                break;
-
-              case RuntimeSettings::Mode::Tildeh0:
-                pixelConstants.useTexture = true;
-                mask.Texture = computeTildeh0;
-                break;
-              case RuntimeSettings::Mode::Frequencies:
-                pixelConstants.useTexture = true;
-                mask.Texture = computeFrequencies;
-                break;
-              case RuntimeSettings::Mode::Tildeh:
-                pixelConstants.useTexture = true;
-                mask.Texture =
-                    *drawingSimResource.tildeh.ShaderResource(allocator);
-                break;
-
-              case RuntimeSettings::Mode::TildeD:
-                pixelConstants.useTexture = true;
-                mask.Texture =
-                    *drawingSimResource.tildeD.ShaderResource(allocator);
-                break;
-              case RuntimeSettings::Mode::FFTTildeh:
-                pixelConstants.useTexture = true;
-                mask.Texture =
-                    *drawingSimResource.FFTTildeh.ShaderResource(allocator);
-                break;
-              case RuntimeSettings::Mode::FFTTildeD:
-                pixelConstants.useTexture = true;
-                mask.Texture =
-                    *drawingSimResource.FFTTildeD.ShaderResource(allocator);
-                break;
-              case RuntimeSettings::Mode::Displacement:
-                pixelConstants.useTexture = true;
-                mask.Texture =
-                    *drawingSimResource.finalDisplacementMap.ShaderResource(
-                        allocator);
-                break;
-              case RuntimeSettings::Mode::Gradients:
-                pixelConstants.useTexture = true;
-                mask.Texture =
-                    *drawingSimResource.gradients.ShaderResource(allocator);
-                break;
-              case RuntimeSettings::Mode::TildehBuffer:
-                pixelConstants.useTexture = true;
-                mask.Texture =
-                    *drawingSimResource.tildehBuffer.ShaderResource(allocator);
-                break;
-              case RuntimeSettings::Mode::TildeDBuffer:
-                pixelConstants.useTexture = true;
-                mask.Texture =
-                    *drawingSimResource.tildeDBuffer.ShaderResource(allocator);
-                break;
-              }
-
               mask.PixelBuffer =
                   frameResource.DynamicBuffer.AddBuffer(pixelConstants);
               mask.GradientsForDomain =

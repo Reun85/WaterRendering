@@ -8,7 +8,7 @@ cbuffer Constants : register(b0)
     float4 cameraPos;
     float4 mult;
     uint4 swizzleorder;
-    bool useTexture;
+    int useTexture;
 }
 
 struct input_t
@@ -48,7 +48,7 @@ float4 main(input_t input) : SV_TARGET
 {
 
 
-    if (useTexture)
+    if (useTexture ==0)
     {
         float4 text = _texture.Sample(_sampler, input.TextureCoord) * float4(mult.xyz, 1);
         return Swizzle(text, swizzleorder);

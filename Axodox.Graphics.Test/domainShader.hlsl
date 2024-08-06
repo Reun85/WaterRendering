@@ -5,6 +5,7 @@ SamplerState _sampler : register(s0);
 cbuffer DomainBuffer : register(b0)
 {
     float4x4 ViewTransform;
+    int useDisplacement;
 };
 // --------------------------------------
 // Domain Shader
@@ -50,10 +51,12 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
                       (patch[2].TexCoord * (1.0f - UV.x) + patch[3].TexCoord * UV.x) * UV.y;
 
     
+    if (useDisplacement ==0)
+    {
     float4 disp = _heightmap.SampleLevel(_sampler, texCoord, 0);
     //disp.xz =float2(0, 0);
     localPos += disp.xyz;
-
+    }
     float4 normal = _gradients.SampleLevel(_sampler, texCoord, 0);
     
     
