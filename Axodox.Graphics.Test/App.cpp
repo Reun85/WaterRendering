@@ -7,6 +7,7 @@
 #include "Defaults.h"
 #include "WaterMath.h"
 #include "Helpers.h"
+#include "pix3.h"
 
 using namespace std;
 using namespace winrt;
@@ -713,6 +714,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         }
         // Upload queue
         {
+          PIXScopedEvent(computeQueue.get(), 0, "asdadwadsdawddawdsdzxc");
           auto commandList = computeAllocator.EndList();
           computeAllocator.BeginList();
           simResource.DynamicBuffer.UploadResources(computeAllocator);

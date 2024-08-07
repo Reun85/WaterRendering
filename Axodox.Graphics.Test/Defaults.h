@@ -23,7 +23,6 @@ using namespace DirectX::PackedVector;
 constexpr bool isPowerOfTwo(u32 x) { return std::has_single_bit(x); }
 
 struct Defaults {
-
 public:
   struct Cam {
     QUALIFIER float3 camStartPos = float3(-1, 10, 0);
@@ -56,11 +55,11 @@ public:
 
     QUALIFIER f32 gravity = 9.81f;
 
-    QUALIFIER f32 WindForce = 1 * 4;
+    QUALIFIER f32 WindForce = 1 * 10;
     QUALIFIER float2 WindDirection = float2(-0.4f, -0.9f);
 
     // A constant that scales the waves
-    QUALIFIER f32 Amplitude = 0.45e-4f;
+    QUALIFIER f32 Amplitude = 0.45e-3f;
     // QUALIFIER f32 Amplitude = 0.45e-3f;
 
     QUALIFIER f32 timeStep = 1.0f / 60.0f;
