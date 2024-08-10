@@ -3,11 +3,12 @@
 #include "QuadTree.h"
 #include <fstream>
 #include <string.h>
-#include "ConstantGPUBuffer.h"
 #include "Defaults.h"
 #include "WaterMath.h"
 #include "Helpers.h"
 #include "pix3.h"
+#include "ComputePipeline.h"
+#include "GraphicsPipeline.h"
 
 using namespace std;
 using namespace winrt;
@@ -52,191 +53,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         : Allocator(*context.Device), Fence(*context.Device),
           DynamicBuffer(*context.Device), DepthBuffer(context) {}
   };
-
-  struct SimpleGraphicsRootDescription : public RootSignatureMask {
-    struct DomainConstants {
-      XMFLOAT4X4 ViewProjTransform;
-      int useDisplacement;
-    };
-
-    struct VertexConstants {
-      XMFLOAT4X4 WorldTransform;
-      XMFLOAT4X4 ViewTransform;
-      // This cannot be center and size, otherwise we could not rotate the thing
-      // But it does require that the plane perpendicular to the y axis
-      // If not, rewrite this to use float3s.
-      XMFLOAT2 PlaneBottomLeft;
-      XMFLOAT2 PlaneTopRight;
-    };
-    struct HullConstants {
-      // zneg,xneg, zpos, xpos
-      XMFLOAT4 TesselationFactor;
-    };
-
-    struct PixelConstants {
-      XMFLOAT4 cameraPos;
-      XMFLOAT4 mult;
-      XMUINT4 swizzleorder;
-      int useTexture;
-    };
-
-    RootDescriptor<RootDescriptorType::ConstantBuffer> VertexBuffer;
-    RootDescriptor<RootDescriptorType::ConstantBuffer> HullBuffer;
-    RootDescriptor<RootDescriptorType::ConstantBuffer> DomainBuffer;
-    RootDescriptor<RootDescriptorType::ConstantBuffer> PixelBuffer;
-    RootDescriptorTable<1> Texture;
-    StaticSampler TextureSampler;
-    RootDescriptorTable<1> HeightMapForDomain;
-    StaticSampler HeightmapSamplerForDomain;
-    RootDescriptorTable<1> GradientsForDomain;
-
-    explicit SimpleGraphicsRootDescription(const RootSignatureContext &context)
-        : RootSignatureMask(context),
-          VertexBuffer(this, {0}, ShaderVisibility::Vertex),
-          HullBuffer(this, {0}, ShaderVisibility::Hull),
-          DomainBuffer(this, {0}, ShaderVisibility::Domain),
-          PixelBuffer(this, {0}, ShaderVisibility::Pixel),
-          Texture(this, {DescriptorRangeType::ShaderResource},
-                  ShaderVisibility::Pixel),
-          TextureSampler(this, {0}, Filter::Linear, TextureAddressMode::Clamp,
-                         ShaderVisibility::Pixel),
-          HeightMapForDomain(this, {DescriptorRangeType::ShaderResource, {0}},
-                             ShaderVisibility::Domain),
-          HeightmapSamplerForDomain(this, {0}, Filter::Linear,
-                                    TextureAddressMode::Clamp,
-                                    ShaderVisibility::Domain),
-          GradientsForDomain(this, {DescriptorRangeType::ShaderResource, {1}},
-                             ShaderVisibility::Domain) {
-      Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
-    }
-  };
-
-  struct SimulationStage {
-    struct SpektrumRootDescription : public RootSignatureMask {
-      // In
-      RootDescriptorTable<1> Tildeh0;
-      RootDescriptorTable<1> Frequencies;
-      struct InputConstants {
-        float time;
-      };
-      RootDescriptor<RootDescriptorType::ConstantBuffer> InputBuffer;
-      // Out
-      RootDescriptorTable<1> Tildeh;
-      RootDescriptorTable<1> TildeD;
-
-      explicit SpektrumRootDescription(const RootSignatureContext &context)
-          : RootSignatureMask(context),
-            Tildeh0(this, {DescriptorRangeType::ShaderResource, 0}),
-            Frequencies(this, {DescriptorRangeType::ShaderResource, 1}),
-            InputBuffer(this, {0}),
-            Tildeh(this, {DescriptorRangeType::UnorderedAccess, 0}),
-            TildeD(this, {DescriptorRangeType::UnorderedAccess, 1}) {
-        Flags = RootSignatureFlags::None;
-      }
-    };
-    struct FFTDescription : public RootSignatureMask {
-      // In
-      RootDescriptorTable<1> Input;
-      // Out
-      RootDescriptorTable<1> Output;
-
-      explicit FFTDescription(const RootSignatureContext &context)
-          : RootSignatureMask(context),
-            Input(this, {DescriptorRangeType::ShaderResource, 0}),
-            Output(this, {DescriptorRangeType::UnorderedAccess, 0}) {
-        Flags = RootSignatureFlags::None;
-      }
-    };
-    struct DisplacementDescription : public RootSignatureMask {
-      // In
-      RootDescriptorTable<1> Height;
-      RootDescriptorTable<1> Choppy;
-      // Out
-      RootDescriptorTable<1> Output;
-
-      explicit DisplacementDescription(const RootSignatureContext &context)
-          : RootSignatureMask(context),
-            Height(this, {DescriptorRangeType::ShaderResource, 0}),
-            Choppy(this, {DescriptorRangeType::ShaderResource, 1}),
-            Output(this, {DescriptorRangeType::UnorderedAccess, 0}) {
-        Flags = RootSignatureFlags::None;
-      }
-    };
-    struct GradientDescription : public RootSignatureMask {
-      // In
-      RootDescriptorTable<1> Displacement;
-      // Out
-      RootDescriptorTable<1> Output;
-
-      explicit GradientDescription(const RootSignatureContext &context)
-          : RootSignatureMask(context),
-            Displacement(this, {DescriptorRangeType::ShaderResource, 0}),
-            Output(this, {DescriptorRangeType::UnorderedAccess, 0}) {
-        Flags = RootSignatureFlags::None;
-      }
-    };
-
-    struct SimulationResources {
-      CommandAllocator Allocator;
-      CommandFence Fence;
-      CommandFenceMarker FrameDoneMarker;
-      DynamicBufferManager DynamicBuffer;
-
-      MutableTextureWithState tildeh;
-      MutableTextureWithState tildeD;
-#define useDifferentFFTOutputBuffers true
-#if useDifferentFFTOutputBuffers
-      MutableTextureWithState FFTTildeh;
-      MutableTextureWithState FFTTildeD;
-#else
-      MutableTextureWithState &FFTTildeh = tildeh;
-      MutableTextureWithState &FFTTildeD = tildeD;
-#endif
-      MutableTextureWithState tildehBuffer;
-      MutableTextureWithState tildeDBuffer;
-
-      MutableTextureWithState finalDisplacementMap;
-      MutableTextureWithState gradients;
-
-      explicit SimulationResources(const ResourceAllocationContext &context,
-                                   const u32 N, const u32 M)
-          : Allocator(*context.Device),
-
-            Fence(*context.Device), DynamicBuffer(*context.Device),
-            tildeh(context, TextureDefinition::TextureDefinition(
-                                Format::R32G32_Float, N, M, 0,
-                                TextureFlags::UnorderedAccess)),
-            tildeD(context, TextureDefinition::TextureDefinition(
-                                Format::R32G32_Float, N, M, 0,
-                                TextureFlags::UnorderedAccess)),
-#if useDifferentFFTOutputBuffers
-            FFTTildeh(context, TextureDefinition::TextureDefinition(
-                                   Format::R32G32_Float, N, M, 0,
-                                   TextureFlags::UnorderedAccess)),
-            FFTTildeD(context, TextureDefinition::TextureDefinition(
-                                   Format::R32G32_Float, N, M, 0,
-                                   TextureFlags::UnorderedAccess)),
-#endif
-            tildehBuffer(context, TextureDefinition::TextureDefinition(
-                                      Format::R32G32_Float, N, M, 0,
-                                      TextureFlags::UnorderedAccess)),
-            tildeDBuffer(context, TextureDefinition::TextureDefinition(
-                                      Format::R32G32_Float, N, M, 0,
-                                      TextureFlags::UnorderedAccess)),
-            finalDisplacementMap(context,
-                                 TextureDefinition::TextureDefinition(
-                                     Format::R32G32B32A32_Float, N, M, 0,
-                                     TextureFlags::UnorderedAccess)),
-
-            gradients(context, TextureDefinition::TextureDefinition(
-                                   Format::R16G16B16A16_Float, N, M, 0,
-                                   TextureFlags::UnorderedAccess))
-
-      {
-      }
-    };
-  };
-
   struct RuntimeSettings {
     enum class Mode : u8 {
       Full = 0,
@@ -255,9 +71,80 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     bool timeRunning = true;
     XMFLOAT4 clearColor = Defaults::App::clearColor;
     XMFLOAT4 pixelMult = XMFLOAT4(1, 1, 1, 1);
-    Mode mode = Mode::Tildeh0;
+    Mode mode = Mode::Full;
     XMUINT4 swizzleorder = XMUINT4(0, 1, 2, 3);
   };
+
+  static void SetUpWindowInput(const CoreWindow &window,
+                               RuntimeSettings &settings, bool &quit,
+                               Camera &cam) {
+
+    bool &timerunning = settings.timeRunning;
+    window.KeyDown([&cam, &quit, &timerunning](CoreWindow const &,
+                                               KeyEventArgs const &args) {
+      if (ImGui::GetIO().WantCaptureKeyboard)
+        return;
+      switch (args.VirtualKey()) {
+      case Windows::System::VirtualKey::Escape:
+        quit = true;
+        break;
+      case Windows::System::VirtualKey::Space:
+        timerunning = !timerunning;
+        break;
+
+      default:
+        cam.KeyboardDown(args);
+        break;
+      }
+    });
+    window.KeyUp([&cam](CoreWindow const &, KeyEventArgs const &args) {
+      if (ImGui::GetIO().WantCaptureKeyboard)
+        return;
+      cam.KeyboardUp(args);
+    });
+    window.PointerMoved(
+        [&cam](CoreWindow const &, PointerEventArgs const &args) {
+          if (ImGui::GetIO().WantCaptureMouse)
+            return;
+          cam.MouseMove(args);
+        });
+    window.PointerWheelChanged(
+        [&cam](CoreWindow const &, PointerEventArgs const &args) {
+          if (ImGui::GetIO().WantCaptureMouse)
+            return;
+          cam.MouseWheel(args);
+        });
+  }
+
+  static ID3D12DescriptorHeap *
+  InitImGui(const Axodox::Graphics::D3D12::GraphicsDevice &device,
+            u8 framesInFlight) {
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO &io = ImGui::GetIO();
+    (void)io;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    ImGui::StyleColorsDark();
+
+    // Setup Platform/Renderer bindings
+    ImGui_ImplUwp_InitForCurrentView();
+
+    D3D12_DESCRIPTOR_HEAP_DESC ImGuiDescriptorHeapDesc = {};
+    ImGuiDescriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    ImGuiDescriptorHeapDesc.NumDescriptors = 2;
+    ImGuiDescriptorHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+
+    ID3D12DescriptorHeap *ImGuiDescriptorHeap{};
+    check_hresult(device.get()->CreateDescriptorHeap(
+        &ImGuiDescriptorHeapDesc, IID_PPV_ARGS(&ImGuiDescriptorHeap)));
+    ImGui_ImplDX12_Init(
+        device.get(), static_cast<int>(framesInFlight),
+        DXGI_FORMAT_B8G8R8A8_UNORM, ImGuiDescriptorHeap,
+        ImGuiDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
+
+        ImGuiDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+    return ImGuiDescriptorHeap;
+  }
 
   void Run() const {
     CoreWindow window = CoreWindow::GetForCurrentThread();
@@ -274,43 +161,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     cam.SetFirstPerson(settings.firstPerson);
     // Events
 
-    bool &timerunning = settings.timeRunning;
-    {
-      window.KeyDown([&cam, &quit, &timerunning](CoreWindow const &,
-                                                 KeyEventArgs const &args) {
-        if (ImGui::GetIO().WantCaptureKeyboard)
-          return;
-        switch (args.VirtualKey()) {
-        case Windows::System::VirtualKey::Escape:
-          quit = true;
-          break;
-        case Windows::System::VirtualKey::Space:
-          timerunning = !timerunning;
-          break;
-
-        default:
-          cam.KeyboardDown(args);
-          break;
-        }
-      });
-      window.KeyUp([&cam](CoreWindow const &, KeyEventArgs const &args) {
-        if (ImGui::GetIO().WantCaptureKeyboard)
-          return;
-        cam.KeyboardUp(args);
-      });
-      window.PointerMoved(
-          [&cam](CoreWindow const &, PointerEventArgs const &args) {
-            if (ImGui::GetIO().WantCaptureMouse)
-              return;
-            cam.MouseMove(args);
-          });
-      window.PointerWheelChanged(
-          [&cam](CoreWindow const &, PointerEventArgs const &args) {
-            if (ImGui::GetIO().WantCaptureMouse)
-              return;
-            cam.MouseWheel(args);
-          });
-    }
+    SetUpWindowInput(window, settings, quit, cam);
 
     CoreDispatcher dispatcher = window.Dispatcher();
 
@@ -325,7 +176,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     // Graphics pipeline
     RootSignature<SimpleGraphicsRootDescription> simpleRootSignature{device};
 
-    VertexShader simpleVertexShader{app_folder() / L"SimpleVertexShader.cso"};
+    VertexShader simpleVertexShader{app_folder() / L"VertexShader.cso"};
     PixelShader simplePixelShader{app_folder() / L"PixelShader.cso"};
     HullShader hullShader{app_folder() / L"hullShader.cso"};
     DomainShader domainShader{app_folder() / L"domainShader.cso"};
@@ -424,9 +275,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     ImmutableMesh planeMesh{immutableAllocationContext, CreateQuadPatch()};
 
-    ImmutableTexture gradientTexture{immutableAllocationContext,
-                                     app_folder() / L"gradient.jpg"};
-
     auto mutableAllocationContext = immutableAllocationContext;
     CommittedResourceAllocator committedResourceAllocator{device};
     mutableAllocationContext.ResourceAllocator = &committedResourceAllocator;
@@ -449,32 +297,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           commonDescriptorHeap.Clean();
         });
 
-    ID3D12DescriptorHeap *ImGuiDescriptorHeap{};
-    // Init ImGUI
-    {
-      IMGUI_CHECKVERSION();
-      ImGui::CreateContext();
-      ImGuiIO &io = ImGui::GetIO();
-      (void)io;
-      io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-      ImGui::StyleColorsDark();
-
-      // Setup Platform/Renderer bindings
-      ImGui_ImplUwp_InitForCurrentView();
-
-      D3D12_DESCRIPTOR_HEAP_DESC ImGuiDescriptorHeapDesc = {};
-      ImGuiDescriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-      ImGuiDescriptorHeapDesc.NumDescriptors = 2;
-      ImGuiDescriptorHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-
-      check_hresult(device.get()->CreateDescriptorHeap(
-          &ImGuiDescriptorHeapDesc, IID_PPV_ARGS(&ImGuiDescriptorHeap)));
-      ImGui_ImplDX12_Init(
-          device.get(), static_cast<int>(frameResources.size()),
-          DXGI_FORMAT_B8G8R8A8_UNORM, ImGuiDescriptorHeap,
-          ImGuiDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
-          ImGuiDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-    }
+    ID3D12DescriptorHeap *ImGuiDescriptorHeap =
+        InitImGui(device, frameResources.size());
     ImGuiIO const &io = ImGui::GetIO();
 
     // Time counter
@@ -518,7 +342,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                                                     std::chrono::milliseconds>(
             newFrameStart - frameStart);
         frameStart = newFrameStart;
-        if (timerunning) {
+        if (settings.timeRunning) {
           gameTime += deltaTime;
         }
       }
@@ -747,7 +571,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         renderTargetView->Clear(allocator, settings.clearColor);
         frameResource.DepthBuffer.DepthStencil()->Clear(allocator);
       }
-      // Draw objects
+      // Draw Ocean
       uint qtNodes = 0;
       uint drawnNodes = 0;
       std::chrono::nanoseconds QuadTreeBuildTime(0);
@@ -759,169 +583,189 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         SimpleGraphicsRootDescription::HullConstants hullConstants{};
         SimpleGraphicsRootDescription::DomainConstants domainConstants{};
         SimpleGraphicsRootDescription::PixelConstants pixelConstants{};
+        SimpleGraphicsRootDescription::cameraConstants cameraConstants{};
+        SimpleGraphicsRootDescription::ModelConstants modelConstants{};
+
         XMFLOAT3 cam_eye;
-        float2 fullSizeXZ = {Defaults::App::planeSize,
-                             Defaults::App::planeSize};
-
         XMStoreFloat3(&cam_eye, cam.GetEye());
+        auto worldBasic = XMMatrixIdentity();
 
-        const i32 displaycount = 10;
-        for (i32 idc = -(displaycount - 1); idc <= displaycount / 2; ++idc) {
-          for (i32 jdc = -(displaycount - 1); jdc <= displaycount / 2; ++jdc) {
-            float3 center = {
-                static_cast<float>(idc) * Defaults::App::planeSize, 0,
-                static_cast<float>(jdc) * Defaults::App::planeSize};
-            auto worldBasic = XMMatrixIdentity();
-            QuadTree qt;
-            auto start = std::chrono::high_resolution_clock::now();
+        XMStoreFloat3(&cameraConstants.cameraPos, cam.GetEye());
+        XMStoreFloat4x4(&cameraConstants.vMatrix,
+                        XMMatrixTranspose(cam.GetViewMatrix()));
+        XMStoreFloat4x4(&cameraConstants.pMatrix,
+                        XMMatrixTranspose(cam.GetProj()));
+        XMStoreFloat4x4(&cameraConstants.vpMatrix,
+                        XMMatrixTranspose(cam.GetViewProj()));
 
-            qt.Build(center, fullSizeXZ,
-                     float3(cam_eye.x, cam_eye.y, cam_eye.z));
+        XMStoreFloat4x4(&modelConstants.mMatrix, XMMatrixTranspose(worldBasic));
 
-            QuadTreeBuildTime +=
-                std::chrono::duration_cast<decltype(QuadTreeBuildTime)>(
-                    std::chrono::high_resolution_clock::now() - start);
+        std::optional<GpuVirtualAddress> usedTexture;
+        // Debug stuff
+        {
 
-            qtNodes += qt.GetSize();
+          pixelConstants.swizzleorder = settings.swizzleorder;
 
-            XMVECTOR planeBottomLeft =
-                XMVectorSet(-fullSizeXZ.x / 2 + center.x, 0,
-                            -fullSizeXZ.y / 2 + center.z, 1);
-            XMVECTOR planeTopRight = XMVectorSet(
-                fullSizeXZ.x / 2 + center.x, 0, fullSizeXZ.y / 2 + center.z, 1);
-            planeBottomLeft =
-                XMVector3TransformCoord(planeBottomLeft, worldBasic);
-            planeTopRight = XMVector3TransformCoord(planeTopRight, worldBasic);
-            // Reorder to float2
-            planeBottomLeft = XMVectorSwizzle(planeBottomLeft, 0, 2, 1, 3);
-            planeTopRight = XMVectorSwizzle(planeTopRight, 0, 2, 1, 3);
+          domainConstants.useDisplacement = 1;
+          pixelConstants.useTexture = 0;
 
-            start = std::chrono::high_resolution_clock::now();
-            for (auto it = qt.begin(); it != qt.end(); ++it) {
-              drawnNodes++;
-              NavigatingTheQuadTree +=
-                  std::chrono::duration_cast<decltype(NavigatingTheQuadTree)>(
-                      (std::chrono::high_resolution_clock::now() - start));
+          switch (settings.mode) {
+          case RuntimeSettings::Mode::Full:
+            pixelConstants.useTexture = 1;
+            domainConstants.useDisplacement = 0;
+            break;
 
-              {
-                auto world =
-                    XMMatrixScaling(it->size.x, 1, it->size.y) *
-                    XMMatrixTranslation(it->center.x, center.y, it->center.y) *
-                    worldBasic;
-                auto ViewProjection = cam.GetViewProj();
-                // auto worldIT = XMMatrixInverse(nullptr, world);
+          case RuntimeSettings::Mode::Tildeh0:
+            usedTexture = computeTildeh0;
+            break;
+          case RuntimeSettings::Mode::Frequencies:
+            usedTexture = computeFrequencies;
+            break;
+          case RuntimeSettings::Mode::Tildeh:
+            usedTexture = *drawingSimResource.tildeh.ShaderResource(allocator);
+            break;
 
-                XMStoreFloat4x4(&vertexConstants.WorldTransform,
-                                XMMatrixTranspose(world));
-                XMStoreFloat4x4(&vertexConstants.ViewTransform,
-                                XMMatrixTranspose(ViewProjection));
-
-                XMStoreFloat4x4(&domainConstants.ViewProjTransform,
-                                XMMatrixTranspose(ViewProjection));
-
-                // Why no 2x2?
-                XMStoreFloat2(&vertexConstants.PlaneBottomLeft,
-                              planeBottomLeft);
-                XMStoreFloat2(&vertexConstants.PlaneTopRight, planeTopRight);
-
-                XMStoreFloat4(&pixelConstants.cameraPos, cam.GetEye());
-                pixelConstants.mult = settings.pixelMult;
-              }
-              {
-                start = std::chrono::high_resolution_clock::now();
-
-                auto res = it.GetSmallerNeighbor();
-
-                NavigatingTheQuadTree +=
-                    std::chrono::duration_cast<decltype(NavigatingTheQuadTree)>(
-                        (std::chrono::high_resolution_clock::now() - start));
-                static const constexpr auto l = [](const float x) -> float {
-                  if (x == 0)
-                    return 1;
-                  else
-                    return 1 / x;
-                };
-                hullConstants.TesselationFactor = {l(res.zneg), l(res.xneg),
-                                                   l(res.zpos), l(res.xpos)};
-              }
-
-              auto mask = simpleRootSignature.Set(allocator,
-                                                  RootSignatureUsage::Graphics);
-              mask.HeightMapForDomain =
-                  *drawingSimResource.finalDisplacementMap.ShaderResource(
-                      allocator);
-
-              pixelConstants.swizzleorder = settings.swizzleorder;
-
-              domainConstants.useDisplacement = 1;
-              pixelConstants.useTexture = 0;
-              switch (settings.mode) {
-              case RuntimeSettings::Mode::Full:
-                pixelConstants.useTexture = 1;
-                domainConstants.useDisplacement = 0;
-                break;
-
-              case RuntimeSettings::Mode::Tildeh0:
-                mask.Texture = computeTildeh0;
-                break;
-              case RuntimeSettings::Mode::Frequencies:
-                mask.Texture = computeFrequencies;
-                break;
-              case RuntimeSettings::Mode::Tildeh:
-                mask.Texture =
-                    *drawingSimResource.tildeh.ShaderResource(allocator);
-                break;
-
-              case RuntimeSettings::Mode::TildeD:
-                mask.Texture =
-                    *drawingSimResource.tildeD.ShaderResource(allocator);
-                break;
-              case RuntimeSettings::Mode::FFTTildeh:
-                mask.Texture =
-                    *drawingSimResource.FFTTildeh.ShaderResource(allocator);
-                break;
-              case RuntimeSettings::Mode::FFTTildeD:
-                mask.Texture =
-                    *drawingSimResource.FFTTildeD.ShaderResource(allocator);
-                break;
-              case RuntimeSettings::Mode::Displacement:
-                mask.Texture =
-                    *drawingSimResource.finalDisplacementMap.ShaderResource(
-                        allocator);
-                break;
-              case RuntimeSettings::Mode::Gradients:
-                mask.Texture =
-                    *drawingSimResource.gradients.ShaderResource(allocator);
-                break;
-              case RuntimeSettings::Mode::TildehBuffer:
-                mask.Texture =
-                    *drawingSimResource.tildehBuffer.ShaderResource(allocator);
-                break;
-              case RuntimeSettings::Mode::TildeDBuffer:
-                mask.Texture =
-                    *drawingSimResource.tildeDBuffer.ShaderResource(allocator);
-                break;
-              }
-
-              mask.HullBuffer =
-                  frameResource.DynamicBuffer.AddBuffer(hullConstants);
-              mask.VertexBuffer =
-                  frameResource.DynamicBuffer.AddBuffer(vertexConstants);
-              mask.DomainBuffer =
-                  frameResource.DynamicBuffer.AddBuffer(domainConstants);
-              mask.PixelBuffer =
-                  frameResource.DynamicBuffer.AddBuffer(pixelConstants);
-              mask.GradientsForDomain =
-                  *drawingSimResource.gradients.ShaderResource(allocator);
-
-              allocator.SetRenderTargets(
-                  {renderTargetView}, frameResource.DepthBuffer.DepthStencil());
-              graphicsPipelineState.Apply(allocator);
-              planeMesh.Draw(allocator);
-
-              start = std::chrono::high_resolution_clock::now();
-            }
+          case RuntimeSettings::Mode::TildeD:
+            usedTexture = *drawingSimResource.tildeD.ShaderResource(allocator);
+            break;
+          case RuntimeSettings::Mode::FFTTildeh:
+            usedTexture =
+                *drawingSimResource.FFTTildeh.ShaderResource(allocator);
+            break;
+          case RuntimeSettings::Mode::FFTTildeD:
+            usedTexture =
+                *drawingSimResource.FFTTildeD.ShaderResource(allocator);
+            break;
+          case RuntimeSettings::Mode::Displacement:
+            usedTexture =
+                *drawingSimResource.finalDisplacementMap.ShaderResource(
+                    allocator);
+            break;
+          case RuntimeSettings::Mode::Gradients:
+            usedTexture =
+                *drawingSimResource.gradients.ShaderResource(allocator);
+            break;
+          case RuntimeSettings::Mode::TildehBuffer:
+            usedTexture =
+                *drawingSimResource.tildehBuffer.ShaderResource(allocator);
+            break;
+          case RuntimeSettings::Mode::TildeDBuffer:
+            usedTexture =
+                *drawingSimResource.tildeDBuffer.ShaderResource(allocator);
+            break;
           }
+        }
+
+        pixelConstants.mult = settings.pixelMult;
+
+        // Upload absolute contants
+        GpuVirtualAddress cameraConstantBuffer =
+            frameResource.DynamicBuffer.AddBuffer(cameraConstants);
+        GpuVirtualAddress domainConstantBuffer =
+            frameResource.DynamicBuffer.AddBuffer(domainConstants);
+        GpuVirtualAddress pixelConstantBuffer =
+            frameResource.DynamicBuffer.AddBuffer(pixelConstants);
+
+        GpuVirtualAddress modelBuffer =
+            frameResource.DynamicBuffer.AddBuffer(modelConstants);
+
+        // Pre translate resources
+        GpuVirtualAddress displacementMap =
+            *drawingSimResource.finalDisplacementMap.ShaderResource(allocator);
+
+        GpuVirtualAddress gradients =
+            *drawingSimResource.gradients.ShaderResource(allocator);
+
+        float2 fullSizeXZ = {Defaults::App::oceanSize,
+                             Defaults::App::oceanSize};
+
+        float3 center = {0, 0, 0};
+        QuadTree qt;
+        auto start = std::chrono::high_resolution_clock::now();
+
+        qt.Build(center, fullSizeXZ, float3(cam_eye.x, cam_eye.y, cam_eye.z));
+
+        QuadTreeBuildTime +=
+            std::chrono::duration_cast<decltype(QuadTreeBuildTime)>(
+                std::chrono::high_resolution_clock::now() - start);
+
+        qtNodes += qt.GetSize();
+
+        // The best choice is to upload planeBottomLeft and planeTopRight and
+        // kinda of UV coordinate that can go outside [0,1] and the fract is the
+        // actual UV value.
+
+        XMVECTOR planeBottomLeft = XMVectorSet(-fullSizeXZ.x / 2 + center.x, 0,
+                                               -fullSizeXZ.y / 2 + center.z, 1);
+        XMVECTOR planeTopRight = XMVectorSet(fullSizeXZ.x / 2 + center.x, 0,
+                                             fullSizeXZ.y / 2 + center.z, 1);
+        planeBottomLeft = XMVector3TransformCoord(planeBottomLeft, worldBasic);
+        planeTopRight = XMVector3TransformCoord(planeTopRight, worldBasic);
+        // Reorder to float2
+        planeBottomLeft = XMVectorSwizzle(planeBottomLeft, 0, 2, 1, 3);
+        planeTopRight = XMVectorSwizzle(planeTopRight, 0, 2, 1, 3);
+
+        start = std::chrono::high_resolution_clock::now();
+        for (auto it = qt.begin(); it != qt.end(); ++it) {
+          drawnNodes++;
+          NavigatingTheQuadTree +=
+              std::chrono::duration_cast<decltype(NavigatingTheQuadTree)>(
+                  (std::chrono::high_resolution_clock::now() - start));
+
+          {
+            auto world =
+                XMMatrixScaling(it->size.x, 1, it->size.y) *
+                XMMatrixTranslation(it->center.x, center.y, it->center.y);
+
+            // Why no 2x2?
+            XMStoreFloat2(&vertexConstants.PlaneBottomLeft, planeBottomLeft);
+            XMStoreFloat2(&vertexConstants.PlaneTopRight, planeTopRight);
+
+            XMStoreFloat4x4(&vertexConstants.Transformation,
+                            XMMatrixTranspose(world));
+          }
+          {
+            start = std::chrono::high_resolution_clock::now();
+
+            auto res = it.GetSmallerNeighbor();
+
+            NavigatingTheQuadTree +=
+                std::chrono::duration_cast<decltype(NavigatingTheQuadTree)>(
+                    (std::chrono::high_resolution_clock::now() - start));
+            static const constexpr auto l = [](const float x) -> float {
+              if (x == 0)
+                return 1;
+              else
+                return 1 / x;
+            };
+            hullConstants.TesselationFactor = {l(res.zneg), l(res.xneg),
+                                               l(res.zpos), l(res.xpos)};
+          }
+
+          auto mask =
+              simpleRootSignature.Set(allocator, RootSignatureUsage::Graphics);
+
+          if (usedTexture)
+            mask.texture = *usedTexture;
+
+          mask.heightMapForDomain = displacementMap;
+          mask.gradientsForDomain = gradients;
+
+          mask.hullBuffer =
+              frameResource.DynamicBuffer.AddBuffer(hullConstants);
+          mask.vertexBuffer =
+              frameResource.DynamicBuffer.AddBuffer(vertexConstants);
+          mask.domainBuffer = domainConstantBuffer;
+          mask.pixelBuffer = pixelConstantBuffer;
+          mask.cameraBuffer = cameraConstantBuffer;
+          mask.modelBuffer = modelBuffer;
+
+          allocator.SetRenderTargets({renderTargetView},
+                                     frameResource.DepthBuffer.DepthStencil());
+          graphicsPipelineState.Apply(allocator);
+          planeMesh.Draw(allocator);
+
+          start = std::chrono::high_resolution_clock::now();
         }
       }
 
