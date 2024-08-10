@@ -13,4 +13,6 @@
 #include "../Axodox.Graphics.Shared/Include/Axodox.Graphics.D3D12.h"
 
 #include "../ImGUI/Includes/includes.h"
+
 #include "Typedefs.h"
+#include "ConstantGPUBuffer.h"

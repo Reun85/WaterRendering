@@ -19,8 +19,17 @@ using namespace DirectX::PackedVector;
 // these values require checking shader files as well.
 #define CONST_QUALIFIER static const constexpr
 
-// Checks
 constexpr bool isPowerOfTwo(u32 x) { return std::has_single_bit(x); }
+
+constexpr bool divides_within_eps(float a, float b, float epsilon) noexcept {
+  float value = a / b;
+
+  int int_part = static_cast<int>(value);
+  float frac_part = value - int_part;
+  float back = frac_part * b;
+  float diff = back > 0 ? back : -back;
+  return diff < epsilon;
+}
 
 struct Defaults {
 public:
@@ -29,8 +38,12 @@ public:
     QUALIFIER bool startFirstPerson = true;
   };
   struct App {
-    /// Have to change in gradients.hlsl as well
-    CONST_QUALIFIER float planeSize = 20.0f;
+    CONST_QUALIFIER float patchSize = 20.0f;
+    QUALIFIER float oceanSize = 1000.f;
+
+    static_assert(divides_within_eps(oceanSize, patchSize, 0.001f),
+                  "Ocean size has to be multiple of patch size");
+
     QUALIFIER XMFLOAT4 clearColor = {37.f / 255.f, 37.f / 255.f, 37.f / 255.f,
                                      0};
   };
@@ -42,15 +55,15 @@ public:
   };
   struct QuadTree {
     QUALIFIER float distanceThreshold = 3e+0f;
-    QUALIFIER u32 allocation = 10000;
-    QUALIFIER u32 maxDepth = 7;
+    QUALIFIER u32 allocation = 20000;
+    QUALIFIER u32 maxDepth = 15;
     QUALIFIER u32 minDepth = 0;
   };
   struct Simulation {
   public:
     CONST_QUALIFIER u32 N = ComputeShader::heightMapDimensions;
-    CONST_QUALIFIER f32 L_x = App::planeSize;
-    CONST_QUALIFIER f32 L_z = App::planeSize;
+    /// Have to change in gradients.hlsl as well
+    CONST_QUALIFIER f32 L = App::patchSize;
     QUALIFIER f32 Depth = 100;
 
     QUALIFIER f32 gravity = 9.81f;
@@ -60,7 +73,6 @@ public:
 
     // A constant that scales the waves
     QUALIFIER f32 Amplitude = 0.45e-3f;
-    // QUALIFIER f32 Amplitude = 0.45e-3f;
 
     QUALIFIER f32 timeStep = 1.0f / 60.0f;
     static_assert(isPowerOfTwo(N));

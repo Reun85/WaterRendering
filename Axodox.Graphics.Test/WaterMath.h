@@ -55,7 +55,7 @@ constexpr u32 RowMajorIndexing(const u32 i, const u32 j, const u32 M) {
 constexpr u32 ColumnMajorIndexing(const u32 i, const u32 j, const u32 N) {
   return i + j * N;
 };
-constexpr u32 Indexing(const u32 i, const u32 j, const u32 N, const u32 M) {
+constexpr u32 Indexing(const u32 i, const u32 j, const u32 _, const u32 M) {
   // return ColumnMajorIndexing(i, j, N);
   return RowMajorIndexing(i, j, M);
 };
@@ -74,8 +74,7 @@ CalculateTildeh0FromDefaults(std::random_device &rd, const u32 _N,
   const auto &gravity = Def::gravity;
   const auto &WindForce = Def::WindForce;
   const auto &Amplitude = Def::Amplitude;
-  const auto &L_x = Def::L_x;
-  const auto &L_z = Def::L_z;
+  const auto &L = Def::L;
 
   std::mt19937 gen(rd());
   std::normal_distribution<Prec> dis(0, 1);
@@ -85,9 +84,9 @@ CalculateTildeh0FromDefaults(std::random_device &rd, const u32 _N,
   std::vector<std::complex<Prec>> res(N * M);
   float2 k(0, 0);
   for (i32 i = 0; i < N; ++i) {
-    k.x = 2 * std::numbers::pi_v<Prec> * (Nx2 - i) / L_x;
+    k.x = 2 * std::numbers::pi_v<Prec> * (Nx2 - i) / L;
     for (i32 j = 0; j < M; j++) {
-      k.y = 2 * std::numbers::pi_v<Prec> * (Mx2 - j) / L_z;
+      k.y = 2 * std::numbers::pi_v<Prec> * (Mx2 - j) / L;
 
       const auto index = Inner::Indexing(i, j, N, M);
 
@@ -108,8 +107,7 @@ constexpr std::vector<Prec> CalculateFrequenciesFromDefaults(const u32 _N,
   using Def = Defaults::Simulation;
   const auto &gravity = Def::gravity;
   const auto &D = Def::Depth;
-  const auto &L_x = Def::L_x;
-  const auto &L_z = Def::L_z;
+  const auto &L = Def::L;
 
   const i32 N = (i32)_N;
   const i32 M = (i32)_M;
@@ -119,9 +117,9 @@ constexpr std::vector<Prec> CalculateFrequenciesFromDefaults(const u32 _N,
   std::vector<Prec> res(N * M);
   float2 kvec(0, 0);
   for (i32 i = 0; i < N; ++i) {
-    kvec.x = 2 * std::numbers::pi_v<Prec> * (Nx2 - i) / L_x;
+    kvec.x = 2 * std::numbers::pi_v<Prec> * (Nx2 - i) / L;
     for (i32 j = 0; j < M; j++) {
-      kvec.y = 2 * std::numbers::pi_v<Prec> * (Mx2 - j) / L_z;
+      kvec.y = 2 * std::numbers::pi_v<Prec> * (Mx2 - j) / L;
 
       const auto index = Inner::Indexing(i, j, N, M);
 
