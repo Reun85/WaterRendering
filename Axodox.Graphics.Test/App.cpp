@@ -552,7 +552,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         commonDescriptorHeap.Build();
       }
 
-      // Compute shader phase
+      // Compute shader stage
       {
         auto &simResource = calculatingSimResource;
         auto &computeAllocator = simResource.Allocator;
@@ -745,7 +745,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         frameResource.DepthBuffer.DepthStencil()->Clear(allocator);
       }
       // Draw objects
-      uint qtNodes;
+      uint qtNodes = 0;
       uint drawnNodes = 0;
       std::chrono::nanoseconds QuadTreeBuildTime(0);
 
@@ -756,34 +756,37 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         SimpleGraphicsRootDescription::HullConstants hullConstants{};
         SimpleGraphicsRootDescription::DomainConstants domainConstants{};
         SimpleGraphicsRootDescription::PixelConstants pixelConstants{};
-        float3 center = {0, 0, 0};
+        XMFLOAT3 cam_eye;
         float2 fullSizeXZ = {Defaults::App::planeSize,
                              Defaults::App::planeSize};
-        QuadTree qt;
-        XMFLOAT3 cam_eye;
 
         XMStoreFloat3(&cam_eye, cam.GetEye());
-        auto start = std::chrono::high_resolution_clock::now();
 
-        qt.Build(center, fullSizeXZ, float3(cam_eye.x, cam_eye.y, cam_eye.z));
-
-        QuadTreeBuildTime =
-            std::chrono::duration_cast<decltype(QuadTreeBuildTime)>(
-                std::chrono::high_resolution_clock::now() - start);
-
-        qtNodes = qt.GetSize();
-
-        const i32 displaycount = 1;
+        const i32 displaycount = 10;
         for (i32 idc = -(displaycount - 1); idc <= displaycount / 2; ++idc) {
           for (i32 jdc = -(displaycount - 1); jdc <= displaycount / 2; ++jdc) {
-            auto worldBasic =
-                XMMatrixTranslation(idc * Defaults::App::planeSize, 0,
-                                    jdc * Defaults::App::planeSize);
+            float3 center = {idc * Defaults::App::planeSize, 0,
+                             jdc * Defaults::App::planeSize};
+            // auto worldBasic = XMMatrixTranslation(center.x, center.y,
+            // center.z);
+            auto worldBasic = XMMatrixIdentity();
+            QuadTree qt;
+            auto start = std::chrono::high_resolution_clock::now();
+
+            qt.Build(center, fullSizeXZ,
+                     float3(cam_eye.x, cam_eye.y, cam_eye.z));
+
+            QuadTreeBuildTime +=
+                std::chrono::duration_cast<decltype(QuadTreeBuildTime)>(
+                    std::chrono::high_resolution_clock::now() - start);
+
+            qtNodes += qt.GetSize();
 
             XMVECTOR planeBottomLeft =
-                XMVectorSet(-fullSizeXZ.x / 2, 0, -fullSizeXZ.y / 2, 1);
-            XMVECTOR planeTopRight =
-                XMVectorSet(fullSizeXZ.x / 2, 0, fullSizeXZ.y / 2, 1);
+                XMVectorSet(-fullSizeXZ.x / 2 + center.x, 0,
+                            -fullSizeXZ.y / 2 + center.z, 1);
+            XMVECTOR planeTopRight = XMVectorSet(
+                fullSizeXZ.x / 2 + center.x, 0, fullSizeXZ.y / 2 + center.z, 1);
             planeBottomLeft =
                 XMVector3TransformCoord(planeBottomLeft, worldBasic);
             planeTopRight = XMVector3TransformCoord(planeTopRight, worldBasic);
