@@ -1,3 +1,4 @@
+#include "common.hlsli"
 // HLSL compute shader
 Texture2D<float2> tilde_h0 : register(t0);
 Texture2D<float> frequencies : register(t1);
@@ -13,10 +14,6 @@ cbuffer Constants : register(b0)
 }
 
 
-inline float2 ComplexMul(float2 a, float2 b)
-{
-    return float2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
-}
 
 
 

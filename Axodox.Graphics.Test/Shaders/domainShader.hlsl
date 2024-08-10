@@ -1,10 +1,15 @@
+#include "common.hlsli"
 Texture2D<float4> _heightmap : register(t0);
 Texture2D<float4> _gradients : register(t1);
 SamplerState _sampler : register(s0);
 
-cbuffer DomainBuffer : register(b0)
+cbuffer CameraBuffer : register(b0)
 {
-    float4x4 ViewTransform;
+    cameraConstants camConstants;
+}
+
+cbuffer DomainBuffer : register(b1)
+{
     int useDisplacement;
 };
 // --------------------------------------
@@ -51,17 +56,17 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
                       (patch[2].TexCoord * (1.0f - UV.x) + patch[3].TexCoord * UV.x) * UV.y;
 
     
-    if (useDisplacement ==0)
+    if (useDisplacement == 0)
     {
-    float4 disp = _heightmap.SampleLevel(_sampler, texCoord, 0);
+        float4 disp = _heightmap.SampleLevel(_sampler, texCoord, 0);
     //disp.xz =float2(0, 0);
-    localPos += disp.xyz;
+        localPos += disp.xyz;
     }
     float4 normal = _gradients.SampleLevel(_sampler, texCoord, 0);
     
     
     
-    float4 position = mul(float4(localPos, 1), ViewTransform);
+    float4 position = mul(float4(localPos, 1), camConstants.vpMatrix);
     output.Position = position;
     output.TexCoord = texCoord;
     output.Normal = normal;

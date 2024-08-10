@@ -1,11 +1,16 @@
+#include "common.hlsli"
 Texture2D<float4> _texture : register(t0);
 SamplerState _sampler : register(s0);
 
 
-
-cbuffer Constants : register(b0)
+cbuffer CameraBuffer : register(b0)
 {
-    float4 cameraPos;
+    cameraConstants camConstants;
+}
+
+
+cbuffer Constants : register(b1)
+{
     float4 mult;
     uint4 swizzleorder;
     int useTexture;
@@ -19,28 +24,6 @@ struct input_t
     float4 normal : Variable;
 };
 
-float GetComponentByIndex(float4 vec, uint index)
-{
-    if (index == 0)
-        return vec.x;
-    if (index == 1)
-        return vec.y;
-    if (index == 2)
-        return vec.z;
-    if (index == 3)
-        return vec.w;
-    return 0.0; // Default case, should not occur if indices are valid
-}
-
-float4 Swizzle(float4 vec, uint4 order)
-{
-    return float4(
-        GetComponentByIndex(vec, order.x),
-        GetComponentByIndex(vec, order.y),
-        GetComponentByIndex(vec, order.z),
-        GetComponentByIndex(vec, order.w)
-    );
-}
 
 
 
@@ -48,7 +31,7 @@ float4 main(input_t input) : SV_TARGET
 {
 
 
-    if (useTexture ==0)
+    if (useTexture == 0)
     {
         float4 text = _texture.Sample(_sampler, input.TextureCoord) * float4(mult.xyz, 1);
         return Swizzle(text, swizzleorder);
@@ -105,7 +88,7 @@ float4 main(input_t input) : SV_TARGET
     float DiffuseFactor = max(dot(ToLight, normal), 0.0) * Attenuation;
     float3 Diffuse = DiffuseFactor * Ld * Kd;
 
-    float3 viewDir = normalize(cameraPos.xyz - (input.localPos.xyz));
+    float3 viewDir = normalize(camConstants.cameraPos.xyz - (input.localPos.xyz));
     float3 reflectDir = reflect(-ToLight, normal);
 	
     float SpecularFactor = pow(max(dot(viewDir, reflectDir), 0.0), Shininess) * Attenuation;

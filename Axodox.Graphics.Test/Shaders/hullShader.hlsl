@@ -1,5 +1,5 @@
 
-cbuffer HullBuffer : register(b0)
+cbuffer HullBuffer : register(b1)
 {
     // zneg,xneg, zpos, xpos
     float4 TessellationFactor;

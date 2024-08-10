@@ -1,3 +1,4 @@
+#include "common.hlsli"
 // HLSL compute shader
 Texture2D<float2> readbuff : register(t0);
 RWTexture2D<float2> writebuff : register(u0);
@@ -10,10 +11,6 @@ RWTexture2D<float2> writebuff : register(u0);
 
 groupshared float2 pingpong[2][N];
 
-inline float2 ComplexMul(float2 a, float2 b)
-{
-    return float2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
-}
 
 
 /* Should be called as:

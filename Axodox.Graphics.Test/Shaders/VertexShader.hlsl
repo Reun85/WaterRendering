@@ -1,14 +1,23 @@
+#include "common.hlsli"
 
-cbuffer VertexBuffer : register(b0)
+cbuffer CameraBuffer : register(b0)
 {
-    float4x4 WorldTransform;
-    float4x4 ViewTransform;
+    cameraConstants camConstants;
+};
+cbuffer ModelBuffer : register(b1)
+{
+    float4x4 mMatrix;
+};
+cbuffer VertexBuffer : register(b2)
+{
+    float4x4 Transformation;
     float2 PlaneBottomLeft;
     float2 PlaneTopRight;
 };
 struct input_t
 {
     float3 Position : POSITION;
+    uint instanceID : SV_InstanceID;
 };
 struct output_t
 {
@@ -26,7 +35,8 @@ output_t main(input_t input)
 {
     output_t output;
     float4 position
-     = mul(float4(input.Position, 1), WorldTransform);
+     = mul(float4(input.Position, 1), mMatrix);
+    position = mul(position, Transformation);
     //Maybe move this to the domain shader later?
     float2 texCoord = (position.xz - PlaneBottomLeft) / (PlaneTopRight - PlaneBottomLeft);
     // If the quad is rotated
@@ -34,7 +44,7 @@ output_t main(input_t input)
     // For normal images
     
 
-    float4 screenPosition = mul(position, ViewTransform);
+    float4 screenPosition = mul(position, camConstants.vpMatrix);
     output.Position = screenPosition;
     output.localPos = position.xyz;
     output.TexCoord = texCoord;
