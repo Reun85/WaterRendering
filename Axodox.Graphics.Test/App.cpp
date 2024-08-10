@@ -768,10 +768,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         const i32 displaycount = 10;
         for (i32 idc = -(displaycount - 1); idc <= displaycount / 2; ++idc) {
           for (i32 jdc = -(displaycount - 1); jdc <= displaycount / 2; ++jdc) {
-            float3 center = {idc * Defaults::App::planeSize, 0,
-                             jdc * Defaults::App::planeSize};
-            // auto worldBasic = XMMatrixTranslation(center.x, center.y,
-            // center.z);
+            float3 center = {
+                static_cast<float>(idc) * Defaults::App::planeSize, 0,
+                static_cast<float>(jdc) * Defaults::App::planeSize};
             auto worldBasic = XMMatrixIdentity();
             QuadTree qt;
             auto start = std::chrono::high_resolution_clock::now();
