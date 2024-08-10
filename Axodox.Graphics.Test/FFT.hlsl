@@ -42,7 +42,6 @@ int ReverseBitfield(int x)
 
 
 // LocalGroupSize=N
-// WorkGroupCount=1 ?
 [numthreads(N, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3 GTid : SV_GroupID)
 {
@@ -60,7 +59,6 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3
     
     GroupMemoryBarrierWithGroupSync();
 
-    // Butterfly stages
     int src = 0;
 
     for (int s = 1; s <= LOG2_N; ++s)
@@ -72,7 +70,6 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3
         int i = (x & ~(m - 1)); // Starting row of butterfly group
         int j = (x & (mh - 1)); // Butterfly index in group
 
-        // WN-k twiddle factor
         float theta = (TWO_PI * float(k)) / float(N);
         float2 W_N_k = float2(cos(theta), sin(theta));
     
