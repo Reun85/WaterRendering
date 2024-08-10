@@ -39,8 +39,7 @@ struct output_t
 
 output_t main(input_t input)
 {
-    const float patchSize = 20.f;
-    const float planeSize = 1000.f;
+    const float patchSize = PATCH_SIZE;
     output_t output;
 
     const float2 scaling = instances[input.instanceID].scaling;

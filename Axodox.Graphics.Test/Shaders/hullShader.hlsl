@@ -6,10 +6,6 @@ cbuffer HullBuffer : register(b1)
     float4 TessellationFactor[NUM_INSTANCES];
 };
 
-// --------------------------------------
-// Hull Shader
-// --------------------------------------
-
 
 // Input
 struct HS_INPUT_PATCH
@@ -129,7 +125,6 @@ inline float toNearestPowerOfTwo(float a)
 //}
 
 
-// Tessellation Factors Phase
 struct HS_CONSTANT_DATA_OUTPUT
 {
     /* zneg,xneg, zpos, xpos
@@ -146,7 +141,7 @@ HS_CONSTANT_DATA_OUTPUT HSConstantFunction(InputPatch<HS_INPUT_PATCH, 4> patch, 
 {
     const float mult = 0.1;
     HS_CONSTANT_DATA_OUTPUT output;
-    const float def = 16.f;
+    const float def = DEFAULT_TESSELATION;
     output.edges[0] = def;
     output.edges[1] = def;
     output.edges[2] = def;

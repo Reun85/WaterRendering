@@ -73,6 +73,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     XMFLOAT4 pixelMult = XMFLOAT4(1, 1, 1, 1);
     Mode mode = Mode::Full;
     XMUINT4 swizzleorder = XMUINT4(0, 1, 2, 3);
+    float distanceThreshold = Defaults::QuadTree::distanceThreshold;
   };
 
   static void SetUpWindowInput(const CoreWindow &window,
@@ -683,7 +684,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         QuadTree qt;
         auto start = std::chrono::high_resolution_clock::now();
 
-        qt.Build(center, fullSizeXZ, float3(cam_eye.x, cam_eye.y, cam_eye.z));
+        qt.Build(center, fullSizeXZ, float3(cam_eye.x, cam_eye.y, cam_eye.z),
+                 settings.distanceThreshold);
 
         QuadTreeBuildTime +=
             std::chrono::duration_cast<decltype(QuadTreeBuildTime)>(
@@ -811,6 +813,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                       GetDurationInFloatWithPrecision<std::chrono::milliseconds,
                                                       std::chrono::nanoseconds>(
                           NavigatingTheQuadTree));
+          ImGui::InputFloat("Distance Threshold", &settings.distanceThreshold);
           ImGui::Text("Drawn Nodes: %d", drawnNodes);
           ImGui::Text("CPU time %.3f ms/frame",
                       GetDurationInFloatWithPrecision<std::chrono::milliseconds,

@@ -1,10 +1,9 @@
 #include "common.hlsli"
-// HLSL compute shader
 Texture2D<float2> readbuff : register(t0);
 RWTexture2D<float2> writebuff : register(u0);
 
-#define N 1024
-#define LOG2_N 10
+#define N DISP_MAP_SIZE
+#define LOG2_N DISP_MAP_LOG2
 #define PI		3.1415926535897932
 #define TWO_PI	6.2831853071795864
 

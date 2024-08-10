@@ -1,3 +1,4 @@
+#include "common.hlsli"
 Texture2D<float4> displacement : register(t0);
 RWTexture2D<float4> gradients : register(u0);
 
@@ -5,11 +6,8 @@ RWTexture2D<float4> gradients : register(u0);
 void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
 
-    uint DISP_MAP_SIZE = 1024;
-
-    float PATCH_SIZE = 20.f;
-    float TILE_SIZE_X2 = PATCH_SIZE * 2.0f / float(DISP_MAP_SIZE);
-    float INV_TILE_SIZE = DISP_MAP_SIZE / PATCH_SIZE;
+    float TILE_SIZE_X2 =  PATCH_SIZE * 2.0f / float(DISP_MAP_SIZE);
+    float INV_TILE_SIZE = DISP_MAP_SIZE /  PATCH_SIZE;
 
     int2 loc = int2(dispatchThreadID.xy);
 

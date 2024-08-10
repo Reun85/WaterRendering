@@ -6,7 +6,7 @@ RWTexture2D<float2> tilde_h : register(u0);
 RWTexture2D<float2> tilde_D : register(u1);
 
 
-#define N 1024
+#define N DISP_MAP_SIZE
 
 cbuffer Constants : register(b0)
 {
@@ -21,12 +21,10 @@ cbuffer Constants : register(b0)
 [numthreads(16, 16, 1)]
 void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3 LTid : SV_GroupID)
 {
- // SV_DISPATCHTHREADID is the globalPos 
     int2 loc1 = int2(DTid.xy);
     int2 loc2 = int2(N - 1 - loc1.x, N - 1 - loc1.y);
 
     // Load initial spectrum
-    // These should probably be a sampler?
     float2 h0_k = tilde_h0[loc1].rg;
     float2 h0_mk = tilde_h0[loc2].rg;
     float w_k = frequencies[loc1].r;

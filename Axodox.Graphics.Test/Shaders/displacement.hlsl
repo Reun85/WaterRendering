@@ -1,4 +1,4 @@
-// HLSL compute shader
+#include "common.hlsli"
 Texture2D<float2> heightfield : register(t0);
 Texture2D<float2> choppyfield : register(t1);
 RWTexture2D<float4> displacement : register(u0);
@@ -8,7 +8,7 @@ RWTexture2D<float4> displacement : register(u0);
 void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3 LTid : SV_GroupID)
 {
 
-    const float lambda = 1.3f;
+    const float lambda = DISPLACEMENT_LAMBDA;
     int2 loc = int2(DTid.xy);
 
     // Required due to interval change

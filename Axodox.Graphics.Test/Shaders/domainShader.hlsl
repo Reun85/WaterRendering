@@ -12,9 +12,6 @@ cbuffer DomainBuffer : register(b1)
 {
     int useDisplacement;
 };
-// --------------------------------------
-// Domain Shader
-// --------------------------------------
 
 struct DS_OUTPUT
 {
@@ -31,7 +28,6 @@ struct HS_OUTPUT_PATCH
 };
 
 
-// Tessellation Factors Phase
 struct HS_CONSTANT_DATA_OUTPUT
 {
     float edges[4] : SV_TessFactor;

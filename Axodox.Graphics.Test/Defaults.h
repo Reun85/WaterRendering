@@ -40,7 +40,7 @@ public:
 
   struct App {
     CONST_QUALIFIER u16 maxInstances = 1 << 11;
-    QUALIFIER float oceanSize = 1000.f;
+    QUALIFIER float oceanSize = 10000.f;
 
     QUALIFIER XMFLOAT4 clearColor = {37.f / 255.f, 37.f / 255.f, 37.f / 255.f,
                                      0};
@@ -52,16 +52,15 @@ public:
     CONST_QUALIFIER u32 computeShaderGroupsDim2 = 16;
   };
   struct QuadTree {
-    QUALIFIER float distanceThreshold = 3e+0f;
+    QUALIFIER float distanceThreshold = 2e+2f;
     QUALIFIER u32 allocation = 20000;
     QUALIFIER u32 maxDepth = 20;
     QUALIFIER u32 minDepth = 0;
   };
   struct Simulation {
   public:
-    /// Have to change in gradients.hlsl and VertexShader.hlsl as well
-
-    CONST_QUALIFIER float patchSize = 20.0f;
+    /// Have to change in common.hlsli as well
+    CONST_QUALIFIER float patchSize = 40.0f;
     static_assert(divides_within_eps(App::oceanSize, patchSize, 0.001f),
                   "Ocean size has to be multiple of patch size");
     CONST_QUALIFIER u32 N = ComputeShader::heightMapDimensions;
