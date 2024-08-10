@@ -74,7 +74,7 @@ CalculateTildeh0FromDefaults(std::random_device &rd, const u32 _N,
   const auto &gravity = Def::gravity;
   const auto &WindForce = Def::WindForce;
   const auto &Amplitude = Def::Amplitude;
-  const auto &L = Def::L;
+  const auto &L = Def::patchSize;
 
   std::mt19937 gen(rd());
   std::normal_distribution<Prec> dis(0, 1);
@@ -107,7 +107,7 @@ constexpr std::vector<Prec> CalculateFrequenciesFromDefaults(const u32 _N,
   using Def = Defaults::Simulation;
   const auto &gravity = Def::gravity;
   const auto &D = Def::Depth;
-  const auto &L = Def::L;
+  const auto &L = Def::patchSize;
 
   const i32 N = (i32)_N;
   const i32 M = (i32)_M;

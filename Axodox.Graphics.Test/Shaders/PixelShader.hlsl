@@ -29,6 +29,7 @@ struct input_t
 
 float4 main(input_t input) : SV_TARGET
 {
+    //return float4(input.TextureCoord, 0, 1);
 
 
     if (useTexture == 0)
@@ -36,7 +37,7 @@ float4 main(input_t input) : SV_TARGET
         float4 text = _texture.Sample(_sampler, input.TextureCoord) * float4(mult.xyz, 1);
         return Swizzle(text, swizzleorder);
     }
-
+    
     
 // Colors
     const float3 sunColor = float3(1.0, 1.0, 0.47);

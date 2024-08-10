@@ -1,5 +1,7 @@
 #include "common.hlsli"
 
+
+
 cbuffer CameraBuffer : register(b0)
 {
     cameraConstants camConstants;
@@ -8,10 +10,14 @@ cbuffer ModelBuffer : register(b1)
 {
     float4x4 mMatrix;
 };
-cbuffer VertexBuffer : register(b2)
+struct InstanceData
 {
     float2 scaling;
     float2 offset;
+};
+cbuffer VertexBuffer : register(b2)
+{
+    InstanceData instances[NUM_INSTANCES];
 };
 struct input_t
 {
@@ -23,6 +29,7 @@ struct output_t
     float4 Position : SV_POSITION;
     float3 localPos : POSITION;
     float2 TexCoord : TEXCOORD;
+    uint instanceID : InstanceID;
 };
 
 
@@ -32,14 +39,14 @@ struct output_t
 
 output_t main(input_t input)
 {
-    const float patchSize = 20;
-    const float planeSize = 1000;
-    const float2 PlaneBottomLeft = float2(-planeSize / 2, -planeSize / 2);
-    const float2 PlaneTopRight = float2(planeSize / 2, planeSize / 2);
+    const float patchSize = 20.f;
+    const float planeSize = 1000.f;
     output_t output;
 
+    const float2 scaling = instances[input.instanceID].scaling;
+    const float2 offset = instances[input.instanceID].offset;
     float2 pos = input.Position.xz * scaling + offset;
-    float2 texCoord = (pos - PlaneBottomLeft) / (PlaneTopRight - PlaneBottomLeft);
+    float2 texCoord = (pos / patchSize.xx) - 0.5f.xx;
     
     float4 position = mul(float4(pos.x, 0, pos.y, 1), mMatrix);
 
@@ -47,5 +54,6 @@ output_t main(input_t input)
     output.Position = screenPosition;
     output.localPos = position.xyz;
     output.TexCoord = texCoord;
+    output.instanceID = input.instanceID;
     return output;
 }

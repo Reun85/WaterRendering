@@ -1,4 +1,5 @@
 
+#define NUM_INSTANCES (1 << 11)
 struct cameraConstants
 {
     float4x4 vMatrix;

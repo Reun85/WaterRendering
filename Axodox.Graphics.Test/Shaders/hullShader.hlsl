@@ -1,8 +1,9 @@
+#include "common.hlsli"
 
 cbuffer HullBuffer : register(b1)
 {
     // zneg,xneg, zpos, xpos
-    float4 TessellationFactor;
+    float4 TessellationFactor[NUM_INSTANCES];
 };
 
 // --------------------------------------
@@ -16,6 +17,7 @@ struct HS_INPUT_PATCH
     float4 Position : SV_POSITION;
     float3 localPos : POSITION;
     float2 TexCoord : TEXCOORD;
+    uint instanceID : InstanceID;
 };
 
 struct HS_OUTPUT_PATCH
@@ -35,8 +37,10 @@ HS_OUTPUT_PATCH main(InputPatch<HS_INPUT_PATCH, 4> patch, uint i : SV_OutputCont
 {
     HS_OUTPUT_PATCH output;
 
-    output.TexCoord = patch[i].TexCoord;
-    output.localPos = patch[i].localPos;
+    output.TexCoord = patch[i].
+TexCoord;
+    output.localPos = patch[i].
+localPos;
     
     return
 output;
@@ -153,10 +157,11 @@ HS_CONSTANT_DATA_OUTPUT HSConstantFunction(InputPatch<HS_INPUT_PATCH, 4> patch, 
     //output.edges[0] = dostuff(patch[2].Position, patch[0].Position);
     //output.edges[1] = dostuff(patch[2].Position, patch[3].Position);
     
-    output.edges[0] *= TessellationFactor.g;
-    output.edges[1] *= TessellationFactor.b;
-    output.edges[2] *= TessellationFactor.a;
-    output.edges[3] *= TessellationFactor.r;
+    uint instanceID = patch[0].instanceID;
+    output.edges[0] *= TessellationFactor[instanceID].g;
+    output.edges[1] *= TessellationFactor[instanceID].b;
+    output.edges[2] *= TessellationFactor[instanceID].a;
+    output.edges[3] *= TessellationFactor[instanceID].r;
 
     output.inside[1] = (output.edges[1] + output.edges[2]) / 2;
     output.inside[0] = (output.edges[0] + output.edges[3]) / 2;

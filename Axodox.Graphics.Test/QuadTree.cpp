@@ -29,11 +29,9 @@ using NeighborDirection =
     const std::array<const std::pair<const ChildrenID, const NeedToGoUp>, 4>;
 
 // NodeID must be a leaf.
-constexpr float inline IsSmaller(NeighborDirection &directions,
-                                 const QuadTree &tree,
-                                 const std::vector<int> &path,
-                                 std::vector<ChildrenID> &buff,
-                                 const Node *node) {
+constexpr float IsSmaller(NeighborDirection &directions, const QuadTree &tree,
+                          const std::vector<int> &path,
+                          std::vector<ChildrenID> &buff, const Node *node) {
   buff.clear();
 
   // Traverse the path in reverse to backtrack
@@ -42,12 +40,11 @@ constexpr float inline IsSmaller(NeighborDirection &directions,
        backitr++) {
     if (*backitr == -1) {
       // No neighbor
-      continue;
-      // return 0;
+      return 0;
     }
-    auto &p = directions[*backitr];
-    stop = !p.second;
-    buff.push_back(p.first);
+    auto [child, goUp] = directions[*backitr];
+    stop = !goUp;
+    buff.push_back(child);
     node = &tree.GetAt(node->parent);
   }
   for (auto backitr = buff.rbegin(); backitr != buff.rend(); backitr++) {
@@ -55,12 +52,45 @@ constexpr float inline IsSmaller(NeighborDirection &directions,
     if (!node->HasChildren()) {
       return 1;
     }
-  };
-  if (node->HasChildren()) {
-    return 0.5;
-  } else {
-    return 1;
   }
+  float ret = 1.f;
+  while (node->HasChildren()) {
+    node = &tree.GetAt(node->children[*buff.begin()]);
+    ret *= 0.5f;
+  }
+  return ret;
+}
+template <const NeighborDirection &directions>
+constexpr float
+IsSmallerTemplated(const QuadTree &tree, const std::vector<int> &path,
+                   std::vector<ChildrenID> &buff, const Node *node) {
+  buff.clear();
+
+  // Traverse the path in reverse to backtrack
+  bool stop = false;
+  for (auto backitr = path.rbegin(); backitr != path.rend() && !stop;
+       backitr++) {
+    if (*backitr == -1) {
+      // No neighbor
+      return 0;
+    }
+    auto [child, goUp] = directions[*backitr];
+    stop = !goUp;
+    buff.push_back(child);
+    node = &tree.GetAt(node->parent);
+  }
+  for (auto backitr = buff.rbegin(); backitr != buff.rend(); backitr++) {
+    node = &tree.GetAt(node->children[*backitr]);
+    if (!node->HasChildren()) {
+      return 1;
+    }
+  }
+  float ret = 1.f;
+  while (node->HasChildren()) {
+    node = &tree.GetAt(node->children[*buff.begin()]);
+    ret *= 0.5f;
+  }
+  return ret;
 }
 
 /*
@@ -91,10 +121,14 @@ ConstQuadTreeLeafIteratorDepthFirst::GetSmallerNeighbor() const {
   SmallerNeighborRatio res{};
 
   const Node *const id = &tree.GetAt(node);
-  res.xpos = IsSmaller(xpos, tree, path, buff, id);
-  res.xneg = IsSmaller(xneg, tree, path, buff, id);
-  res.zneg = IsSmaller(zneg, tree, path, buff, id);
-  res.zpos = IsSmaller(zpos, tree, path, buff, id);
+  // res.xpos = IsSmaller(xpos, tree, path, buff, id);
+  // res.xneg = IsSmaller(xneg, tree, path, buff, id);
+  // res.zneg = IsSmaller(zneg, tree, path, buff, id);
+  // res.zpos = IsSmaller(zpos, tree, path, buff, id);
+  res.xpos = IsSmallerTemplated<xpos>(tree, path, buff, id);
+  res.xneg = IsSmallerTemplated<xneg>(tree, path, buff, id);
+  res.zneg = IsSmallerTemplated<zneg>(tree, path, buff, id);
+  res.zpos = IsSmallerTemplated<zpos>(tree, path, buff, id);
   return res;
 }
 void ConstQuadTreeLeafIteratorDepthFirst::AdjustNode() {
@@ -151,8 +185,10 @@ void QuadTree::BuildRecursively(const uint index, const float yCoordinate,
                  node.center.y - camEye.z};
   double dist = sqrt(diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
 
-  // bool cont = dist / (node.size.x * node.size.y) < distanceThreshold;
-  bool cont = dist / (std::max(node.size.x, node.size.y)) < distanceThreshold;
+  bool cont = dist / (node.size.x * node.size.y) < distanceThreshold;
+  // bool cont = dist / (std::max(node.size.x, node.size.y)) <
+  // distanceThreshold;
+  // bool cont = dist < distanceThreshold;
   if (cont || depth < minDepth) {
     for (uint i = 0; i < 4; i++) {
       uint id = count;

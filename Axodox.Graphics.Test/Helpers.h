@@ -134,3 +134,5 @@ public:
 
   MutableTexture &getInnerUnsafe() { return *this; }
 };
+
+inline float frac(float x) { return x - std::floor(x); }

@@ -695,16 +695,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         // kinda of UV coordinate that can go outside [0,1] and the fract is the
         // actual UV value.
 
-        XMVECTOR planeBottomLeft = XMVectorSet(-fullSizeXZ.x / 2 + center.x, 0,
-                                               -fullSizeXZ.y / 2 + center.z, 1);
-        XMVECTOR planeTopRight = XMVectorSet(fullSizeXZ.x / 2 + center.x, 0,
-                                             fullSizeXZ.y / 2 + center.z, 1);
-        planeBottomLeft = XMVector3TransformCoord(planeBottomLeft, worldBasic);
-        planeTopRight = XMVector3TransformCoord(planeTopRight, worldBasic);
-        // Reorder to float2
-        planeBottomLeft = XMVectorSwizzle(planeBottomLeft, 0, 2, 1, 3);
-        planeTopRight = XMVectorSwizzle(planeTopRight, 0, 2, 1, 3);
-
+        u16 instanceCount = 0;
         start = std::chrono::high_resolution_clock::now();
         for (auto it = qt.begin(); it != qt.end(); ++it) {
           drawnNodes++;
@@ -714,8 +705,10 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
           {
 
-            vertexConstants.scaling = {it->size.x, it->size.y};
-            vertexConstants.offset = {it->center.x, it->center.y};
+            vertexConstants.instanceData[instanceCount].scaling = {it->size.x,
+                                                                   it->size.y};
+            vertexConstants.instanceData[instanceCount].offset = {it->center.x,
+                                                                  it->center.y};
           }
           {
             start = std::chrono::high_resolution_clock::now();
@@ -731,9 +724,41 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
               else
                 return 1 / x;
             };
-            hullConstants.TesselationFactor = {l(res.zneg), l(res.xneg),
-                                               l(res.zpos), l(res.xpos)};
+            hullConstants.instanceData[instanceCount].TesselationFactor = {
+                l(res.zneg), l(res.xneg), l(res.zpos), l(res.xpos)};
           }
+
+          instanceCount++;
+          if (instanceCount == Defaults::App::maxInstances) {
+
+            auto mask = simpleRootSignature.Set(allocator,
+                                                RootSignatureUsage::Graphics);
+
+            if (usedTexture)
+              mask.texture = *usedTexture;
+
+            mask.heightMapForDomain = displacementMap;
+            mask.gradientsForDomain = gradients;
+
+            mask.hullBuffer =
+                frameResource.DynamicBuffer.AddBuffer(hullConstants);
+            mask.vertexBuffer =
+                frameResource.DynamicBuffer.AddBuffer(vertexConstants);
+            mask.domainBuffer = domainConstantBuffer;
+            mask.pixelBuffer = pixelConstantBuffer;
+            mask.cameraBuffer = cameraConstantBuffer;
+            mask.modelBuffer = modelBuffer;
+
+            allocator.SetRenderTargets(
+                {renderTargetView}, frameResource.DepthBuffer.DepthStencil());
+            graphicsPipelineState.Apply(allocator);
+            planeMesh.Draw(allocator, instanceCount);
+            instanceCount = 0;
+          }
+
+          start = std::chrono::high_resolution_clock::now();
+        }
+        if (instanceCount != 0) {
 
           auto mask =
               simpleRootSignature.Set(allocator, RootSignatureUsage::Graphics);
@@ -756,9 +781,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           allocator.SetRenderTargets({renderTargetView},
                                      frameResource.DepthBuffer.DepthStencil());
           graphicsPipelineState.Apply(allocator);
-          planeMesh.Draw(allocator);
-
-          start = std::chrono::high_resolution_clock::now();
+          planeMesh.Draw(allocator, instanceCount);
+          instanceCount = 0;
         }
       }
 

@@ -25,7 +25,7 @@ constexpr bool divides_within_eps(float a, float b, float epsilon) noexcept {
   float value = a / b;
 
   int int_part = static_cast<int>(value);
-  float frac_part = value - int_part;
+  float frac_part = value - static_cast<float>(int_part);
   float back = frac_part * b;
   float diff = back > 0 ? back : -back;
   return diff < epsilon;
@@ -34,15 +34,13 @@ constexpr bool divides_within_eps(float a, float b, float epsilon) noexcept {
 struct Defaults {
 public:
   struct Cam {
-    QUALIFIER float3 camStartPos = float3(-1, 10, 0);
+    QUALIFIER float3 camStartPos = float3(-23, 10, 11);
     QUALIFIER bool startFirstPerson = true;
   };
-  struct App {
-    CONST_QUALIFIER float patchSize = 20.0f;
-    QUALIFIER float oceanSize = 1000.f;
 
-    static_assert(divides_within_eps(oceanSize, patchSize, 0.001f),
-                  "Ocean size has to be multiple of patch size");
+  struct App {
+    CONST_QUALIFIER u16 maxInstances = 1 << 11;
+    QUALIFIER float oceanSize = 1000.f;
 
     QUALIFIER XMFLOAT4 clearColor = {37.f / 255.f, 37.f / 255.f, 37.f / 255.f,
                                      0};
@@ -54,21 +52,24 @@ public:
     CONST_QUALIFIER u32 computeShaderGroupsDim2 = 16;
   };
   struct QuadTree {
-    QUALIFIER float distanceThreshold = 1e+1f;
+    QUALIFIER float distanceThreshold = 3e+0f;
     QUALIFIER u32 allocation = 20000;
-    QUALIFIER u32 maxDepth = 15;
+    QUALIFIER u32 maxDepth = 20;
     QUALIFIER u32 minDepth = 0;
   };
   struct Simulation {
   public:
+    /// Have to change in gradients.hlsl and VertexShader.hlsl as well
+
+    CONST_QUALIFIER float patchSize = 20.0f;
+    static_assert(divides_within_eps(App::oceanSize, patchSize, 0.001f),
+                  "Ocean size has to be multiple of patch size");
     CONST_QUALIFIER u32 N = ComputeShader::heightMapDimensions;
-    /// Have to change in gradients.hlsl as well
-    CONST_QUALIFIER f32 L = App::patchSize;
     QUALIFIER f32 Depth = 100;
 
     QUALIFIER f32 gravity = 9.81f;
 
-    QUALIFIER f32 WindForce = 1 * 10;
+    QUALIFIER f32 WindForce = 6.f;
     QUALIFIER float2 WindDirection = float2(-0.4f, -0.9f);
 
     // A constant that scales the waves
