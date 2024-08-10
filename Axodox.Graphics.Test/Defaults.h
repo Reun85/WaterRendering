@@ -54,7 +54,7 @@ public:
     CONST_QUALIFIER u32 computeShaderGroupsDim2 = 16;
   };
   struct QuadTree {
-    QUALIFIER float distanceThreshold = 3e+0f;
+    QUALIFIER float distanceThreshold = 1e+1f;
     QUALIFIER u32 allocation = 20000;
     QUALIFIER u32 maxDepth = 15;
     QUALIFIER u32 minDepth = 0;
