@@ -1,3 +1,4 @@
+#pragma once
 #include <pch.h>
 #include <winrt/Windows.UI.Core.h>
 #include <array>
@@ -14,9 +15,9 @@ using Depth = uint;
 struct Node {
   NodeCenter center = {0, 0};
   NodeSize size = {0, 0};
-  std::array<Node *, 4> children = {nullptr, nullptr, nullptr, nullptr};
-  Node *parent = nullptr;
-  constexpr bool HasChildren() const { return children[0] != nullptr; }
+  std::array<NodeID, 4> children = {0, 0, 0, 0};
+  NodeID parent = 0;
+  constexpr bool HasChildren() const { return children[0] != 0; }
 
   constexpr static std::array<NodeSize, 4> childDirections = {
       {{-1.f, -1.f}, {-1.f, 1.f}, {1.f, -1.f}, {1.f, 1.f}}};
@@ -30,7 +31,7 @@ struct Node {
 
   */
 
-  float3 GetCenter(const float height) const {
+  const float3 GetCenter(const float height) const {
     return float3(center.x, height, center.y);
   }
 };
@@ -39,7 +40,7 @@ class QuadTree;
 
 class ConstQuadTreeLeafIteratorDepthFirst {
 public:
-  ConstQuadTreeLeafIteratorDepthFirst(const Node *node, const Depth maxDepth,
+  ConstQuadTreeLeafIteratorDepthFirst(const NodeID node, const Depth maxDepth,
                                       const QuadTree &_tree);
 
   ConstQuadTreeLeafIteratorDepthFirst &operator++() noexcept;
@@ -49,7 +50,10 @@ public:
   operator==(const ConstQuadTreeLeafIteratorDepthFirst &other) const noexcept {
     return node == other.node;
   }
-  constexpr bool operator==(const Node *other) const noexcept {
+  constexpr bool operator!=(const NodeID other) const noexcept {
+    return node != other;
+  }
+  constexpr bool operator==(const NodeID other) const noexcept {
     return node == other;
   }
 
@@ -75,7 +79,7 @@ private:
   void AdjustNode();
   void IterateTillLeaf();
 
-  const Node *node;
+  NodeID node;
   // Path to get current leaf
   std::vector<ChildrenID> path;
   const QuadTree &tree;
@@ -86,18 +90,17 @@ class QuadTree {
   using const_iterator = ConstQuadTreeLeafIteratorDepthFirst;
 
 public:
-  explicit QuadTree(const uint allocation = Defaults::QuadTree::allocation)
+  QuadTree(const uint allocation = Defaults::QuadTree::allocation)
       : nodes(allocation) {}
   void
   Build(const float3 center, const float2 fullSizeXZ, const float3 camEye,
         const float distanceThreshold = Defaults::QuadTree::distanceThreshold);
   const value_type &GetRoot() const { return nodes[0]; }
-  const value_type &GetAt(NodeID id) const { return nodes[id]; }
-
   const_iterator begin() const {
-    return const_iterator(&nodes[0], height, *this);
+    return ConstQuadTreeLeafIteratorDepthFirst(0, height, *this);
   }
-  Node const *end() const { return &nodes[count]; }
+  const value_type &GetAt(NodeID id) const { return nodes[id]; }
+  const NodeID end() const { return GetSize(); }
   const NodeID &GetSize() const { return count; }
 
 private:

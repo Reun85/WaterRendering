@@ -3,7 +3,7 @@
 #include <array>
 
 ConstQuadTreeLeafIteratorDepthFirst::ConstQuadTreeLeafIteratorDepthFirst(
-    const Node *node, const Depth maxDepth, const QuadTree &_tree)
+    const NodeID node, const Depth maxDepth, const QuadTree &_tree)
     : node(node), path(maxDepth), tree(_tree) {
   path.clear();
   path.push_back(-1);
@@ -11,10 +11,10 @@ ConstQuadTreeLeafIteratorDepthFirst::ConstQuadTreeLeafIteratorDepthFirst(
 }
 
 const Node &ConstQuadTreeLeafIteratorDepthFirst::operator*() const {
-  return *node;
+  return tree.GetAt(node);
 }
 const Node *ConstQuadTreeLeafIteratorDepthFirst::operator->() const {
-  return node;
+  return &tree.GetAt(node);
 }
 ConstQuadTreeLeafIteratorDepthFirst &
 ConstQuadTreeLeafIteratorDepthFirst::operator++() noexcept {
@@ -29,9 +29,11 @@ using NeighborDirection =
     const std::array<const std::pair<const ChildrenID, const NeedToGoUp>, 4>;
 
 // NodeID must be a leaf.
-constexpr float IsSmaller(NeighborDirection &directions,
-                          const std::vector<int> &path,
-                          std::vector<ChildrenID> &buff, const Node *node) {
+constexpr float inline IsSmaller(NeighborDirection &directions,
+                                 const QuadTree &tree,
+                                 const std::vector<int> &path,
+                                 std::vector<ChildrenID> &buff,
+                                 const Node *node) {
   buff.clear();
 
   // Traverse the path in reverse to backtrack
@@ -40,19 +42,20 @@ constexpr float IsSmaller(NeighborDirection &directions,
        backitr++) {
     if (*backitr == -1) {
       // No neighbor
-      return 0;
+      continue;
+      // return 0;
     }
-    auto &[matchingIndex, shouldGoUp] = directions[*backitr];
-    stop = !shouldGoUp;
-    buff.push_back(matchingIndex);
-    node = node->parent;
+    auto &p = directions[*backitr];
+    stop = !p.second;
+    buff.push_back(p.first);
+    node = &tree.GetAt(node->parent);
   }
   for (auto backitr = buff.rbegin(); backitr != buff.rend(); backitr++) {
-    node = node->children[*backitr];
+    node = &tree.GetAt(node->children[*backitr]);
     if (!node->HasChildren()) {
       return 1;
     }
-  }
+  };
   if (node->HasChildren()) {
     return 0.5;
   } else {
@@ -61,7 +64,10 @@ constexpr float IsSmaller(NeighborDirection &directions,
 }
 
 /*
+  constexpr static std::array<float2, 4> childDirections = {
+      {{-1, -1}, {-1, 1}, {1, -1}, {1, 1}}};
 
+  /*
 
      ^   2 3
      |   0 1
@@ -84,16 +90,17 @@ ConstQuadTreeLeafIteratorDepthFirst::GetSmallerNeighbor() const {
   std::vector<ChildrenID> buff(path.size());
   SmallerNeighborRatio res{};
 
-  const Node *const id = node;
-  res.xpos = IsSmaller(xpos, path, buff, id);
-  res.xneg = IsSmaller(xneg, path, buff, id);
-  res.zneg = IsSmaller(zneg, path, buff, id);
-  res.zpos = IsSmaller(zpos, path, buff, id);
+  const Node *const id = &tree.GetAt(node);
+  res.xpos = IsSmaller(xpos, tree, path, buff, id);
+  res.xneg = IsSmaller(xneg, tree, path, buff, id);
+  res.zneg = IsSmaller(zneg, tree, path, buff, id);
+  res.zpos = IsSmaller(zpos, tree, path, buff, id);
   return res;
 }
 void ConstQuadTreeLeafIteratorDepthFirst::AdjustNode() {
 
-  if (node + 1 == node->children[0]) {
+  const auto curr_id = node;
+  if (curr_id + 1 == tree.GetAt(node).children[0]) {
     // Child node
     path.push_back(0);
   } else if (path.back() != 3) {
@@ -110,7 +117,7 @@ void ConstQuadTreeLeafIteratorDepthFirst::AdjustNode() {
 }
 
 void ConstQuadTreeLeafIteratorDepthFirst::IterateTillLeaf() {
-  while (node->HasChildren()) {
+  while (tree.GetAt(node).HasChildren()) {
     AdjustNode();
   }
 }
@@ -136,7 +143,10 @@ void QuadTree::BuildRecursively(const uint index, const float yCoordinate,
   if (depth > maxDepth) {
     return;
   }
-  auto &node = nodes[index];
+  if (count + 4 > nodes.size()) {
+    nodes.emplace_back();
+  }
+  const auto &node = nodes[index];
   float3 diff = {node.center.x - camEye.x, yCoordinate - camEye.y,
                  node.center.y - camEye.z};
   double dist = sqrt(diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
@@ -147,15 +157,13 @@ void QuadTree::BuildRecursively(const uint index, const float yCoordinate,
   if (cont || depth < minDepth) {
     for (uint i = 0; i < 4; i++) {
       uint id = count;
-      count++;
-      if (id >= nodes.size() - 1) {
-        nodes.emplace_back();
-      }
+      auto &node2 = nodes[index];
+      ++count;
+      node2.children[i] = id;
       auto &curr = nodes[id];
-      node.children[i] = &nodes[id];
-      curr.parent = &nodes[index];
-      curr.size = node.size / 2;
-      curr.center = node.center + Node::childDirections[i] * (curr.size / 2);
+      curr.parent = index;
+      curr.size = node2.size / 2;
+      curr.center = node2.center + Node::childDirections[i] * (curr.size / 2);
       BuildRecursively(id, yCoordinate, camEye, distanceThreshold, depth + 1);
     }
   }
