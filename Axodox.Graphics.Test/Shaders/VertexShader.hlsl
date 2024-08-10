@@ -10,9 +10,8 @@ cbuffer ModelBuffer : register(b1)
 };
 cbuffer VertexBuffer : register(b2)
 {
-    float4x4 Transformation;
-    float2 PlaneBottomLeft;
-    float2 PlaneTopRight;
+    float2 scaling;
+    float2 offset;
 };
 struct input_t
 {
@@ -33,16 +32,16 @@ struct output_t
 
 output_t main(input_t input)
 {
+    const float patchSize = 20;
+    const float planeSize = 1000;
+    const float2 PlaneBottomLeft = float2(-planeSize / 2, -planeSize / 2);
+    const float2 PlaneTopRight = float2(planeSize / 2, planeSize / 2);
     output_t output;
-    float4 position
-     = mul(float4(input.Position, 1), mMatrix);
-    position = mul(position, Transformation);
-    //Maybe move this to the domain shader later?
-    float2 texCoord = (position.xz - PlaneBottomLeft) / (PlaneTopRight - PlaneBottomLeft);
-    // If the quad is rotated
-    texCoord = ((PlaneBottomLeft.x < PlaneTopRight.x && PlaneBottomLeft.y > PlaneTopRight.y) || (PlaneBottomLeft.x > PlaneTopRight.x && PlaneBottomLeft.y < PlaneTopRight.y) ? texCoord.xy : texCoord.yx);
-    // For normal images
+
+    float2 pos = input.Position.xz * scaling + offset;
+    float2 texCoord = (pos - PlaneBottomLeft) / (PlaneTopRight - PlaneBottomLeft);
     
+    float4 position = mul(float4(pos.x, 0, pos.y, 1), mMatrix);
 
     float4 screenPosition = mul(position, camConstants.vpMatrix);
     output.Position = screenPosition;

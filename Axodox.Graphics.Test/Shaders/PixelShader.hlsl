@@ -38,10 +38,6 @@ float4 main(input_t input) : SV_TARGET
     }
 
     
-
-    
-    
-    
 // Colors
     const float3 sunColor = float3(1.0, 1.0, 0.47);
     const float3 sunDir = float3(0.45, 0.1, -0.45);

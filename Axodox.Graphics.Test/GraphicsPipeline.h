@@ -37,12 +37,8 @@ struct SimpleGraphicsRootDescription : public RootSignatureMask {
   };
 
   struct VertexConstants {
-    XMFLOAT4X4 Transformation;
-    // This cannot be center and size, otherwise we could not rotate the thing
-    // But it does require that the plane perpendicular to the y axis
-    // If not, rewrite this to use float3s.
-    XMFLOAT2 PlaneBottomLeft;
-    XMFLOAT2 PlaneTopRight;
+    XMFLOAT2 scaling;
+    XMFLOAT2 offset;
   };
   struct HullConstants {
     // zneg,xneg, zpos, xpos
@@ -89,10 +85,10 @@ public:
                            ShaderVisibility::Domain),
         gradientsForDomain(this, {DescriptorRangeType::ShaderResource, {1}},
                            ShaderVisibility::Domain),
-        _textureSampler(this, {0}, Filter::Linear, TextureAddressMode::Clamp,
+        _textureSampler(this, {0}, Filter::Linear, TextureAddressMode::Wrap,
                         ShaderVisibility::Pixel),
         _heightmapSamplerForDomain(this, {0}, Filter::Linear,
-                                   TextureAddressMode::Clamp,
+                                   TextureAddressMode::Wrap,
                                    ShaderVisibility::Domain) {
     Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
   }

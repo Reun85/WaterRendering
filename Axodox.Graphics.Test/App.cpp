@@ -713,16 +713,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                   (std::chrono::high_resolution_clock::now() - start));
 
           {
-            auto world =
-                XMMatrixScaling(it->size.x, 1, it->size.y) *
-                XMMatrixTranslation(it->center.x, center.y, it->center.y);
 
-            // Why no 2x2?
-            XMStoreFloat2(&vertexConstants.PlaneBottomLeft, planeBottomLeft);
-            XMStoreFloat2(&vertexConstants.PlaneTopRight, planeTopRight);
-
-            XMStoreFloat4x4(&vertexConstants.Transformation,
-                            XMMatrixTranspose(world));
+            vertexConstants.scaling = {it->size.x, it->size.y};
+            vertexConstants.offset = {it->center.x, it->center.y};
           }
           {
             start = std::chrono::high_resolution_clock::now();
