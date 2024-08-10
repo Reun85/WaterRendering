@@ -21,6 +21,7 @@ inline float2 ComplexMul(float2 a, float2 b)
 
 float GetComponentByIndex(float4 vec, uint index)
 {
+
     if (index == 0)
         return vec.x;
     if (index == 1)

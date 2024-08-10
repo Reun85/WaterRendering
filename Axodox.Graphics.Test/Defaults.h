@@ -40,27 +40,41 @@ public:
 
   struct App {
     CONST_QUALIFIER u16 maxInstances = 1 << 11;
-    QUALIFIER float oceanSize = 10000.f;
+    QUALIFIER f32 oceanSize = 10000.f;
 
     QUALIFIER XMFLOAT4 clearColor = {37.f / 255.f, 37.f / 255.f, 37.f / 255.f,
                                      0};
   };
   struct ComputeShader {
     /// Have to change in gradients.hlsl as well
-    CONST_QUALIFIER u32 heightMapDimensions = 1024;
+    CONST_QUALIFIER u32 heightMapDimensions = (1 << 10);
     CONST_QUALIFIER u32 computeShaderGroupsDim1 = 16;
     CONST_QUALIFIER u32 computeShaderGroupsDim2 = 16;
   };
   struct QuadTree {
-    QUALIFIER float distanceThreshold = 2e+2f;
+    QUALIFIER f32 distanceThreshold = 2e+2f;
     QUALIFIER u32 allocation = 20000;
     QUALIFIER u32 maxDepth = 20;
     QUALIFIER u32 minDepth = 0;
   };
   struct Simulation {
-  public:
+    struct KnownToWork {
+      struct Large {
+        CONST_QUALIFIER f32 patchSize = 400.0f;
+        QUALIFIER f32 WindForce = 30 * 6.f;
+        QUALIFIER float2 WindDirection = float2(-0.4f, -0.9f);
+        QUALIFIER f32 Amplitude = 0.45e-6f;
+      };
+      struct Small {
+        CONST_QUALIFIER f32 patchSize = 40.0f;
+        QUALIFIER f32 WindForce = 6.f;
+        QUALIFIER float2 WindDirection = float2(-0.4f, -0.9f);
+        QUALIFIER f32 Amplitude = 0.45e-3f;
+      };
+    };
+
     /// Have to change in common.hlsli as well
-    CONST_QUALIFIER float patchSize = 40.0f;
+    CONST_QUALIFIER f32 patchSize = 40.0f;
     static_assert(divides_within_eps(App::oceanSize, patchSize, 0.001f),
                   "Ocean size has to be multiple of patch size");
     CONST_QUALIFIER u32 N = ComputeShader::heightMapDimensions;
