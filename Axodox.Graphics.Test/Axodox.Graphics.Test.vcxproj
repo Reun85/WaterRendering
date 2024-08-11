@@ -78,6 +78,10 @@
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
     <ClCompile>
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MaxSpeed</Optimization>
+      <FavorSizeOrSpeed Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Speed</FavorSizeOrSpeed>
+      <InlineFunctionExpansion Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AnySuitable</InlineFunctionExpansion>
+      <IntrinsicFunctions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</IntrinsicFunctions>
     </ClCompile>
     <FxCompile>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.0</ShaderModel>
@@ -88,6 +92,8 @@
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
     <ClCompile>
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <FavorSizeOrSpeed Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Speed</FavorSizeOrSpeed>
+      <InlineFunctionExpansion Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AnySuitable</InlineFunctionExpansion>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -101,6 +107,7 @@
     <ClInclude Include="Camera.h" />
     <ClInclude Include="ComputePipeline.h" />
     <ClInclude Include="ConstantGPUBuffer.h" />
+    <ClInclude Include="constants.h" />
     <ClInclude Include="Defaults.h" />
     <ClInclude Include="GraphicsPipeline.h" />
     <ClInclude Include="Helpers.h" />
@@ -125,6 +132,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\ELTE\GPGPU\GPGPU-Assignment\src\imgui.ini" />
+    <None Include="Shaders\constants.hlsli" />
     <None Include="packages.config" />
     <None Include="PropertySheet.props" />
     <None Include="Shaders\common.hlsli" />

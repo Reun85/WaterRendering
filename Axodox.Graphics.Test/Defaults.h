@@ -4,6 +4,8 @@
 #include <pch.h>
 #include <winrt/Windows.UI.Core.h>
 
+#include "constants.h"
+
 using namespace std;
 using namespace winrt;
 
@@ -39,7 +41,7 @@ public:
   };
 
   struct App {
-    CONST_QUALIFIER u16 maxInstances = 1 << 11;
+    CONST_QUALIFIER u16 maxInstances = ShaderConstantCompat::numInstances;
     QUALIFIER f32 oceanSize = 10000.f;
 
     QUALIFIER XMFLOAT4 clearColor = {37.f / 255.f, 37.f / 255.f, 37.f / 255.f,
@@ -47,7 +49,7 @@ public:
   };
   struct ComputeShader {
     /// Have to change in gradients.hlsl as well
-    CONST_QUALIFIER u32 heightMapDimensions = (1 << 10);
+    CONST_QUALIFIER u32 heightMapDimensions = ShaderConstantCompat::dispMapSize;
     CONST_QUALIFIER u32 computeShaderGroupsDim1 = 16;
     CONST_QUALIFIER u32 computeShaderGroupsDim2 = 16;
   };
@@ -74,7 +76,7 @@ public:
     };
 
     /// Have to change in common.hlsli as well
-    CONST_QUALIFIER f32 patchSize = 40.0f;
+    CONST_QUALIFIER f32 patchSize = ShaderConstantCompat::patchSize;
     static_assert(divides_within_eps(App::oceanSize, patchSize, 0.001f),
                   "Ocean size has to be multiple of patch size");
     CONST_QUALIFIER u32 N = ComputeShader::heightMapDimensions;
@@ -86,9 +88,11 @@ public:
     QUALIFIER float2 WindDirection = float2(-0.4f, -0.9f);
 
     // A constant that scales the waves
-    QUALIFIER f32 Amplitude = 0.45e-3f;
+    QUALIFIER f32 Amplitude = 0.45e-6f;
 
     QUALIFIER f32 timeStep = 1.0f / 60.0f;
     static_assert(isPowerOfTwo(N));
   };
 };
+#undef QUALIFIER
+#undef CONST_QUALIFIER
