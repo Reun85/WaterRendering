@@ -527,7 +527,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         SimpleGraphicsRootDescription::cameraConstants cameraConstants{};
         SimpleGraphicsRootDescription::ModelConstants modelConstants{};
 
-        auto worldBasic = XMMatrixIdentity();
+        auto modelMatrix = XMMatrixIdentity();
 
         XMStoreFloat3(&cameraConstants.cameraPos, cam.GetEye());
         XMStoreFloat4x4(&cameraConstants.vMatrix,
@@ -537,7 +537,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         XMStoreFloat4x4(&cameraConstants.vpMatrix,
                         XMMatrixTranspose(cam.GetViewProj()));
 
-        XMStoreFloat4x4(&modelConstants.mMatrix, XMMatrixTranspose(worldBasic));
+        XMStoreFloat4x4(&modelConstants.mMatrix,
+                        XMMatrixTranspose(modelMatrix));
 
         std::optional<GpuVirtualAddress> usedTexture;
         // Debug stuff
@@ -623,10 +624,14 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         XMFLOAT3 camUsedPos;
         XMVECTOR camEye = cam.GetEye();
         XMStoreFloat3(&camUsedPos, camEye);
+
+        XMMATRIX mvpMatrix = XMMatrixTranspose(
+            modelMatrix * cam.GetViewMatrix() * cam.GetProj());
+
         auto start = std::chrono::high_resolution_clock::now();
 
         qt.Build(center, fullSizeXZ,
-                 float3(camUsedPos.x, camUsedPos.y, camUsedPos.z),
+                 float3(camUsedPos.x, camUsedPos.y, camUsedPos.z), mvpMatrix,
                  settings.distanceThreshold);
 
         QuadTreeBuildTime +=

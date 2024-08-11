@@ -101,6 +101,7 @@
     <ClInclude Include="Camera.h" />
     <ClInclude Include="ComputePipeline.h" />
     <ClInclude Include="ConstantGPUBuffer.h" />
+    <ClInclude Include="constants.h" />
     <ClInclude Include="Defaults.h" />
     <ClInclude Include="GraphicsPipeline.h" />
     <ClInclude Include="Helpers.h" />
@@ -128,6 +129,7 @@
     <None Include="packages.config" />
     <None Include="PropertySheet.props" />
     <None Include="Shaders\common.hlsli" />
+    <None Include="Shaders\constants.hlsli" />
     <Text Include="readme.txt" />
   </ItemGroup>
   <ItemGroup>
