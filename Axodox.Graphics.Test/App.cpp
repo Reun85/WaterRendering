@@ -688,7 +688,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
               mask.texture = *usedTexture;
 
             mask.heightMapForDomain = displacementMap;
-            mask.gradientsForDomain = gradients;
+            mask.gradientsForPixel = gradients;
 
             mask.hullBuffer =
                 frameResource.DynamicBuffer.AddBuffer(hullConstants);
@@ -714,7 +714,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             mask.texture = *usedTexture;
 
           mask.heightMapForDomain = displacementMap;
-          mask.gradientsForDomain = gradients;
+          mask.gradientsForPixel = gradients;
 
           mask.hullBuffer =
               frameResource.DynamicBuffer.AddBuffer(hullConstants);

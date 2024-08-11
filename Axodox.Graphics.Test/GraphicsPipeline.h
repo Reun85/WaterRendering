@@ -57,7 +57,7 @@ struct SimpleGraphicsRootDescription : public RootSignatureMask {
   RootDescriptorTable<1> texture;
 
   RootDescriptorTable<1> heightMapForDomain;
-  RootDescriptorTable<1> gradientsForDomain;
+  RootDescriptorTable<1> gradientsForPixel;
 
   explicit SimpleGraphicsRootDescription(const RootSignatureContext &context)
       : RootSignatureMask(context),
@@ -71,8 +71,8 @@ struct SimpleGraphicsRootDescription : public RootSignatureMask {
                 ShaderVisibility::Pixel),
         heightMapForDomain(this, {DescriptorRangeType::ShaderResource, {0}},
                            ShaderVisibility::Domain),
-        gradientsForDomain(this, {DescriptorRangeType::ShaderResource, {1}},
-                           ShaderVisibility::Domain),
+        gradientsForPixel(this, {DescriptorRangeType::ShaderResource, {1}},
+                          ShaderVisibility::Pixel),
         _textureSampler(this, {0}, Filter::Linear, TextureAddressMode::Wrap,
                         ShaderVisibility::Pixel),
         _heightmapSamplerForDomain(this, {0}, Filter::Linear,

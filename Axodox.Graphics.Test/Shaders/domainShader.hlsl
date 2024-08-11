@@ -1,6 +1,5 @@
 #include "common.hlsli"
 Texture2D<float4> _heightmap : register(t0);
-Texture2D<float4> _gradients : register(t1);
 SamplerState _sampler : register(s0);
 
 cbuffer CameraBuffer : register(b0)
@@ -18,7 +17,6 @@ struct DS_OUTPUT
     float4 Position : SV_POSITION;
     float3 localPos : POSITION;
     float2 TexCoord : TEXCOORD;
-    float4 Normal : Variable;
 };
 
 struct HS_OUTPUT_PATCH
@@ -57,14 +55,12 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
         float4 disp = _heightmap.SampleLevel(_sampler, texCoord, 0);
         localPos += disp.xyz;
     }
-    float4 normal = _gradients.SampleLevel(_sampler, texCoord, 0);
     
     
     
     float4 position = mul(float4(localPos, 1), camConstants.vpMatrix);
     output.Position = position;
     output.TexCoord = texCoord;
-    output.Normal = normal;
     output.localPos = localPos;
     
     return output;
