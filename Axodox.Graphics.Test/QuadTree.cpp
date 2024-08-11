@@ -88,7 +88,7 @@ IsSmallerTemplated(const QuadTree &tree, const std::vector<int> &path,
   float ret = 1.f;
   while (node->HasChildren()) {
     node = &tree.GetAt(node->children[*buff.begin()]);
-    ret *= 0.5f;
+    ret *= 2.f;
   }
   return ret;
 }
@@ -131,15 +131,12 @@ ConstQuadTreeLeafIteratorDepthFirst::GetSmallerNeighbor() const {
   res.zpos = IsSmallerTemplated<zpos>(tree, path, buff, id);
   return res;
 }
-void ConstQuadTreeLeafIteratorDepthFirst::AdjustNode() {
+inline void ConstQuadTreeLeafIteratorDepthFirst::AdjustNode() {
 
   const auto curr_id = node;
   if (curr_id + 1 == tree.GetAt(node).children[0]) {
     // Child node
     path.push_back(0);
-  } else if (path.back() != 3) {
-    // Sibling node
-    path.back()++;
   } else {
     while (path.back() == 3) {
       path.pop_back();

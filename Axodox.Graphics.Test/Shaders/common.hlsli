@@ -1,11 +1,5 @@
 
-#define NUM_INSTANCES (1 << 11)
-#define DISP_MAP_LOG2 10
-#define DISP_MAP_SIZE (1<<DISP_MAP_LOG2)
-#define PATCH_SIZE 40.f
-
-#define DEFAULT_TESSELATION 16.f
-#define DISPLACEMENT_LAMBDA 1.3f
+#include "constants.hlsli"
 struct cameraConstants
 {
     float4x4 vMatrix;

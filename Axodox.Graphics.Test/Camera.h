@@ -14,6 +14,7 @@ public:
   inline XMVECTOR GetEye() const { return m_eye; }
   inline XMVECTOR GetAt() const { return m_at; }
   inline XMVECTOR GetWorldUp() const { return m_worldUp; }
+  inline XMVECTOR GetForward() const { return m_forward; }
 
   inline XMMATRIX GetViewMatrix() const { return m_viewMatrix; }
   inline XMMATRIX GetProj() const { return m_matProj; }

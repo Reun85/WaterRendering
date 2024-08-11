@@ -150,4 +150,10 @@ struct SimulationStage {
     {
     }
   };
+
+  struct ConstantGpuSources {
+    ImmutableTexture Tildeh0;
+    ImmutableTexture Frequencies;
+    // ImmutableTexture PerlinNoise;
+  };
 };
