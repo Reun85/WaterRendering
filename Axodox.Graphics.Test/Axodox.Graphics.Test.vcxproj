@@ -103,6 +103,7 @@
     <ClInclude Include="ConstantGPUBuffer.h" />
     <ClInclude Include="constants.h" />
     <ClInclude Include="Defaults.h" />
+    <ClInclude Include="Frustum.hpp" />
     <ClInclude Include="GraphicsPipeline.h" />
     <ClInclude Include="Helpers.h" />
     <ClInclude Include="pch.h" />

@@ -3,6 +3,7 @@
 #include <winrt/Windows.UI.Core.h>
 #include <array>
 #include "Defaults.h"
+#include "Frustum.hpp"
 
 using uint = uint32_t;
 using NodeID = uint;
@@ -94,7 +95,7 @@ public:
       : nodes(allocation) {}
   void
   Build(const float3 center, const float2 fullSizeXZ, const float3 camEye,
-        const XMMATRIX &mvpMatrix,
+        const Frustum &f, const XMMATRIX &mMatrix,
         const float distanceThreshold = Defaults::QuadTree::distanceThreshold);
   const value_type &GetRoot() const { return nodes[0]; }
   const_iterator begin() const {
@@ -108,7 +109,8 @@ private:
   friend class const_iterator;
   void BuildRecursively(const uint index, const float height,
                         const float3 camEye, const float distanceThreshold,
-                        const Depth depth, const XMMATRIX &mvpMatrix);
+                        const Depth depth, const Frustum &f,
+                        const XMMATRIX &mMatrix);
 
   std::vector<value_type> nodes;
   NodeID count = 0;

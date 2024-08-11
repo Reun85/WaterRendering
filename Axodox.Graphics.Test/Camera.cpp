@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Camera.h"
+#include "Frustum.hpp"
 #include <DirectXMath.h>
 
 Camera::Camera() {
@@ -57,6 +58,47 @@ void Camera::SetZNear(const float _zn) noexcept {
 void Camera::SetZFar(const float _zf) noexcept {
   m_zFar = _zf;
   m_projectionDirty = true;
+}
+
+Frustum Camera::GetFrustum() const {
+  Frustum frustum{};
+  const float halfVSide = m_zFar * tanf(m_angle * .5f);
+  const float halfHSide = halfVSide * m_aspect;
+  const XMVECTOR frontMultFar =
+      m_zFar *
+      m_forward; // m_forward should point in the +Z direction for DirectX
+
+  frustum.nearFace = {m_eye + m_zNear * m_forward, m_forward};
+  frustum.farFace = {m_eye + frontMultFar, -m_forward};
+  frustum.rightFace = {
+      m_eye, XMVector3Cross(frontMultFar - m_right * halfHSide, m_up)};
+  frustum.leftFace = {m_eye,
+                      XMVector3Cross(m_up, frontMultFar + m_right * halfHSide)};
+  frustum.topFace = {m_eye,
+                     XMVector3Cross(m_right, frontMultFar - m_up * halfVSide)};
+  frustum.bottomFace = {
+      m_eye, XMVector3Cross(frontMultFar + m_up * halfVSide, m_right)};
+
+  return frustum;
+  // Frustum frustum{};
+  // const float halfVSide = m_zFar * tanf(m_angle * .5f);
+  // const float halfHSide = halfVSide * m_aspect;
+  // const XMVECTOR frontMultFar = m_zFar * m_forward;
+
+  // frustum.nearFace = {m_eye + m_zNear * m_forward, m_forward};
+  // frustum.farFace = {m_eye + frontMultFar, -m_forward};
+  // frustum.rightFace = {
+  //     m_eye, XMVector3Cross(frontMultFar - m_right * halfHSide, m_up)};
+  // frustum.leftFace = {m_eye,
+  //                     XMVector3Cross(m_up, frontMultFar + m_right *
+  //                     halfHSide)};
+  // frustum.topFace = {m_eye,
+  //                    XMVector3Cross(m_right, frontMultFar - m_up *
+  //                    halfVSide)};
+  // frustum.bottomFace = {
+  //     m_eye, XMVector3Cross(frontMultFar + m_up * halfVSide, m_right)};
+
+  // return frustum;
 }
 
 bool Camera::Update(float _deltaTime) {

@@ -42,7 +42,7 @@ public:
 
   struct App {
     CONST_QUALIFIER u16 maxInstances = ShaderConstantCompat::numInstances;
-    QUALIFIER f32 oceanSize = 10000.f;
+    QUALIFIER f32 oceanSize = 100000.f;
 
     QUALIFIER XMFLOAT4 clearColor = {37.f / 255.f, 37.f / 255.f, 37.f / 255.f,
                                      0};
@@ -56,7 +56,7 @@ public:
   struct QuadTree {
     QUALIFIER f32 distanceThreshold = 2e+2f;
     QUALIFIER u32 allocation = 20000;
-    QUALIFIER u32 maxDepth = 20;
+    QUALIFIER u32 maxDepth = 40;
     QUALIFIER u32 minDepth = 0;
   };
   struct Simulation {
@@ -84,7 +84,7 @@ public:
 
     QUALIFIER f32 gravity = 9.81f;
 
-    QUALIFIER f32 WindForce = 6.f;
+    QUALIFIER f32 WindForce = 30 * 6.f;
     QUALIFIER float2 WindDirection = float2(-0.4f, -0.9f);
 
     // A constant that scales the waves

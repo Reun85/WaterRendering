@@ -4,6 +4,8 @@
 using namespace winrt::Windows::UI::Core;
 using namespace DirectX;
 
+struct Frustum;
+
 class Camera {
 public:
   Camera();
@@ -20,6 +22,7 @@ public:
   inline XMMATRIX GetProj() const { return m_matProj; }
   inline XMMATRIX GetViewProj() const { return m_matViewProj; }
 
+  Frustum GetFrustum() const;
   // Returns true if the view has changed.
   bool Update(float _deltaTime);
 
@@ -121,7 +124,7 @@ private:
 
   // projection parameters
   float m_zNear = 0.01f;
-  float m_zFar = 1000.0f;
+  float m_zFar = 10000.0f;
 
   float m_angle = XMConvertToRadians(27.0f);
   float m_aspect = 640.0f / 480.0f;

@@ -157,8 +157,8 @@ void ConstQuadTreeLeafIteratorDepthFirst::IterateTillLeaf() {
 }
 
 void QuadTree::Build(const float3 center, const float2 fullSizeXZ,
-                     const float3 camEye, const XMMATRIX &mvpMatrix,
-                     const float distanceThreshold) {
+                     const float3 camEye, const Frustum &f,
+                     const XMMATRIX &mMatrix, const float distanceThreshold) {
 
   // zero it out, especially the children part
   memset(&nodes[0], 0, sizeof(Node) * nodes.size());
@@ -166,93 +166,21 @@ void QuadTree::Build(const float3 center, const float2 fullSizeXZ,
   nodes[0] = {{center.x, center.z}, {fullSizeXZ.x, fullSizeXZ.y}};
   count = 1;
   height = 0;
-  BuildRecursively(0, center.y, camEye, distanceThreshold, 0, mvpMatrix);
-}
-bool AreAABBsIntersecting(const XMFLOAT3 &min1, const XMFLOAT3 &max1,
-                          const XMFLOAT3 &min2, const XMFLOAT3 &max2) {
-  if (max1.x < min2.x || max2.x < min1.x)
-    return false;
-  // Check if one box is above the other
-  if (max1.y < min2.y || max2.y < min1.y)
-    return false;
-  // Check if one box is in front of the other
-  if (max1.z < min2.z || max2.z < min1.z)
-    return false;
-
-  // If none of the above, the boxes intersect
-  return true;
-}
-bool IsAABBContained(const XMFLOAT3 &outerMin, const XMFLOAT3 &outerMax,
-                     const XMFLOAT3 &innerMin, const XMFLOAT3 &innerMax) {
-  // Check if the inner box is within the outer box
-  return (outerMin.x <= innerMin.x && outerMax.x >= innerMax.x &&
-          outerMin.y <= innerMin.y && outerMax.y >= innerMax.y/* &&
-          outerMin.z <= innerMin.z && outerMax.z >= innerMax.z*/);
+  BuildRecursively(0, center.y, camEye, distanceThreshold, 0, f, mMatrix);
 }
 inline bool IsInViewFrustum(const Node &node, const float &yCoordinate,
-                            const XMMATRIX &mvpMatrix) {
-  return true;
+                            const Frustum &f, const XMMATRIX &mMatrix) {
 
-  XMVECTOR centerWorldSpace =
-      XMVectorSet(node.center.x, yCoordinate, node.center.y, 1.0f);
+  const AABB aabb{XMVECTOR{node.center.x, yCoordinate, node.center.y},
+                  node.size.x / 2, 0, node.size.y / 2};
 
-  float sizex = node.size.x / 2.0f;
-  float sizey = node.size.y / 2.0f;
-
-  XMVECTOR p0 =
-      XMVectorAdd(centerWorldSpace, XMVectorSet(sizex, 0.0f, sizey, 0.0f));
-  XMVECTOR p1 =
-      XMVectorAdd(centerWorldSpace, XMVectorSet(-sizex, 0.0f, sizey, 0.0f));
-  XMVECTOR p2 =
-      XMVectorAdd(centerWorldSpace, XMVectorSet(-sizex, 0.0f, -sizey, 0.0f));
-  XMVECTOR p3 =
-      XMVectorAdd(centerWorldSpace, XMVectorSet(sizex, 0.0f, -sizey, 0.0f));
-
-  p0 = XMVector3TransformCoord(p0, mvpMatrix);
-  p1 = XMVector3TransformCoord(p1, mvpMatrix);
-  p2 = XMVector3TransformCoord(p2, mvpMatrix);
-  p3 = XMVector3TransformCoord(p3, mvpMatrix);
-
-  std::array<XMFLOAT3, 4> corners;
-  XMStoreFloat3(&corners[0], p0);
-  XMStoreFloat3(&corners[1], p1);
-  XMStoreFloat3(&corners[2], p2);
-  XMStoreFloat3(&corners[3], p3);
-
-  // Calculate bounding box of the quad
-  XMFLOAT3 min = {std::numeric_limits<float>::max(),
-                  std::numeric_limits<float>::max(),
-                  std::numeric_limits<float>::max()};
-  XMFLOAT3 max = {std::numeric_limits<float>::min(),
-                  std::numeric_limits<float>::min(),
-                  std::numeric_limits<float>::min()};
-
-  XMFLOAT3 min2 = {-1.0f, -1.0f, 0.0f};
-  XMFLOAT3 max2 = {1.0f, 1.0f, 1.0f};
-
-  for (const auto &corner : corners) {
-    min.x = std::min(min.x, corner.x);
-    max.x = std::max(max.x, corner.x);
-    min.y = std::min(min.y, corner.y);
-    max.y = std::max(max.y, corner.y);
-    min.z = std::min(min.z, corner.z);
-    max.z = std::max(max.z, corner.z);
-  }
-  if (AreAABBsIntersecting(min, max, min2, max2)) {
-    return true;
-  }
-
-  if (IsAABBContained(min, max, min2, max2) ||
-      IsAABBContained(min2, max2, min, max)) {
-    return true;
-  }
-
-  return false;
+  return aabb.isOnFrustum(f, mMatrix);
 }
 void QuadTree::BuildRecursively(const uint index, const float yCoordinate,
                                 const float3 camEye,
                                 const float distanceThreshold,
-                                const Depth depth, const XMMATRIX &mvpMatrix) {
+                                const Depth depth, const Frustum &f,
+                                const XMMATRIX &mMatrix) {
   if (depth > height)
     height = depth;
   if (depth > maxDepth) {
@@ -274,7 +202,7 @@ void QuadTree::BuildRecursively(const uint index, const float yCoordinate,
   // distanceThreshold;
   //  bool cont = dist < distanceThreshold;
   if ((cont || depth < minDepth) &&
-      IsInViewFrustum(node, yCoordinate, mvpMatrix)) {
+      IsInViewFrustum(node, yCoordinate, f, mMatrix)) {
     for (uint i = 0; i < 4; i++) {
       uint id = count;
       auto &node2 = nodes[index];
@@ -284,8 +212,8 @@ void QuadTree::BuildRecursively(const uint index, const float yCoordinate,
       curr.parent = index;
       curr.size = node2.size / 2;
       curr.center = node2.center + Node::childDirections[i] * (curr.size / 2);
-      BuildRecursively(id, yCoordinate, camEye, distanceThreshold, depth + 1,
-                       mvpMatrix);
+      BuildRecursively(id, yCoordinate, camEye, distanceThreshold, depth + 1, f,
+                       mMatrix);
     }
   }
 }

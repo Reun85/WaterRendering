@@ -182,7 +182,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     HullShader hullShader{app_folder() / L"hullShader.cso"};
     DomainShader domainShader{app_folder() / L"domainShader.cso"};
 
-    RasterizerFlags rasterizerFlags = RasterizerFlags::CullClockwise;
+    RasterizerFlags rasterizerFlags = RasterizerFlags::Wireframe;
 
     GraphicsPipelineStateDefinition graphicsPipelineStateDefinition{
         .RootSignature = &simpleRootSignature,
@@ -625,14 +625,11 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         XMVECTOR camEye = cam.GetEye();
         XMStoreFloat3(&camUsedPos, camEye);
 
-        XMMATRIX mvpMatrix = XMMatrixTranspose(
-            modelMatrix * cam.GetViewMatrix() * cam.GetProj());
-
         auto start = std::chrono::high_resolution_clock::now();
 
         qt.Build(center, fullSizeXZ,
-                 float3(camUsedPos.x, camUsedPos.y, camUsedPos.z), mvpMatrix,
-                 settings.distanceThreshold);
+                 float3(camUsedPos.x, camUsedPos.y, camUsedPos.z),
+                 cam.GetFrustum(), modelMatrix, settings.distanceThreshold);
 
         QuadTreeBuildTime +=
             std::chrono::duration_cast<decltype(QuadTreeBuildTime)>(
