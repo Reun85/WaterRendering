@@ -32,7 +32,6 @@ constexpr bool divides_within_eps(float a, float b, float epsilon) noexcept {
   float diff = back > 0 ? back : -back;
   return diff < epsilon;
 }
-
 struct Defaults {
 public:
   struct Cam {
@@ -84,11 +83,11 @@ public:
 
     QUALIFIER f32 gravity = 9.81f;
 
-    QUALIFIER f32 WindForce = 30 * 6.f;
+    QUALIFIER f32 WindForce = 3 * 6.f;
     QUALIFIER float2 WindDirection = float2(-0.4f, -0.9f);
 
     // A constant that scales the waves
-    QUALIFIER f32 Amplitude = 0.45e-6f;
+    QUALIFIER f32 Amplitude = 0.75e-3f;
 
     QUALIFIER f32 timeStep = 1.0f / 60.0f;
     static_assert(isPowerOfTwo(N));

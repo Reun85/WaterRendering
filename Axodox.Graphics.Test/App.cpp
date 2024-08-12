@@ -79,7 +79,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   static void SetUpWindowInput(const CoreWindow &window,
                                RuntimeSettings &settings, bool &quit,
                                Camera &cam) {
-
     bool &timerunning = settings.timeRunning;
     window.KeyDown([&cam, &quit, &timerunning](CoreWindow const &,
                                                KeyEventArgs const &args) {
@@ -182,7 +181,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     HullShader hullShader{app_folder() / L"hullShader.cso"};
     DomainShader domainShader{app_folder() / L"domainShader.cso"};
 
-    RasterizerFlags rasterizerFlags = RasterizerFlags::Wireframe;
+    RasterizerFlags rasterizerFlags = RasterizerFlags::CullClockwise;
 
     GraphicsPipelineStateDefinition graphicsPipelineStateDefinition{
         .RootSignature = &simpleRootSignature,
@@ -251,6 +250,17 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         pipelineStateProvider
             .CreatePipelineStateAsync(gradientRootStateDefinition)
             .get();
+    RootSignature<SimulationStage::FoamDecayDescription>
+        foamDecayRootDescription{device};
+    ComputeShader foamDecay{app_folder() / L"foamDecay.cso"};
+    ComputePipelineStateDefinition foamDecayRootStateDefinition{
+        .RootSignature = &foamDecayRootDescription,
+        .ComputeShader = &foamDecay,
+    };
+    auto foamDecayPipelineState =
+        pipelineStateProvider
+            .CreatePipelineStateAsync(foamDecayRootStateDefinition)
+            .get();
 
     // Group together allocations
     GroupedResourceAllocator groupedResourceAllocator{device};
@@ -266,13 +276,19 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     u32 N = Defaults::Simulation::N;
     std::random_device rd;
-    SimulationStage::ConstantGpuSources simulationSources{
+    SimulationStage::ConstantGpuSources simulationConstantSources{
         .Tildeh0 = ImmutableTextureFromData<std::complex<f32>>(
             immutableAllocationContext, Format::R32G32_Float, N, N, 0u,
             CalculateTildeh0FromDefaults<f32>(rd, N, N)),
         .Frequencies = ImmutableTextureFromData<f32>(
             immutableAllocationContext, Format::R32_Float, N, N, 0u,
             CalculateFrequenciesFromDefaults<f32>(N, N))};
+
+    SimulationStage::GpuSources simulationSources{
+        .Foam = MutableTexture(
+            immutableAllocationContext,
+            TextureDefinition::TextureDefinition(
+                Format::R32G32_Float, N, N, 0, TextureFlags::UnorderedAccess))};
 
     ImmutableMesh planeMesh{immutableAllocationContext, CreateQuadPatch()};
 
@@ -387,18 +403,20 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         computeAllocator.Reset();
         computeAllocator.BeginList();
         commonDescriptorHeap.Set(computeAllocator);
+        SimulationStage::TimeData timeConstants{.deltaTime = deltaTime,
+                                                .timeSinceLaunch = gameTime};
+        GpuVirtualAddress timeDataBuffer =
+            simResource.DynamicBuffer.AddBuffer(timeConstants);
         // Spektrums
         {
-          SimulationStage::SpektrumRootDescription::InputConstants constant{};
-          constant.time = gameTime;
-
           spektrumPipelineState.Apply(computeAllocator);
           auto mask = spektrumRootDescription.Set(computeAllocator,
                                                   RootSignatureUsage::Compute);
           // Inputs
-          mask.InputBuffer = simResource.DynamicBuffer.AddBuffer(constant);
-          mask.Tildeh0 = simulationSources.Tildeh0;
-          mask.Frequencies = simulationSources.Frequencies;
+          mask.timeDataBuffer = timeDataBuffer;
+
+          mask.Tildeh0 = simulationConstantSources.Tildeh0;
+          mask.Frequencies = simulationConstantSources.Frequencies;
 
           // Outputs
           mask.Tildeh = *simResource.tildeh.UnorderedAccess(computeAllocator);
@@ -477,6 +495,24 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
                                     (sizeY + yGroupSize - 1) / yGroupSize, 1);
         }
+        // Foam Calculations
+        {
+          foamDecayPipelineState.Apply(computeAllocator);
+          auto mask = foamDecayRootDescription.Set(computeAllocator,
+                                                   RootSignatureUsage::Compute);
+
+          mask.Gradients =
+              *simResource.gradients.UnorderedAccess(computeAllocator);
+
+          mask.Foam = *simulationSources.Foam.UnorderedAccess();
+
+          const auto xGroupSize = 16;
+          const auto yGroupSize = 16;
+          const auto sizeX = N;
+          const auto sizeY = N;
+          computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
+                                    (sizeY + yGroupSize - 1) / yGroupSize, 1);
+        }
         // Upload queue
         {
           PIXScopedEvent(computeQueue.get(), 0, "asdadwadsdawddawdsdzxc");
@@ -543,7 +579,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         std::optional<GpuVirtualAddress> usedTexture;
         // Debug stuff
         {
-
           pixelConstants.swizzleorder = settings.swizzleorder;
 
           domainConstants.useDisplacement = 1;
@@ -556,10 +591,10 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             break;
 
           case RuntimeSettings::Mode::Tildeh0:
-            usedTexture = simulationSources.Tildeh0;
+            usedTexture = simulationConstantSources.Tildeh0;
             break;
           case RuntimeSettings::Mode::Frequencies:
-            usedTexture = simulationSources.Frequencies;
+            usedTexture = simulationConstantSources.Frequencies;
             break;
           case RuntimeSettings::Mode::Tildeh:
             usedTexture = *drawingSimResource.tildeh.ShaderResource(allocator);
@@ -654,7 +689,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           drawnNodes++;
 
           {
-
             vertexConstants.instanceData[instanceCount].scaling = {it->size.x,
                                                                    it->size.y};
             vertexConstants.instanceData[instanceCount].offset = {it->center.x,
@@ -680,7 +714,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
           instanceCount++;
           if (instanceCount == Defaults::App::maxInstances) {
-
             auto mask = simpleRootSignature.Set(allocator,
                                                 RootSignatureUsage::Graphics);
 
@@ -706,7 +739,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           start = std::chrono::high_resolution_clock::now();
         }
         if (instanceCount != 0) {
-
           auto mask =
               simpleRootSignature.Set(allocator, RootSignatureUsage::Graphics);
 
@@ -905,6 +937,18 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
       // Present frame
       swapChain.Present();
+    }
+    // Wait until everything is done
+
+    for (auto &frameResource : frameResources) {
+      if (frameResource.Marker) {
+        frameResource.Fence.Await(frameResource.Marker);
+      }
+    }
+    for (auto &drawingSimResource : simulationResources) {
+      if (drawingSimResource.FrameDoneMarker) {
+        drawingSimResource.Fence.Await(drawingSimResource.FrameDoneMarker);
+      }
     }
     ImGui_ImplDX12_Shutdown();
     ImGui_ImplUwp_Shutdown();

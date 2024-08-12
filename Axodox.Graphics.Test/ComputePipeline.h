@@ -1,4 +1,3 @@
-
 #pragma once
 #include "pch.h"
 #include "Camera.h"
@@ -28,14 +27,15 @@ using namespace DirectX;
 using namespace DirectX::PackedVector;
 
 struct SimulationStage {
+  struct TimeData {
+    float deltaTime;
+    float timeSinceLaunch;
+  };
   struct SpektrumRootDescription : public RootSignatureMask {
     // In
     RootDescriptorTable<1> Tildeh0;
     RootDescriptorTable<1> Frequencies;
-    struct InputConstants {
-      float time;
-    };
-    RootDescriptor<RootDescriptorType::ConstantBuffer> InputBuffer;
+    RootDescriptor<RootDescriptorType::ConstantBuffer> timeDataBuffer;
     // Out
     RootDescriptorTable<1> Tildeh;
     RootDescriptorTable<1> TildeD;
@@ -44,7 +44,7 @@ struct SimulationStage {
         : RootSignatureMask(context),
           Tildeh0(this, {DescriptorRangeType::ShaderResource, 0}),
           Frequencies(this, {DescriptorRangeType::ShaderResource, 1}),
-          InputBuffer(this, {0}),
+          timeDataBuffer(this, {0}),
           Tildeh(this, {DescriptorRangeType::UnorderedAccess, 0}),
           TildeD(this, {DescriptorRangeType::UnorderedAccess, 1}) {
       Flags = RootSignatureFlags::None;
@@ -88,6 +88,21 @@ struct SimulationStage {
         : RootSignatureMask(context),
           Displacement(this, {DescriptorRangeType::ShaderResource, 0}),
           Output(this, {DescriptorRangeType::UnorderedAccess, 0}) {
+      Flags = RootSignatureFlags::None;
+    }
+  };
+  struct FoamDecayDescription : public RootSignatureMask {
+    // In-Out
+    RootDescriptorTable<1> Gradients;
+    // In
+    RootDescriptorTable<1> Foam;
+    RootDescriptor<RootDescriptorType::ConstantBuffer> timeBuffer;
+
+    explicit FoamDecayDescription(const RootSignatureContext &context)
+        : RootSignatureMask(context),
+          Gradients(this, {DescriptorRangeType::UnorderedAccess, 0}),
+          Foam(this, {DescriptorRangeType::UnorderedAccess, 1}),
+          timeBuffer(this, {0}) {
       Flags = RootSignatureFlags::None;
     }
   };
@@ -155,5 +170,8 @@ struct SimulationStage {
     ImmutableTexture Tildeh0;
     ImmutableTexture Frequencies;
     // ImmutableTexture PerlinNoise;
+  };
+  struct GpuSources {
+    MutableTexture Foam;
   };
 };
