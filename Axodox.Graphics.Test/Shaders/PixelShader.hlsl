@@ -65,9 +65,10 @@ float4 main(input_t input) : SV_TARGET
     //if (input.localPos.x < 0 == sunDir.x < 0 && input.localPos.z < 0 == sunDir.z < 0)
     //{
     //    return float4(1, 0, 0, 1);
-    //}n
+    //}
      
     float4 grad = _gradients.Sample(_sampler, input.TextureCoord);
+    return float4(grad.www, 1);
 
     float3 normal = normalize(grad.xyz);
 	
@@ -95,7 +96,7 @@ float4 main(input_t input) : SV_TARGET
     float3 lighting = Ambient + Diffuse + Specular;
     float3 baseColor = waterColor;
     float foam= grad.w ;
-    const float3 foamColor = float3(10, 10, 10);
+    const float3 foamColor = 0.2*float3(1, 1, 1);
 
     baseColor += foam * foamColor;
     float3 ret = baseColor * lighting;

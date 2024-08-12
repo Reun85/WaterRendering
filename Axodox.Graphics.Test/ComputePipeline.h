@@ -113,62 +113,78 @@ struct SimulationStage {
     CommandFenceMarker FrameDoneMarker;
     DynamicBufferManager DynamicBuffer;
 
-    MutableTextureWithState tildeh;
-    MutableTextureWithState tildeD;
 #define useDifferentFFTOutputBuffers true
+    struct LODData {
+      MutableTextureWithState tildeh;
+      MutableTextureWithState tildeD;
 #if useDifferentFFTOutputBuffers
-    MutableTextureWithState FFTTildeh;
-    MutableTextureWithState FFTTildeD;
+      MutableTextureWithState FFTTildeh;
+      MutableTextureWithState FFTTildeD;
 #else
-    MutableTextureWithState &FFTTildeh = tildeh;
-    MutableTextureWithState &FFTTildeD = tildeD;
+      MutableTextureWithState &FFTTildeh = tildeh;
+      MutableTextureWithState &FFTTildeD = tildeD;
 #endif
-    MutableTextureWithState tildehBuffer;
-    MutableTextureWithState tildeDBuffer;
+      MutableTextureWithState tildehBuffer;
+      MutableTextureWithState tildeDBuffer;
+      MutableTextureWithState DisplacementMap;
+      MutableTextureWithState gradients;
 
-    MutableTextureWithState finalDisplacementMap;
-    MutableTextureWithState gradients;
+      LODData(const ResourceAllocationContext &context, const u32 N,
+              const u32 M)
+          : tildeh(context, TextureDefinition::TextureDefinition(
+                                Format::R32G32_Float, N, M, 0,
+                                TextureFlags::UnorderedAccess)),
+            tildeD(context, TextureDefinition::TextureDefinition(
+                                Format::R32G32_Float, N, M, 0,
+                                TextureFlags::UnorderedAccess)),
+#if useDifferentFFTOutputBuffers
+            FFTTildeh(context, TextureDefinition::TextureDefinition(
+                                   Format::R32G32_Float, N, M, 0,
+                                   TextureFlags::UnorderedAccess)),
+            FFTTildeD(context, TextureDefinition::TextureDefinition(
+                                   Format::R32G32_Float, N, M, 0,
+                                   TextureFlags::UnorderedAccess)),
+#endif
+            tildehBuffer(context, TextureDefinition::TextureDefinition(
+                                      Format::R32G32_Float, N, M, 0,
+                                      TextureFlags::UnorderedAccess)),
+            tildeDBuffer(context, TextureDefinition::TextureDefinition(
+                                      Format::R32G32_Float, N, M, 0,
+                                      TextureFlags::UnorderedAccess)),
+            DisplacementMap(context, TextureDefinition::TextureDefinition(
+                                         Format::R32G32B32A32_Float, N, M, 0,
+                                         TextureFlags::UnorderedAccess)),
+            gradients(context, TextureDefinition::TextureDefinition(
+                                   Format::R16G16B16A16_Float, N, M, 0,
+                                   TextureFlags::UnorderedAccess)) {
+      }
+    };
+
+    LODData Highest;
+    LODData Medium;
+    LODData Lowest;
+    const std::array<const LODData *const, 3> LODs = {&Highest, &Medium,
+                                                      &Lowest};
 
     explicit SimulationResources(const ResourceAllocationContext &context,
                                  const u32 N, const u32 M)
         : Allocator(*context.Device),
 
           Fence(*context.Device), DynamicBuffer(*context.Device),
-          tildeh(context, TextureDefinition::TextureDefinition(
-                              Format::R32G32_Float, N, M, 0,
-                              TextureFlags::UnorderedAccess)),
-          tildeD(context, TextureDefinition::TextureDefinition(
-                              Format::R32G32_Float, N, M, 0,
-                              TextureFlags::UnorderedAccess)),
-#if useDifferentFFTOutputBuffers
-          FFTTildeh(context, TextureDefinition::TextureDefinition(
-                                 Format::R32G32_Float, N, M, 0,
-                                 TextureFlags::UnorderedAccess)),
-          FFTTildeD(context, TextureDefinition::TextureDefinition(
-                                 Format::R32G32_Float, N, M, 0,
-                                 TextureFlags::UnorderedAccess)),
-#endif
-          tildehBuffer(context, TextureDefinition::TextureDefinition(
-                                    Format::R32G32_Float, N, M, 0,
-                                    TextureFlags::UnorderedAccess)),
-          tildeDBuffer(context, TextureDefinition::TextureDefinition(
-                                    Format::R32G32_Float, N, M, 0,
-                                    TextureFlags::UnorderedAccess)),
-          finalDisplacementMap(context, TextureDefinition::TextureDefinition(
-                                            Format::R32G32B32A32_Float, N, M, 0,
-                                            TextureFlags::UnorderedAccess)),
-
-          gradients(context, TextureDefinition::TextureDefinition(
-                                 Format::R16G16B16A16_Float, N, M, 0,
-                                 TextureFlags::UnorderedAccess))
-
-    {
+          Highest(context, N, M), Medium(context, N, M), Lowest(context, N, M) {
     }
   };
 
   struct ConstantGpuSources {
-    ImmutableTexture Tildeh0;
-    ImmutableTexture Frequencies;
+    struct LODData {
+      ImmutableTexture Tildeh0;
+      ImmutableTexture Frequencies;
+    };
+    LODData Highest;
+    LODData Medium;
+    LODData Lowest;
+    const std::array<const LODData *const, 3> LODs = {&Highest, &Medium,
+                                                      &Lowest};
     // ImmutableTexture PerlinNoise;
   };
   struct GpuSources {
