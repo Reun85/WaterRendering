@@ -116,7 +116,7 @@ struct SimulationStage {
 #endif
       MutableTextureWithState tildehBuffer;
       MutableTextureWithState tildeDBuffer;
-      MutableTextureWithState DisplacementMap;
+      MutableTextureWithState displacementMap;
       MutableTextureWithState gradients;
 
       LODData(const ResourceAllocationContext &context, const u32 N,
@@ -141,7 +141,7 @@ struct SimulationStage {
             tildeDBuffer(context, TextureDefinition::TextureDefinition(
                                       Format::R32G32_Float, N, M, 0,
                                       TextureFlags::UnorderedAccess)),
-            DisplacementMap(context, TextureDefinition::TextureDefinition(
+            displacementMap(context, TextureDefinition::TextureDefinition(
                                          Format::R32G32B32A32_Float, N, M, 0,
                                          TextureFlags::UnorderedAccess)),
             gradients(context, TextureDefinition::TextureDefinition(

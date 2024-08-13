@@ -294,9 +294,11 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     CoreDispatcher dispatcher = window.Dispatcher();
 
     GraphicsDevice device{};
-    CommandQueue directQueue{device};
+    CommandQueue graphicsQueue{device};
     CommandQueue computeQueue{device};
-    CoreSwapChain swapChain{directQueue, window,
+    computeQueue.get()->SetName(L"Compute Queue");
+    graphicsQueue.get()->SetName(L"Graphics Queue");
+    CoreSwapChain swapChain{graphicsQueue, window,
                             SwapChainFlags::IsShaderResource};
 
     PipelineStateProvider pipelineStateProvider{device};
@@ -451,16 +453,20 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         std::chrono::high_resolution_clock::now();
 
     NeedToDo beforeNextFrame;
+    beforeNextFrame.PatchHighestChanged = true;
     CommandFence beforeNextFence(device);
     std::vector<CommandFenceMarker> AdditionalMarkers;
 
     loopStartTime = std::chrono::high_resolution_clock::now();
+
     while (!settings.quit) {
       // Process user input
       dispatcher.ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
 
       // Get frame frameResource
       frameCounter++;
+      // Prev frames resources
+      auto &PREVframeResource = frameResources[(frameCounter + 1u) & 0x1u];
       // Current frames resources
       auto &frameResource = frameResources[frameCounter & 0x1u];
       // Simulation resources for drawing.
@@ -468,6 +474,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       // Simulation resources for calculating.
       auto &calculatingSimResource =
           simulationResources[(frameCounter + 1u) & 0x1u];
+
       auto renderTargetView = swapChain.RenderTargetView();
 
       std::optional<std::future<PipelineState>> newPipelineState;
@@ -501,6 +508,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         frameResource.Fence.Await(frameResource.Marker);
       if (drawingSimResource.FrameDoneMarker)
         drawingSimResource.Fence.Await(drawingSimResource.FrameDoneMarker);
+      // This is necessary for the compute queue
+      if (PREVframeResource.Marker)
+        PREVframeResource.Fence.Await(PREVframeResource.Marker);
 
       if (beforeNextFrame.changeFlag || newPipelineState) {
         graphicsPipelineState = newPipelineState->get();
@@ -553,61 +563,45 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         commonDescriptorHeap.Build();
       }
 
+      auto &computeAllocator = calculatingSimResource.Allocator;
+      computeAllocator.Reset();
+      computeAllocator.BeginList();
       if (newHighestData || newMediumData || newLowestData) {
-        auto &allocator = calculatingSimResource.Allocator;
-        allocator.BeginList();
-        auto copyRes = [&allocator](MutableTexture &src, MutableTexture &dst) {
-          allocator.TransitionResources(
-              {{src, ResourceStates::AllShaderResource,
-                ResourceStates::CopySource},
-               {dst, ResourceStates::AllShaderResource,
+        auto copyRes = [&computeAllocator](MutableTexture &src,
+                                           MutableTexture &dst) {
+          computeAllocator.TransitionResources(
+              {{src, ResourceStates::Common, ResourceStates::CopySource},
+               {dst, ResourceStates::NonPixelShaderResource,
                 ResourceStates::CopyDest}});
-          allocator.CopyResource(src, dst);
-          allocator.TransitionResources({{dst, ResourceStates::CopyDest,
-                                          ResourceStates::AllShaderResource}});
+          computeAllocator.CopyResource(src, dst);
+          computeAllocator.TransitionResources(
+              {{dst, ResourceStates::CopyDest,
+                ResourceStates::NonPixelShaderResource}});
         };
+        auto copyLOD =
+            [&copyRes](SimulationStage::ConstantGpuSources<>::LODData &src,
+                       SimulationStage::ConstantGpuSources<>::LODData &dst) {
+              copyRes(src.Tildeh0, dst.Tildeh0);
+              copyRes(src.Frequencies, dst.Frequencies);
+            };
         if (newHighestData) {
-
-          copyRes(newHighestData->Tildeh0,
-                  simulationConstantSources.Highest.Tildeh0);
-          copyRes(newHighestData->Frequencies,
-                  simulationConstantSources.Highest.Frequencies);
+          copyLOD(*newHighestData, simulationConstantSources.Highest);
+          beforeNextFrame.PatchHighestChanged = false;
         }
-        // if (newMediumData) {
-
-        //  allocator.CopyResource(newMediumData->Tildeh0,
-        //                         simulationConstantSources.Medium.Tildeh0);
-        //  allocator.CopyResource(newMediumData->Frequencies,
-        //                         simulationConstantSources.Medium.Frequencies);
-
-        //}
-        // if (newLowestData) {
-
-        //  allocator.CopyResource(newLowestData->Tildeh0,
-        //                         simulationConstantSources.Lowest.Tildeh0);
-        //  allocator.CopyResource(newLowestData->Frequencies,
-        //                         simulationConstantSources.Lowest.Frequencies);
-
-        //}
-        beforeNextFrame.PatchMediumChanged = false;
-        beforeNextFrame.PatchLowestChanged = false;
-        beforeNextFrame.PatchHighestChanged = false;
-        auto commandList = allocator.EndList();
-        computeQueue.Execute(commandList);
-        AdditionalMarkers.push_back(
-            beforeNextFence.EnqueueSignal(computeQueue));
+        if (newMediumData) {
+          copyLOD(*newMediumData, simulationConstantSources.Medium);
+          beforeNextFrame.PatchMediumChanged = false;
+        }
+        if (newLowestData) {
+          copyLOD(*newLowestData, simulationConstantSources.Lowest);
+          beforeNextFrame.PatchLowestChanged = false;
+        }
       }
-      for (CommandFenceMarker marker : AdditionalMarkers) {
-        marker.Await(directQueue);
-      }
-      AdditionalMarkers.clear();
       // Compute shader stage
       {
-        auto &simResource = calculatingSimResource;
-        auto &computeAllocator = simResource.Allocator;
 
-        computeAllocator.Reset();
-        computeAllocator.BeginList();
+        auto &simResource = calculatingSimResource;
+
         commonDescriptorHeap.Set(computeAllocator);
         GpuVirtualAddress timeDataBuffer =
             simResource.DynamicBuffer.AddBuffer(timeConstants);
@@ -688,23 +682,19 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
         // Calculate final displacements
         {
-          displacementPipelineState.Apply(computeAllocator);
-          auto mask = displacementRootDescription.Set(
-              computeAllocator, RootSignatureUsage::Compute);
-
           computeAllocator.AddUAVBarrier(
               *simResource.Highest.FFTTildeh.UnorderedAccess(computeAllocator));
           computeAllocator.AddUAVBarrier(
               *simResource.Highest.FFTTildeD.UnorderedAccess(computeAllocator));
-          computeAllocator.AddUAVBarrier(
-              *simResource.Highest.DisplacementMap.UnorderedAccess(
-                  computeAllocator));
+          displacementPipelineState.Apply(computeAllocator);
+          auto mask = displacementRootDescription.Set(
+              computeAllocator, RootSignatureUsage::Compute);
 
           mask.Height =
               *simResource.Highest.FFTTildeh.ShaderResource(computeAllocator);
           mask.Choppy =
               *simResource.Highest.FFTTildeD.ShaderResource(computeAllocator);
-          mask.Output = *simResource.Highest.DisplacementMap.UnorderedAccess(
+          mask.Output = *simResource.Highest.displacementMap.UnorderedAccess(
               computeAllocator);
 
           const auto xGroupSize = 16;
@@ -716,18 +706,17 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         }
 
         // Calculate gradients
-
-        /*{
+        {
           gradientPipelineState.Apply(computeAllocator);
           auto mask = gradientRootDescription.Set(computeAllocator,
                                                   RootSignatureUsage::Compute);
 
           computeAllocator.AddUAVBarrier(
-              *simResource.Highest.DisplacementMap.UnorderedAccess(
+              *simResource.Highest.displacementMap.UnorderedAccess(
                   computeAllocator));
 
           mask.Displacement =
-              *simResource.Highest.DisplacementMap.ShaderResource(
+              *simResource.Highest.displacementMap.ShaderResource(
                   computeAllocator);
           mask.Output =
               *simResource.Highest.gradients.UnorderedAccess(computeAllocator);
@@ -738,11 +727,11 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           const auto sizeY = N;
           computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
                                     (sizeY + yGroupSize - 1) / yGroupSize, 1);
-        }*/
+        }
 
         // Foam Calculations
 
-        /*{
+        {
           foamDecayPipelineState.Apply(computeAllocator);
           auto mask = foamDecayRootDescription.Set(computeAllocator,
                                                    RootSignatureUsage::Compute);
@@ -762,7 +751,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           const auto sizeY = N;
           computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
                                     (sizeY + yGroupSize - 1) / yGroupSize, 1);
-        }*/
+        }
 
         // Upload queue
         {
@@ -782,257 +771,274 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       }
 
       // Graphics Stage
-
-      auto &allocator = frameResource.Allocator;
       {
-        allocator.Reset();
-        allocator.BeginList();
-        allocator.TransitionResource(*renderTargetView, ResourceStates::Present,
-                                     ResourceStates::RenderTarget);
-
-        committedResourceAllocator.Build();
-        depthStencilDescriptorHeap.Build();
-
-        commonDescriptorHeap.Build();
-        commonDescriptorHeap.Set(allocator);
-        // Clears frame with background color
-        renderTargetView->Clear(allocator, settings.clearColor);
-        frameResource.DepthBuffer.DepthStencil()->Clear(allocator);
-      }
-      // Draw Ocean
-      RuntimeResults runtimeResults;
-
-      {
-        SimpleGraphicsRootDescription::VertexConstants vertexConstants{};
-        SimpleGraphicsRootDescription::HullConstants hullConstants{};
-        SimpleGraphicsRootDescription::DomainConstants domainConstants{};
-        SimpleGraphicsRootDescription::PixelConstants pixelConstants{};
-        SimpleGraphicsRootDescription::cameraConstants cameraConstants{};
-        SimpleGraphicsRootDescription::ModelConstants modelConstants{};
-
-        auto modelMatrix = XMMatrixIdentity();
-
-        XMStoreFloat3(&cameraConstants.cameraPos, cam.GetEye());
-        XMStoreFloat4x4(&cameraConstants.vMatrix,
-                        XMMatrixTranspose(cam.GetViewMatrix()));
-        XMStoreFloat4x4(&cameraConstants.pMatrix,
-                        XMMatrixTranspose(cam.GetProj()));
-        XMStoreFloat4x4(&cameraConstants.vpMatrix,
-                        XMMatrixTranspose(cam.GetViewProj()));
-
-        XMStoreFloat4x4(&modelConstants.mMatrix,
-                        XMMatrixTranspose(modelMatrix));
-
-        std::optional<GpuVirtualAddress> usedTexture;
-        // Debug stuff
+        auto &allocator = frameResource.Allocator;
         {
-          pixelConstants.swizzleorder = debugValues.swizzleorder;
+          allocator.Reset();
+          allocator.BeginList();
+          allocator.TransitionResource(*renderTargetView,
+                                       ResourceStates::Present,
+                                       ResourceStates::RenderTarget);
 
-          domainConstants.useDisplacement = 1;
-          pixelConstants.useTexture = 0;
+          committedResourceAllocator.Build();
+          depthStencilDescriptorHeap.Build();
 
-          switch (debugValues.mode) {
-          case DebugValues::Mode::Full:
-            pixelConstants.useTexture = 1;
-            domainConstants.useDisplacement = 0;
-            break;
-
-          case DebugValues::Mode::Displacement1:
-            usedTexture =
-                *drawingSimResource.Highest.DisplacementMap.ShaderResource(
-                    allocator);
-            break;
-          case DebugValues::Mode::Gradients1:
-            usedTexture =
-                *drawingSimResource.Highest.gradients.ShaderResource(allocator);
-            break;
-          }
-
-          pixelConstants.mult = debugValues.pixelMult;
+          commonDescriptorHeap.Build();
+          commonDescriptorHeap.Set(allocator);
+          // Clears frame with background color
+          renderTargetView->Clear(allocator, settings.clearColor);
+          frameResource.DepthBuffer.DepthStencil()->Clear(allocator);
         }
+        // Draw Ocean
+        RuntimeResults runtimeResults;
 
-        // Upload absolute contants
-        GpuVirtualAddress cameraConstantBuffer =
-            frameResource.DynamicBuffer.AddBuffer(cameraConstants);
-        GpuVirtualAddress domainConstantBuffer =
-            frameResource.DynamicBuffer.AddBuffer(domainConstants);
-        GpuVirtualAddress pixelConstantBuffer =
-            frameResource.DynamicBuffer.AddBuffer(pixelConstants);
+        {
+          SimpleGraphicsRootDescription::VertexConstants vertexConstants{};
+          SimpleGraphicsRootDescription::HullConstants hullConstants{};
+          SimpleGraphicsRootDescription::DomainConstants domainConstants{};
+          SimpleGraphicsRootDescription::PixelConstants pixelConstants{};
+          SimpleGraphicsRootDescription::cameraConstants cameraConstants{};
+          SimpleGraphicsRootDescription::ModelConstants modelConstants{};
 
-        GpuVirtualAddress modelBuffer =
-            frameResource.DynamicBuffer.AddBuffer(modelConstants);
+          auto modelMatrix = XMMatrixIdentity();
 
-        // Pre translate resources
-        GpuVirtualAddress displacementMap =
-            *drawingSimResource.Highest.DisplacementMap.ShaderResource(
-                allocator);
+          XMStoreFloat3(&cameraConstants.cameraPos, cam.GetEye());
+          XMStoreFloat4x4(&cameraConstants.vMatrix,
+                          XMMatrixTranspose(cam.GetViewMatrix()));
+          XMStoreFloat4x4(&cameraConstants.pMatrix,
+                          XMMatrixTranspose(cam.GetProj()));
+          XMStoreFloat4x4(&cameraConstants.vpMatrix,
+                          XMMatrixTranspose(cam.GetViewProj()));
 
-        GpuVirtualAddress gradients =
-            *drawingSimResource.Highest.gradients.ShaderResource(allocator);
+          XMStoreFloat4x4(&modelConstants.mMatrix,
+                          XMMatrixTranspose(modelMatrix));
 
-        float2 fullSizeXZ = {Defaults::App::oceanSize,
-                             Defaults::App::oceanSize};
-
-        float3 center = {0, 0, 0};
-        QuadTree qt;
-        XMFLOAT3 camUsedPos;
-        XMVECTOR camEye = cam.GetEye();
-        XMStoreFloat3(&camUsedPos, camEye);
-
-        auto start = std::chrono::high_resolution_clock::now();
-
-        qt.Build(center, fullSizeXZ,
-                 float3(camUsedPos.x, camUsedPos.y, camUsedPos.z),
-                 cam.GetFrustum(), modelMatrix,
-                 simData.quadTreeDistanceThreshold);
-
-        runtimeResults.QuadTreeBuildTime += std::chrono::duration_cast<
-            decltype(runtimeResults.QuadTreeBuildTime)>(
-            std::chrono::high_resolution_clock::now() - start);
-
-        runtimeResults.qtNodes += qt.GetSize();
-
-        // The best choice is to upload planeBottomLeft and planeTopRight and
-        // kinda of UV coordinate that can go outside [0,1] and the fract is
-        // the actual UV value.
-
-        u16 instanceCount = 0;
-
-        allocator.SetRenderTargets({renderTargetView},
-                                   frameResource.DepthBuffer.DepthStencil());
-        graphicsPipelineState.Apply(allocator);
-        start = std::chrono::high_resolution_clock::now();
-        for (auto it = qt.begin(); it != qt.end(); ++it) {
-          runtimeResults.NavigatingTheQuadTree += std::chrono::duration_cast<
-              decltype(runtimeResults.NavigatingTheQuadTree)>(
-              (std::chrono::high_resolution_clock::now() - start));
-          runtimeResults.drawnNodes++;
-
+          std::optional<GpuVirtualAddress> usedTextureAddress;
+          std::optional<MutableTextureWithState *> usedTexture;
+          // Debug stuff
           {
-            vertexConstants.instanceData[instanceCount].scaling = {it->size.x,
-                                                                   it->size.y};
-            vertexConstants.instanceData[instanceCount].offset = {it->center.x,
-                                                                  it->center.y};
-          }
-          {
-            start = std::chrono::high_resolution_clock::now();
+            pixelConstants.swizzleorder = debugValues.swizzleorder;
 
-            auto res = it.GetSmallerNeighbor();
+            domainConstants.useDisplacement = 1;
+            pixelConstants.useTexture = 0;
 
-            runtimeResults.NavigatingTheQuadTree += std::chrono::duration_cast<
-                decltype(runtimeResults.NavigatingTheQuadTree)>(
-                (std::chrono::high_resolution_clock::now() - start));
-            static const constexpr auto l = [](const float x) -> float {
-              if (x == 0)
-                return 1;
-              else
-                return x;
-            };
-            hullConstants.instanceData[instanceCount].TesselationFactor = {
-                l(res.zneg), l(res.xneg), l(res.zpos), l(res.xpos)};
-          }
+            switch (debugValues.mode) {
+            case DebugValues::Mode::Full:
+              pixelConstants.useTexture = 1;
+              domainConstants.useDisplacement = 0;
+              break;
 
-          instanceCount++;
-          if (instanceCount == Defaults::App::maxInstances) {
-            auto mask = simpleRootSignature.Set(allocator,
-                                                RootSignatureUsage::Graphics);
+            case DebugValues::Mode::Displacement1:
+              usedTexture = &drawingSimResource.Highest.displacementMap;
+              break;
+            case DebugValues::Mode::Gradients1:
+              usedTexture = &drawingSimResource.Highest.gradients;
+              break;
+            }
 
-            if (usedTexture)
-              mask.texture = *usedTexture;
+            if (usedTexture) {
+              usedTextureAddress = *(*usedTexture)->ShaderResource(allocator);
+            }
 
-            mask.heightMapForDomain = displacementMap;
-            mask.gradientsForPixel = gradients;
-
-            mask.hullBuffer =
-                frameResource.DynamicBuffer.AddBuffer(hullConstants);
-            mask.vertexBuffer =
-                frameResource.DynamicBuffer.AddBuffer(vertexConstants);
-            mask.domainBuffer = domainConstantBuffer;
-            mask.pixelBuffer = pixelConstantBuffer;
-            mask.cameraBuffer = cameraConstantBuffer;
-            mask.modelBuffer = modelBuffer;
-
-            planeMesh.Draw(allocator, instanceCount);
-            instanceCount = 0;
+            pixelConstants.mult = debugValues.pixelMult;
           }
 
+          // Upload absolute contants
+          GpuVirtualAddress cameraConstantBuffer =
+              frameResource.DynamicBuffer.AddBuffer(cameraConstants);
+          GpuVirtualAddress domainConstantBuffer =
+              frameResource.DynamicBuffer.AddBuffer(domainConstants);
+          GpuVirtualAddress pixelConstantBuffer =
+              frameResource.DynamicBuffer.AddBuffer(pixelConstants);
+
+          GpuVirtualAddress modelBuffer =
+              frameResource.DynamicBuffer.AddBuffer(modelConstants);
+
+          // Pre translate resources
+          GpuVirtualAddress displacementMapAddress =
+              *drawingSimResource.Highest.displacementMap.ShaderResource(
+                  allocator);
+
+          GpuVirtualAddress gradientsAddress =
+              *drawingSimResource.Highest.gradients.ShaderResource(allocator);
+
+          float2 fullSizeXZ = {Defaults::App::oceanSize,
+                               Defaults::App::oceanSize};
+
+          float3 center = {0, 0, 0};
+          QuadTree qt;
+          XMFLOAT3 camUsedPos;
+          XMVECTOR camEye = cam.GetEye();
+          XMStoreFloat3(&camUsedPos, camEye);
+
+          auto start = std::chrono::high_resolution_clock::now();
+
+          qt.Build(center, fullSizeXZ,
+                   float3(camUsedPos.x, camUsedPos.y, camUsedPos.z),
+                   cam.GetFrustum(), modelMatrix,
+                   simData.quadTreeDistanceThreshold);
+
+          runtimeResults.QuadTreeBuildTime += std::chrono::duration_cast<
+              decltype(runtimeResults.QuadTreeBuildTime)>(
+              std::chrono::high_resolution_clock::now() - start);
+
+          runtimeResults.qtNodes += qt.GetSize();
+
+          // The best choice is to upload planeBottomLeft and planeTopRight and
+          // kinda of UV coordinate that can go outside [0,1] and the fract is
+          // the actual UV value.
+
+          u16 instanceCount = 0;
+
+          allocator.SetRenderTargets({renderTargetView},
+                                     frameResource.DepthBuffer.DepthStencil());
+          graphicsPipelineState.Apply(allocator);
           start = std::chrono::high_resolution_clock::now();
-        }
-        if (instanceCount != 0) {
-          auto mask =
-              simpleRootSignature.Set(allocator, RootSignatureUsage::Graphics);
+          // Draw calls
+          {
+            for (auto it = qt.begin(); it != qt.end(); ++it) {
+              runtimeResults.NavigatingTheQuadTree +=
+                  std::chrono::duration_cast<
+                      decltype(runtimeResults.NavigatingTheQuadTree)>(
+                      (std::chrono::high_resolution_clock::now() - start));
+              runtimeResults.drawnNodes++;
 
+              {
+                vertexConstants.instanceData[instanceCount].scaling = {
+                    it->size.x, it->size.y};
+                vertexConstants.instanceData[instanceCount].offset = {
+                    it->center.x, it->center.y};
+              }
+              {
+                start = std::chrono::high_resolution_clock::now();
+
+                auto res = it.GetSmallerNeighbor();
+
+                runtimeResults.NavigatingTheQuadTree +=
+                    std::chrono::duration_cast<
+                        decltype(runtimeResults.NavigatingTheQuadTree)>(
+                        (std::chrono::high_resolution_clock::now() - start));
+                static const constexpr auto l = [](const float x) -> float {
+                  if (x == 0)
+                    return 1;
+                  else
+                    return x;
+                };
+                hullConstants.instanceData[instanceCount].TesselationFactor = {
+                    l(res.zneg), l(res.xneg), l(res.zpos), l(res.xpos)};
+              }
+
+              instanceCount++;
+              if (instanceCount == Defaults::App::maxInstances) {
+                auto mask = simpleRootSignature.Set(
+                    allocator, RootSignatureUsage::Graphics);
+
+                if (usedTextureAddress)
+                  mask.texture = *usedTextureAddress;
+
+                mask.heightMapForDomain = displacementMapAddress;
+                mask.gradientsForPixel = gradientsAddress;
+
+                mask.hullBuffer =
+                    frameResource.DynamicBuffer.AddBuffer(hullConstants);
+                mask.vertexBuffer =
+                    frameResource.DynamicBuffer.AddBuffer(vertexConstants);
+                mask.domainBuffer = domainConstantBuffer;
+                mask.pixelBuffer = pixelConstantBuffer;
+                mask.cameraBuffer = cameraConstantBuffer;
+                mask.modelBuffer = modelBuffer;
+
+                planeMesh.Draw(allocator, instanceCount);
+                instanceCount = 0;
+              }
+
+              start = std::chrono::high_resolution_clock::now();
+            }
+            if (instanceCount != 0) {
+              auto mask = simpleRootSignature.Set(allocator,
+                                                  RootSignatureUsage::Graphics);
+
+              if (usedTextureAddress)
+                mask.texture = *usedTextureAddress;
+
+              mask.heightMapForDomain = displacementMapAddress;
+              mask.gradientsForPixel = gradientsAddress;
+
+              mask.hullBuffer =
+                  frameResource.DynamicBuffer.AddBuffer(hullConstants);
+              mask.vertexBuffer =
+                  frameResource.DynamicBuffer.AddBuffer(vertexConstants);
+              mask.domainBuffer = domainConstantBuffer;
+              mask.pixelBuffer = pixelConstantBuffer;
+              mask.cameraBuffer = cameraConstantBuffer;
+              mask.modelBuffer = modelBuffer;
+
+              planeMesh.Draw(allocator, instanceCount);
+              instanceCount = 0;
+            }
+          }
+
+          // Retransition simulation resources
+
+          drawingSimResource.Highest.gradients.UnorderedAccess(allocator);
+          drawingSimResource.Highest.displacementMap.UnorderedAccess(allocator);
           if (usedTexture)
-            mask.texture = *usedTexture;
-
-          mask.heightMapForDomain = displacementMap;
-          mask.gradientsForPixel = gradients;
-
-          mask.hullBuffer =
-              frameResource.DynamicBuffer.AddBuffer(hullConstants);
-          mask.vertexBuffer =
-              frameResource.DynamicBuffer.AddBuffer(vertexConstants);
-          mask.domainBuffer = domainConstantBuffer;
-          mask.pixelBuffer = pixelConstantBuffer;
-          mask.cameraBuffer = cameraConstantBuffer;
-          mask.modelBuffer = modelBuffer;
-
-          planeMesh.Draw(allocator, instanceCount);
-          instanceCount = 0;
+            (*usedTexture)->UnorderedAccess(allocator);
         }
-      }
 
-      auto CPURenderEnd = std::chrono::high_resolution_clock::now();
-      runtimeResults.CPUTime = CPURenderEnd - frameStart;
-      // ImGUI
-      {
-        ImGui_ImplDX12_NewFrame();
-        ImGui_ImplUwp_NewFrame();
-        ImGui::NewFrame();
+        auto CPURenderEnd = std::chrono::high_resolution_clock::now();
+        runtimeResults.CPUTime = CPURenderEnd - frameStart;
+        // ImGUI
+        {
+          ImGui_ImplDX12_NewFrame();
+          ImGui_ImplUwp_NewFrame();
+          ImGui::NewFrame();
 
-        if (ImGui::Begin("Application")) {
-          ImGui::Text("Press ESC to quit");
-          ImGui::Text("Press Space to stop time");
-          ImGui::Text("frameID = %d", frameCounter);
-          ImGui::Text(
-              "Since start %.3f s",
-              GetDurationInFloatWithPrecision<std::chrono::seconds,
-                                              std::chrono::milliseconds>(
-                  getTimeSinceStart()));
-          ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
-                      1000.0f / io.Framerate, io.Framerate);
-          settings.DrawImGui(beforeNextFrame);
+          if (ImGui::Begin("Application")) {
+            ImGui::Text("Press ESC to quit");
+            ImGui::Text("Press Space to stop time");
+            ImGui::Text("frameID = %d", frameCounter);
+            ImGui::Text(
+                "Since start %.3f s",
+                GetDurationInFloatWithPrecision<std::chrono::seconds,
+                                                std::chrono::milliseconds>(
+                    getTimeSinceStart()));
+            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
+                        1000.0f / io.Framerate, io.Framerate);
+            settings.DrawImGui(beforeNextFrame);
 
-          runtimeResults.DrawImGui(false);
-          cam.DrawImGui(false);
-          debugValues.DrawImGui(beforeNextFrame);
+            runtimeResults.DrawImGui(false);
+            cam.DrawImGui(false);
+            debugValues.DrawImGui(beforeNextFrame);
+          }
+          ImGui::End();
+          simData.DrawImGui(beforeNextFrame);
+
+          ImGui::Render();
+
+          allocator->SetDescriptorHeaps(1, &ImGuiDescriptorHeap);
+
+          ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(),
+                                        allocator.operator->());
         }
-        ImGui::End();
-        simData.DrawImGui(beforeNextFrame);
 
-        ImGui::Render();
+        // End frame command list
+        {
+          allocator.TransitionResource(*renderTargetView,
+                                       ResourceStates::RenderTarget,
+                                       ResourceStates::Present);
+          auto drawCommandList = allocator.EndList();
 
-        allocator->SetDescriptorHeaps(1, &ImGuiDescriptorHeap);
+          allocator.BeginList();
+          frameResource.DynamicBuffer.UploadResources(allocator);
+          resourceUploader.UploadResourcesAsync(allocator);
+          auto initCommandList = allocator.EndList();
 
-        ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(),
-                                      allocator.operator->());
-      }
-
-      // End frame command list
-      {
-        allocator.TransitionResource(*renderTargetView,
-                                     ResourceStates::RenderTarget,
-                                     ResourceStates::Present);
-        auto drawCommandList = allocator.EndList();
-
-        allocator.BeginList();
-        frameResource.DynamicBuffer.UploadResources(allocator);
-        resourceUploader.UploadResourcesAsync(allocator);
-        auto initCommandList = allocator.EndList();
-
-        directQueue.Execute(initCommandList);
-        directQueue.Execute(drawCommandList);
-        frameResource.Marker = frameResource.Fence.EnqueueSignal(directQueue);
+          graphicsQueue.Execute(initCommandList);
+          graphicsQueue.Execute(drawCommandList);
+          frameResource.Marker =
+              frameResource.Fence.EnqueueSignal(graphicsQueue);
+        }
       }
 
       // Present frame
