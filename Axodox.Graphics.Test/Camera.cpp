@@ -271,3 +271,29 @@ void Camera::MouseWheel(const PointerEventArgs &wheel) {
       static_cast<float>(wheel.CurrentPoint().Properties().MouseWheelDelta()) *
       GetSpeed() / -300.0f);
 }
+
+void Camera::DrawImGui(bool exclusiveWindow) {
+
+  bool cont = true;
+  if (exclusiveWindow)
+    cont = ImGui::Begin("Camera");
+  if (cont) {
+
+    ImGui::Checkbox("Firstperson", &firstperson);
+
+    if (ImGui::InputFloat3("Cam eye ", (float *)&m_eye, "%.3f"))
+      SetView(m_eye, m_at, m_worldUp);
+
+    ImGui::SliderFloat("Cam speed", &m_speed, 0, 10);
+
+    if (!firstperson) {
+      if (ImGui::InputFloat3("Cam Look At ", (float *)&m_at, "%.3f"))
+        SetView(m_eye, m_at, m_worldUp);
+
+      ImGui::SliderFloat("Cam distance", &m_distance, 0, 100);
+    }
+  }
+  if (exclusiveWindow) {
+    ImGui::End();
+  }
+}

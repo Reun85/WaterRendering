@@ -59,6 +59,8 @@ public:
   void MouseMove(const PointerEventArgs &mouse);
   void MouseWheel(const PointerEventArgs &wheel);
 
+  void DrawImGui(bool exclusiveWindow = true);
+
 private:
   // Updates the UV.
   void UpdateUV(float du, float dv);

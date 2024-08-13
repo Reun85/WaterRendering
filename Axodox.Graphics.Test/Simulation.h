@@ -5,6 +5,39 @@
 #include "Defaults.h"
 #include <random>
 
+struct NeedToDo;
+
+struct SimulationData {
+  const u32 N;
+  const u32 M;
+  struct PatchData {
+    f32 patchSize;
+
+    const u32 &N;
+    const u32 &M;
+    const float2 &windDirection;
+    const f32 &WindForce;
+    const f32 &gravity;
+    const f32 &Amplitude;
+    const f32 &Depth;
+    bool DrawImGui();
+  };
+  float2 windDirection;
+  f32 WindForce;
+  f32 gravity;
+  f32 Amplitude;
+  f32 Depth;
+  PatchData Highest;
+  PatchData Medium;
+  PatchData Lowest;
+  float quadTreeDistanceThreshold =
+      Defaults::QuadTree::quadTreeDistanceThreshold;
+
+public:
+  void DrawImGui(NeedToDo &out, bool exclusiveWindow = true);
+  static SimulationData Default();
+};
+
 namespace Inner {
 template <typename Prec = f32>
   requires std::is_floating_point_v<Prec>
@@ -59,21 +92,10 @@ constexpr u32 Indexing(const u32 i, const u32 j, const u32 _, const u32 M) {
 };
 } // namespace Inner
 
-struct SimulationData {
-  u32 N;
-  u32 M;
-  float2 windDirection;
-  f32 WindForce;
-  f32 gravity;
-  f32 Amplitude;
-  f32 patchSize;
-  f32 Depth;
-};
-
 template <typename Prec = float>
   requires std::is_floating_point_v<Prec>
-std::vector<std::complex<Prec>> CalculateTildeh0(std::random_device &rd,
-                                                 const SimulationData &dat) {
+std::vector<std::complex<Prec>>
+CalculateTildeh0(const SimulationData::PatchData &dat) {
   const auto N = (i32)dat.N;
   const auto M = (i32)dat.M;
   const auto &wind = normalize(dat.windDirection);
@@ -82,6 +104,7 @@ std::vector<std::complex<Prec>> CalculateTildeh0(std::random_device &rd,
   const auto &Amplitude = dat.Amplitude;
   const auto &L = dat.patchSize;
 
+  std::random_device rd;
   std::mt19937 gen(rd());
   std::normal_distribution<Prec> dis(0, 1);
 
@@ -106,7 +129,8 @@ std::vector<std::complex<Prec>> CalculateTildeh0(std::random_device &rd,
 
 template <typename Prec = float>
   requires std::is_floating_point_v<Prec>
-constexpr std::vector<Prec> CalculateFrequencies(const SimulationData &dat) {
+constexpr std::vector<Prec>
+CalculateFrequencies(const SimulationData::PatchData &dat) {
   // w^2(k) = gktanh(kD)
   const auto &gravity = dat.gravity;
   const auto &D = dat.Depth;

@@ -4,7 +4,7 @@
 #include <fstream>
 #include <string.h>
 #include "Defaults.h"
-#include "WaterMath.h"
+#include "Simulation.h"
 #include "Helpers.h"
 #include "pix3.h"
 #include "ComputePipeline.h"
@@ -40,7 +40,30 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     // ?
   }
 
+  struct TimeData {
+    float deltaTime;
+    float timeSinceLaunch;
+  };
   struct RuntimeSettings {
+    bool timeRunning = true;
+    XMFLOAT4 clearColor = Defaults::App::clearColor;
+    bool quit = false;
+    void DrawImGui(NeedToDo &out, bool exclusiveWindow = false) {
+
+      bool cont = true;
+      if (exclusiveWindow)
+        cont = ImGui::Begin("Runtime Settings");
+      if (cont) {
+        ImGui::ColorEdit3("clear color", (float *)&clearColor);
+        ImGui::Checkbox("Time running", &timeRunning);
+      }
+      if (exclusiveWindow)
+        ImGui::End();
+    }
+  };
+
+  struct DebugValues {
+
     enum class Mode : u8 {
       Full = 0,
       Displacement1,
@@ -50,19 +73,140 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       Gradients2,
       Gradients3,
     };
-    bool firstPerson = Defaults::Cam::startFirstPerson;
-    bool timeRunning = true;
-    XMFLOAT4 clearColor = Defaults::App::clearColor;
+
     XMFLOAT4 pixelMult = XMFLOAT4(1, 1, 1, 1);
     Mode mode = Mode::Full;
     XMUINT4 swizzleorder = XMUINT4(0, 1, 2, 3);
-    float distanceThreshold = Defaults::QuadTree::distanceThreshold;
+    RasterizerFlags rasterizerFlags = RasterizerFlags::CullNone;
+    void DrawImGui(NeedToDo &out, bool exclusiveWindow = true) {
+
+      bool cont = true;
+      if (exclusiveWindow)
+        cont = ImGui::Begin("Debug Values");
+      if (cont) {
+
+        static const std::array<std::string, 7> modeitems = {
+            "Full",       "Displacement1", "Displacement2", "Displacement3",
+            "Gradients1", "Gradients2",    "Gradients3"};
+        if (ImGui::BeginCombo("Mode", modeitems[(u32)(mode)].c_str())) {
+          for (uint i = 0; i < modeitems.size(); i++) {
+            bool isSelected = ((u32)(mode) == i);
+            if (ImGui::Selectable(modeitems[i].c_str(), isSelected)) {
+              mode = Mode(i);
+              swizzleorder = XMUINT4(0, 1, 2, 3);
+            }
+            if (isSelected) {
+              ImGui::SetItemDefaultFocus();
+            }
+          }
+          ImGui::EndCombo();
+        }
+        if (mode != Mode::Full) {
+          ImGui::InputFloat4("Pixel Mult", (float *)&pixelMult);
+
+          static const std::array<std::string, 4> swizzleitems = {"r", "g", "b",
+                                                                  "a"};
+
+          const std::array<u32 *const, 4> vals = {
+              &swizzleorder.x, &swizzleorder.y, &swizzleorder.z,
+              &swizzleorder.w};
+          ImGui::Text("Swizzle");
+          for (int i = 0; i < 4; i++) {
+            const string id = "##Swizzle" + swizzleitems[i];
+            ImGui::Text("%s", swizzleitems[i].c_str());
+            ImGui::SameLine();
+
+            if (ImGui::BeginCombo(id.c_str(), swizzleitems[*vals[i]].c_str())) {
+              for (size_t j = 0; j < swizzleitems.size(); j++) {
+                bool isSelected = (*(vals[i]) == j);
+                if (ImGui::Selectable(swizzleitems[j].c_str(), isSelected)) {
+                  *vals[i] = j;
+                }
+                if (isSelected) {
+                  ImGui::SetItemDefaultFocus();
+                }
+              }
+              ImGui::EndCombo();
+            }
+          }
+        }
+
+        static const std::array<std::string, 3> items = {
+            "CullClockwise", "CullNone", "WireFrame"};
+        static uint itemsIndex =
+            rasterizerFlags == RasterizerFlags::CullNone
+                ? 1
+                : (rasterizerFlags == RasterizerFlags::CullClockwise ? 0 : 2);
+
+        if (ImGui::BeginCombo("Render State", items[itemsIndex].c_str())) {
+          for (uint i = 0; i < items.size(); i++) {
+            bool isSelected = (itemsIndex == i);
+            if (ImGui::Selectable(items[i].c_str(), isSelected)) {
+              itemsIndex = i;
+              switch (itemsIndex) {
+                using enum Axodox::Graphics::D3D12::RasterizerFlags;
+              case 1:
+                rasterizerFlags = CullNone;
+                break;
+              case 2:
+                rasterizerFlags = Wireframe;
+                break;
+              default:
+                rasterizerFlags = CullClockwise;
+                break;
+              }
+              out.changeFlag = rasterizerFlags;
+            }
+            if (isSelected) {
+              ImGui::SetItemDefaultFocus();
+            }
+          }
+          ImGui::EndCombo();
+        }
+      }
+      if (exclusiveWindow)
+        ImGui::End();
+    }
+  };
+
+  struct RuntimeResults {
+    uint qtNodes = 0;
+    uint drawnNodes = 0;
+    std::chrono::nanoseconds QuadTreeBuildTime{0};
+
+    std::chrono::nanoseconds NavigatingTheQuadTree{0};
+    std::chrono::nanoseconds CPUTime{0};
+    void DrawImGui(bool exclusiveWindow = false) {
+      bool cont = true;
+      if (exclusiveWindow)
+        cont = ImGui::Begin("Results");
+      if (cont) {
+
+        ImGui::Text("QuadTree Nodes = %d", qtNodes);
+
+        ImGui::Text("QuadTree buildtime %.3f ms/frame",
+                    GetDurationInFloatWithPrecision<std::chrono::milliseconds,
+                                                    std::chrono::nanoseconds>(
+                        QuadTreeBuildTime));
+        ImGui::Text("Navigating QuadTree %.3f ms/frame",
+                    GetDurationInFloatWithPrecision<std::chrono::milliseconds,
+                                                    std::chrono::nanoseconds>(
+                        NavigatingTheQuadTree));
+        ImGui::Text("Drawn Nodes: %d", drawnNodes);
+        ImGui::Text("CPU time %.3f ms/frame",
+                    GetDurationInFloatWithPrecision<std::chrono::milliseconds,
+                                                    std::chrono::nanoseconds>(
+                        (CPUTime)));
+      }
+      if (exclusiveWindow)
+        ImGui::End();
+    }
   };
 
   static void SetUpWindowInput(const CoreWindow &window,
-                               RuntimeSettings &settings, bool &quit,
-                               Camera &cam) {
+                               RuntimeSettings &settings, Camera &cam) {
     bool &timerunning = settings.timeRunning;
+    bool &quit = settings.quit;
     window.KeyDown([&cam, &quit, &timerunning](CoreWindow const &,
                                                KeyEventArgs const &args) {
       if (ImGui::GetIO().WantCaptureKeyboard)
@@ -129,10 +273,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     return ImGuiDescriptorHeap;
   }
 
-  struct NeedToDo {
-    std::optional<RasterizerFlags> changeFlag;
-  };
-
   void Run() const {
     CoreWindow window = CoreWindow::GetForCurrentThread();
     window.Activate();
@@ -142,13 +282,14 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         XMVectorSet(Defaults::Cam::camStartPos.x, Defaults::Cam::camStartPos.y,
                     Defaults::Cam::camStartPos.z, 0),
         XMVectorSet(0.0f, 0.0f, 0.0f, 0), XMVectorSet(0.0f, 1.0f, 0.0f, 0));
-    bool quit = false;
-    RuntimeSettings settings;
 
-    cam.SetFirstPerson(settings.firstPerson);
+    cam.SetFirstPerson(Defaults::Cam::startFirstPerson);
     // Events
 
-    SetUpWindowInput(window, settings, quit, cam);
+    RuntimeSettings settings;
+    DebugValues debugValues;
+
+    SetUpWindowInput(window, settings, cam);
 
     CoreDispatcher dispatcher = window.Dispatcher();
 
@@ -168,15 +309,13 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     HullShader hullShader{app_folder() / L"hullShader.cso"};
     DomainShader domainShader{app_folder() / L"domainShader.cso"};
 
-    RasterizerFlags rasterizerFlags = RasterizerFlags::CullNone;
-
     GraphicsPipelineStateDefinition graphicsPipelineStateDefinition{
         .RootSignature = &simpleRootSignature,
         .VertexShader = &simpleVertexShader,
         .DomainShader = &domainShader,
         .HullShader = &hullShader,
         .PixelShader = &simplePixelShader,
-        .RasterizerState = rasterizerFlags,
+        .RasterizerState = debugValues.rasterizerFlags,
         .DepthStencilState = DepthStencilMode::WriteDepth,
         .InputLayout = VertexPosition::Layout,
         .TopologyType = PrimitiveTopologyType::Patch,
@@ -188,8 +327,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             .get();
 
     // Compute pipeline
-
-    SimulationStage simulationStage;
 
     ComputeShader spektrum{app_folder() / L"Spektrums.cso"};
 
@@ -261,59 +398,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         .CommonDescriptorHeap = &commonDescriptorHeap,
         .DepthStencilDescriptorHeap = &depthStencilDescriptorHeap};
 
-    u32 N = Defaults::Simulation::N;
-
-    std::random_device rd;
-    SimulationData currData{.N = N,
-                            .M = N,
-                            .windDirection =
-                                Defaults::Simulation::WindDirection,
-                            .WindForce = Defaults::Simulation::WindForce,
-                            .gravity = Defaults::Simulation::gravity,
-                            .Amplitude = Defaults::Simulation::Amplitude,
-                            .patchSize = Defaults::Simulation::patchSize1,
-                            .Depth = Defaults::Simulation::Depth};
-    auto tildeh0_1 = CalculateTildeh0<f32>(rd, currData);
-    auto frequencies_1 = CalculateFrequencies<f32>(currData);
-    currData.patchSize = Defaults::Simulation::patchSize2;
-    auto tildeh0_2 = CalculateTildeh0<f32>(rd, currData);
-    auto frequencies_2 = CalculateFrequencies<f32>(currData);
-    currData.patchSize = Defaults::Simulation::patchSize3;
-    auto tildeh0_3 = CalculateTildeh0<f32>(rd, currData);
-    auto frequencies_3 = CalculateFrequencies<f32>(currData);
-
-    SimulationStage::ConstantGpuSources simulationConstantSources{
-        .Highest =
-            SimulationStage::ConstantGpuSources::LODData{
-                .Tildeh0 = ImmutableTextureFromData<std::complex<f32>>(
-                    immutableAllocationContext, Format::R32G32_Float, N, N, 0u,
-                    tildeh0_1),
-                .Frequencies = ImmutableTextureFromData<f32>(
-                    immutableAllocationContext, Format::R32_Float, N, N, 0u,
-                    frequencies_1)},
-
-        .Medium =
-            SimulationStage::ConstantGpuSources::LODData{
-                .Tildeh0 = ImmutableTextureFromData<std::complex<f32>>(
-                    immutableAllocationContext, Format::R32G32_Float, N, N, 0u,
-                    tildeh0_2),
-                .Frequencies = ImmutableTextureFromData<f32>(
-                    immutableAllocationContext, Format::R32_Float, N, N, 0u,
-                    frequencies_2)},
-
-        .Lowest = SimulationStage::ConstantGpuSources::LODData{
-            .Tildeh0 = ImmutableTextureFromData<std::complex<f32>>(
-                immutableAllocationContext, Format::R32G32_Float, N, N, 0u,
-                tildeh0_3),
-            .Frequencies = ImmutableTextureFromData<f32>(
-                immutableAllocationContext, Format::R32_Float, N, N, 0u,
-                frequencies_3)}};
-
-    SimulationStage::GpuSources simulationSources{
-        .Foam = MutableTexture(
-            immutableAllocationContext,
-            TextureDefinition::TextureDefinition(
-                Format::R32G32_Float, N, N, 0, TextureFlags::UnorderedAccess))};
+    SimulationData simData = SimulationData::Default();
 
     ImmutableMesh planeMesh{immutableAllocationContext, CreateQuadPatch()};
 
@@ -324,13 +409,22 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     CommittedResourceAllocator committedResourceAllocator{device};
     mutableAllocationContext.ResourceAllocator = &committedResourceAllocator;
 
+    SimulationStage::ConstantGpuSources simulationConstantSources(
+        mutableAllocationContext, simData);
+
+    SimulationStage::GpuSources simulationSources(mutableAllocationContext,
+                                                  simData);
+
     array<FrameResources, 2> frameResources{
         FrameResources(mutableAllocationContext),
         FrameResources(mutableAllocationContext)};
 
     array<SimulationStage::SimulationResources, 2> simulationResources{
-        SimulationStage::SimulationResources(mutableAllocationContext, N, N),
-        SimulationStage::SimulationResources(mutableAllocationContext, N, N)};
+        SimulationStage::SimulationResources(mutableAllocationContext,
+                                             simData.N, simData.M),
+        SimulationStage::SimulationResources(mutableAllocationContext,
+                                             simData.N, simData.M)};
+    const u32 &N = simData.N;
 
     swapChain.Resizing(
         no_revoke, [&frameResources, &commonDescriptorHeap](SwapChain const *) {
@@ -345,7 +439,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     // Time counter
     using SinceTimeStartTimeFrame = std::chrono::nanoseconds;
-    auto loopStartTime = std::chrono::high_resolution_clock::now();
+    decltype(std::chrono::high_resolution_clock::now()) loopStartTime;
     auto getTimeSinceStart = [&loopStartTime]() {
       return std::chrono::duration_cast<SinceTimeStartTimeFrame>(
           std::chrono::high_resolution_clock::now() - loopStartTime);
@@ -355,7 +449,13 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     auto frameCounter = 0u;
     std::chrono::steady_clock::time_point frameStart =
         std::chrono::high_resolution_clock::now();
-    while (!quit) {
+
+    NeedToDo beforeNextFrame;
+    CommandFence beforeNextFence(device);
+    std::vector<CommandFenceMarker> AdditionalMarkers;
+
+    loopStartTime = std::chrono::high_resolution_clock::now();
+    while (!settings.quit) {
       // Process user input
       dispatcher.ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
 
@@ -370,11 +470,42 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           simulationResources[(frameCounter + 1u) & 0x1u];
       auto renderTargetView = swapChain.RenderTargetView();
 
+      std::optional<std::future<PipelineState>> newPipelineState;
+      std::optional<SimulationStage::ConstantGpuSources<>::LODData>
+          newHighestData;
+      std::optional<SimulationStage::ConstantGpuSources<>::LODData>
+          newMediumData;
+      std::optional<SimulationStage::ConstantGpuSources<>::LODData>
+          newLowestData;
+      if (beforeNextFrame.changeFlag) {
+        graphicsPipelineStateDefinition.RasterizerState.Flags =
+            *beforeNextFrame.changeFlag;
+        newPipelineState = pipelineStateProvider.CreatePipelineStateAsync(
+            graphicsPipelineStateDefinition);
+      }
+      if (beforeNextFrame.PatchHighestChanged) {
+        newHighestData = SimulationStage::ConstantGpuSources<>::LODData(
+            mutableAllocationContext, simData.Highest);
+      }
+      if (beforeNextFrame.PatchMediumChanged) {
+        newMediumData = SimulationStage::ConstantGpuSources<>::LODData(
+            mutableAllocationContext, simData.Medium);
+      }
+      if (beforeNextFrame.PatchLowestChanged) {
+        newLowestData = SimulationStage::ConstantGpuSources<>::LODData(
+            mutableAllocationContext, simData.Lowest);
+      }
+
       // Wait until buffers can be used
       if (frameResource.Marker)
         frameResource.Fence.Await(frameResource.Marker);
       if (drawingSimResource.FrameDoneMarker)
         drawingSimResource.Fence.Await(drawingSimResource.FrameDoneMarker);
+
+      if (beforeNextFrame.changeFlag || newPipelineState) {
+        graphicsPipelineState = newPipelineState->get();
+        beforeNextFrame.changeFlag = std::nullopt;
+      }
 
       // Get DeltaTime
       float deltaTime;
@@ -388,6 +519,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           gameTime += deltaTime;
         }
       }
+      TimeData timeConstants{.deltaTime = settings.timeRunning ? deltaTime : 0,
+                             .timeSinceLaunch = gameTime};
 
       // Ensure depth buffer matches frame size
       if (!frameResource.DepthBuffer ||
@@ -420,6 +553,54 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         commonDescriptorHeap.Build();
       }
 
+      if (newHighestData || newMediumData || newLowestData) {
+        auto &allocator = calculatingSimResource.Allocator;
+        allocator.BeginList();
+        auto copyRes = [&allocator](MutableTexture &src, MutableTexture &dst) {
+          allocator.TransitionResources(
+              {{src, ResourceStates::AllShaderResource,
+                ResourceStates::CopySource},
+               {dst, ResourceStates::AllShaderResource,
+                ResourceStates::CopyDest}});
+          allocator.CopyResource(src, dst);
+          allocator.TransitionResources({{dst, ResourceStates::CopyDest,
+                                          ResourceStates::AllShaderResource}});
+        };
+        if (newHighestData) {
+
+          copyRes(newHighestData->Tildeh0,
+                  simulationConstantSources.Highest.Tildeh0);
+          copyRes(newHighestData->Frequencies,
+                  simulationConstantSources.Highest.Frequencies);
+        }
+        // if (newMediumData) {
+
+        //  allocator.CopyResource(newMediumData->Tildeh0,
+        //                         simulationConstantSources.Medium.Tildeh0);
+        //  allocator.CopyResource(newMediumData->Frequencies,
+        //                         simulationConstantSources.Medium.Frequencies);
+
+        //}
+        // if (newLowestData) {
+
+        //  allocator.CopyResource(newLowestData->Tildeh0,
+        //                         simulationConstantSources.Lowest.Tildeh0);
+        //  allocator.CopyResource(newLowestData->Frequencies,
+        //                         simulationConstantSources.Lowest.Frequencies);
+
+        //}
+        beforeNextFrame.PatchMediumChanged = false;
+        beforeNextFrame.PatchLowestChanged = false;
+        beforeNextFrame.PatchHighestChanged = false;
+        auto commandList = allocator.EndList();
+        computeQueue.Execute(commandList);
+        AdditionalMarkers.push_back(
+            beforeNextFence.EnqueueSignal(computeQueue));
+      }
+      for (CommandFenceMarker marker : AdditionalMarkers) {
+        marker.Await(directQueue);
+      }
+      AdditionalMarkers.clear();
       // Compute shader stage
       {
         auto &simResource = calculatingSimResource;
@@ -428,8 +609,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         computeAllocator.Reset();
         computeAllocator.BeginList();
         commonDescriptorHeap.Set(computeAllocator);
-        SimulationStage::TimeData timeConstants{.deltaTime = deltaTime,
-                                                .timeSinceLaunch = gameTime};
         GpuVirtualAddress timeDataBuffer =
             simResource.DynamicBuffer.AddBuffer(timeConstants);
         // Spektrums
@@ -440,8 +619,10 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           // Inputs
           mask.timeDataBuffer = timeDataBuffer;
 
-          mask.Tildeh0 = simulationConstantSources.Highest.Tildeh0;
-          mask.Frequencies = simulationConstantSources.Highest.Frequencies;
+          mask.Tildeh0 =
+              *simulationConstantSources.Highest.Tildeh0.ShaderResource();
+          mask.Frequencies =
+              *simulationConstantSources.Highest.Frequencies.ShaderResource();
 
           // Outputs
           mask.Tildeh =
@@ -466,18 +647,21 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           std::array<FFTData, FFTCOUNT> fftStage1 = {
               FFTData{simResource.Highest.tildeh,
                       simResource.Highest.tildehBuffer},
+
+              FFTData{simResource.Highest.tildeD,
+                      simResource.Highest.tildeDBuffer}};
+          std::array<FFTData, FFTCOUNT> fftStage2 = {
+              FFTData{simResource.Highest.tildeDBuffer,
+                      simResource.Highest.FFTTildeD},
               FFTData{simResource.Highest.tildehBuffer,
                       simResource.Highest.FFTTildeh}};
-          std::array<FFTData, FFTCOUNT> fftStage2 = {
-              FFTData{simResource.Highest.tildeD,
-                      simResource.Highest.tildeDBuffer},
-              FFTData{simResource.Highest.tildeDBuffer,
-                      simResource.Highest.FFTTildeD}};
 
           const auto doFFTStage =
               [&computeAllocator, &N, &FFTRootDescription](
                   const std::array<FFTData, FFTCOUNT> &stage) {
                 for (const auto &data : stage) {
+                  computeAllocator.AddUAVBarrier(
+                      *data.Input.UnorderedAccess(computeAllocator));
                   data.Input.ShaderResource(computeAllocator);
                 }
                 for (const auto &data : stage) {
@@ -508,6 +692,14 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           auto mask = displacementRootDescription.Set(
               computeAllocator, RootSignatureUsage::Compute);
 
+          computeAllocator.AddUAVBarrier(
+              *simResource.Highest.FFTTildeh.UnorderedAccess(computeAllocator));
+          computeAllocator.AddUAVBarrier(
+              *simResource.Highest.FFTTildeD.UnorderedAccess(computeAllocator));
+          computeAllocator.AddUAVBarrier(
+              *simResource.Highest.DisplacementMap.UnorderedAccess(
+                  computeAllocator));
+
           mask.Height =
               *simResource.Highest.FFTTildeh.ShaderResource(computeAllocator);
           mask.Choppy =
@@ -524,10 +716,15 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         }
 
         // Calculate gradients
-        {
+
+        /*{
           gradientPipelineState.Apply(computeAllocator);
           auto mask = gradientRootDescription.Set(computeAllocator,
                                                   RootSignatureUsage::Compute);
+
+          computeAllocator.AddUAVBarrier(
+              *simResource.Highest.DisplacementMap.UnorderedAccess(
+                  computeAllocator));
 
           mask.Displacement =
               *simResource.Highest.DisplacementMap.ShaderResource(
@@ -541,15 +738,17 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           const auto sizeY = N;
           computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
                                     (sizeY + yGroupSize - 1) / yGroupSize, 1);
-        }
+        }*/
+
         // Foam Calculations
-        {
+
+        /*{
           foamDecayPipelineState.Apply(computeAllocator);
           auto mask = foamDecayRootDescription.Set(computeAllocator,
                                                    RootSignatureUsage::Compute);
 
           computeAllocator.AddUAVBarrier(
-              simResource.Highest.gradients.getInnerUnsafe());
+              *simResource.Highest.gradients.UnorderedAccess(computeAllocator));
 
           mask.Gradients =
               *simResource.Highest.gradients.UnorderedAccess(computeAllocator);
@@ -563,7 +762,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           const auto sizeY = N;
           computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
                                     (sizeY + yGroupSize - 1) / yGroupSize, 1);
-        }
+        }*/
+
         // Upload queue
         {
           PIXScopedEvent(computeQueue.get(), 0, "asdadwadsdawddawdsdzxc");
@@ -600,11 +800,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         frameResource.DepthBuffer.DepthStencil()->Clear(allocator);
       }
       // Draw Ocean
-      uint qtNodes = 0;
-      uint drawnNodes = 0;
-      std::chrono::nanoseconds QuadTreeBuildTime(0);
-
-      std::chrono::nanoseconds NavigatingTheQuadTree(0);
+      RuntimeResults runtimeResults;
 
       {
         SimpleGraphicsRootDescription::VertexConstants vertexConstants{};
@@ -630,29 +826,29 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         std::optional<GpuVirtualAddress> usedTexture;
         // Debug stuff
         {
-          pixelConstants.swizzleorder = settings.swizzleorder;
+          pixelConstants.swizzleorder = debugValues.swizzleorder;
 
           domainConstants.useDisplacement = 1;
           pixelConstants.useTexture = 0;
 
-          switch (settings.mode) {
-          case RuntimeSettings::Mode::Full:
+          switch (debugValues.mode) {
+          case DebugValues::Mode::Full:
             pixelConstants.useTexture = 1;
             domainConstants.useDisplacement = 0;
             break;
 
-          case RuntimeSettings::Mode::Displacement1:
+          case DebugValues::Mode::Displacement1:
             usedTexture =
                 *drawingSimResource.Highest.DisplacementMap.ShaderResource(
                     allocator);
             break;
-          case RuntimeSettings::Mode::Gradients1:
+          case DebugValues::Mode::Gradients1:
             usedTexture =
                 *drawingSimResource.Highest.gradients.ShaderResource(allocator);
             break;
           }
 
-          pixelConstants.mult = settings.pixelMult;
+          pixelConstants.mult = debugValues.pixelMult;
         }
 
         // Upload absolute contants
@@ -687,13 +883,14 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
         qt.Build(center, fullSizeXZ,
                  float3(camUsedPos.x, camUsedPos.y, camUsedPos.z),
-                 cam.GetFrustum(), modelMatrix, settings.distanceThreshold);
+                 cam.GetFrustum(), modelMatrix,
+                 simData.quadTreeDistanceThreshold);
 
-        QuadTreeBuildTime +=
-            std::chrono::duration_cast<decltype(QuadTreeBuildTime)>(
-                std::chrono::high_resolution_clock::now() - start);
+        runtimeResults.QuadTreeBuildTime += std::chrono::duration_cast<
+            decltype(runtimeResults.QuadTreeBuildTime)>(
+            std::chrono::high_resolution_clock::now() - start);
 
-        qtNodes += qt.GetSize();
+        runtimeResults.qtNodes += qt.GetSize();
 
         // The best choice is to upload planeBottomLeft and planeTopRight and
         // kinda of UV coordinate that can go outside [0,1] and the fract is
@@ -706,10 +903,10 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         graphicsPipelineState.Apply(allocator);
         start = std::chrono::high_resolution_clock::now();
         for (auto it = qt.begin(); it != qt.end(); ++it) {
-          NavigatingTheQuadTree +=
-              std::chrono::duration_cast<decltype(NavigatingTheQuadTree)>(
-                  (std::chrono::high_resolution_clock::now() - start));
-          drawnNodes++;
+          runtimeResults.NavigatingTheQuadTree += std::chrono::duration_cast<
+              decltype(runtimeResults.NavigatingTheQuadTree)>(
+              (std::chrono::high_resolution_clock::now() - start));
+          runtimeResults.drawnNodes++;
 
           {
             vertexConstants.instanceData[instanceCount].scaling = {it->size.x,
@@ -722,9 +919,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
             auto res = it.GetSmallerNeighbor();
 
-            NavigatingTheQuadTree +=
-                std::chrono::duration_cast<decltype(NavigatingTheQuadTree)>(
-                    (std::chrono::high_resolution_clock::now() - start));
+            runtimeResults.NavigatingTheQuadTree += std::chrono::duration_cast<
+                decltype(runtimeResults.NavigatingTheQuadTree)>(
+                (std::chrono::high_resolution_clock::now() - start));
             static const constexpr auto l = [](const float x) -> float {
               if (x == 0)
                 return 1;
@@ -786,6 +983,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       }
 
       auto CPURenderEnd = std::chrono::high_resolution_clock::now();
+      runtimeResults.CPUTime = CPURenderEnd - frameStart;
       // ImGUI
       {
         ImGui_ImplDX12_NewFrame();
@@ -795,143 +993,22 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         if (ImGui::Begin("Application")) {
           ImGui::Text("Press ESC to quit");
           ImGui::Text("Press Space to stop time");
-          ImGui::ColorEdit3("clear color", (float *)&settings.clearColor);
-
           ImGui::Text("frameID = %d", frameCounter);
-          ImGui::Text("QuadTree Nodes = %d", qtNodes);
-
-          ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
-                      1000.0f / io.Framerate, io.Framerate);
-          ImGui::Text("QuadTree buildtime %.3f ms/frame",
-                      GetDurationInFloatWithPrecision<std::chrono::milliseconds,
-                                                      std::chrono::nanoseconds>(
-                          QuadTreeBuildTime));
-          ImGui::Text("Navigating QuadTree %.3f ms/frame",
-                      GetDurationInFloatWithPrecision<std::chrono::milliseconds,
-                                                      std::chrono::nanoseconds>(
-                          NavigatingTheQuadTree));
-          ImGui::InputFloat("Distance Threshold", &settings.distanceThreshold);
-          ImGui::Text("Drawn Nodes: %d", drawnNodes);
-          ImGui::Text("CPU time %.3f ms/frame",
-                      GetDurationInFloatWithPrecision<std::chrono::milliseconds,
-                                                      std::chrono::nanoseconds>(
-                          (CPURenderEnd - frameStart)));
           ImGui::Text(
               "Since start %.3f s",
               GetDurationInFloatWithPrecision<std::chrono::seconds,
                                               std::chrono::milliseconds>(
                   getTimeSinceStart()));
-          static const std::array<std::string, 11> modeitems = {
-              "Full",      "Tildeh0",      "Frequencies", "Tildeh",
-              "TildeD",    "FFTTildeh",    "FFTTildeD",   "Displacement",
-              "Gradients", "TildehBuffer", "TildeDBuffer"};
+          ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
+                      1000.0f / io.Framerate, io.Framerate);
+          settings.DrawImGui(beforeNextFrame);
 
-          if (ImGui::BeginCombo("Mode",
-                                modeitems[(u32)(settings.mode)].c_str())) {
-            for (uint i = 0; i < modeitems.size(); i++) {
-              bool isSelected = ((u32)(settings.mode) == i);
-              if (ImGui::Selectable(modeitems[i].c_str(), isSelected)) {
-                settings.mode = RuntimeSettings::Mode(i);
-                settings.swizzleorder = XMUINT4(0, 1, 2, 3);
-              }
-              if (isSelected) {
-                ImGui::SetItemDefaultFocus();
-              }
-            }
-            ImGui::EndCombo();
-          }
-          if (settings.mode != RuntimeSettings::Mode::Full) {
-            ImGui::InputFloat3("Pixel Mult", (float *)&settings.pixelMult);
-
-            static const std::array<std::string, 4> swizzleitems = {"r", "g",
-                                                                    "b", "a"};
-
-            const std::array<u32 *const, 4> vals = {
-                &settings.swizzleorder.x, &settings.swizzleorder.y,
-                &settings.swizzleorder.z, &settings.swizzleorder.w};
-            ImGui::Text("Swizzle");
-            for (int i = 0; i < 4; i++) {
-              const string id = "##Swizzle" + swizzleitems[i];
-              ImGui::Text("%s", swizzleitems[i].c_str());
-              ImGui::SameLine();
-
-              if (ImGui::BeginCombo(id.c_str(),
-                                    swizzleitems[*vals[i]].c_str())) {
-                for (size_t j = 0; j < swizzleitems.size(); j++) {
-                  bool isSelected = (*(vals[i]) == j);
-                  if (ImGui::Selectable(swizzleitems[j].c_str(), isSelected)) {
-                    *vals[i] = j;
-                  }
-                  if (isSelected) {
-                    ImGui::SetItemDefaultFocus();
-                  }
-                }
-                ImGui::EndCombo();
-              }
-            }
-          }
-
-          static const std::array<std::string, 3> items = {
-              "CullClockwise", "CullNone", "WireFrame"};
-          static uint itemsIndex =
-              rasterizerFlags == RasterizerFlags::CullNone
-                  ? 1
-                  : (rasterizerFlags == RasterizerFlags::CullClockwise ? 0 : 2);
-
-          if (ImGui::BeginCombo("Render State", items[itemsIndex].c_str())) {
-            for (uint i = 0; i < items.size(); i++) {
-              bool isSelected = (itemsIndex == i);
-              if (ImGui::Selectable(items[i].c_str(), isSelected)) {
-                itemsIndex = i;
-                switch (itemsIndex) {
-                case 1:
-                  rasterizerFlags = RasterizerFlags::CullNone;
-                  break;
-                case 2:
-                  rasterizerFlags = RasterizerFlags::Wireframe;
-                  break;
-                default:
-                  rasterizerFlags = RasterizerFlags::CullClockwise;
-                  break;
-                }
-                graphicsPipelineStateDefinition.RasterizerState.Flags =
-                    rasterizerFlags;
-                graphicsPipelineState = pipelineStateProvider
-                                            .CreatePipelineStateAsync(
-                                                graphicsPipelineStateDefinition)
-                                            .get();
-              }
-              if (isSelected) {
-                ImGui::SetItemDefaultFocus();
-              }
-            }
-            ImGui::EndCombo();
-          }
-
-          if (ImGui::Checkbox("Firstperson", &settings.firstPerson))
-            cam.SetFirstPerson(settings.firstPerson);
-
-          ImGui::Checkbox("Time running", &settings.timeRunning);
-
-          XMVECTOR camEye = cam.GetEye();
-          if (ImGui::InputFloat3("Cam eye ", (float *)&camEye, "%.3f"))
-            cam.SetView(camEye, cam.GetAt(), cam.GetWorldUp());
-
-          float camSpeed = cam.GetBaseSpeed();
-          if (ImGui::SliderFloat("Cam speed", &camSpeed, 0, 10))
-            cam.SetBaseSpeed(camSpeed);
-
-          if (!cam.GetFirstPerson()) {
-            XMVECTOR camLookAt = cam.GetAt();
-            if (ImGui::InputFloat3("Cam Look At ", (float *)&camLookAt, "%.3f"))
-              cam.SetView(cam.GetEye(), camLookAt, cam.GetWorldUp());
-
-            float distance = cam.GetDistance();
-            if (ImGui::SliderFloat("Cam distance", &distance, 0, 100))
-              cam.SetDistanceFromAt(distance);
-          }
+          runtimeResults.DrawImGui(false);
+          cam.DrawImGui(false);
+          debugValues.DrawImGui(beforeNextFrame);
         }
         ImGui::End();
+        simData.DrawImGui(beforeNextFrame);
 
         ImGui::Render();
 

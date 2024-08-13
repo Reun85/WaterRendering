@@ -2,7 +2,7 @@
 #define NUM_INSTANCES (1 << 12)
 #define DISP_MAP_LOG2 10
 #define DISP_MAP_SIZE (1<<DISP_MAP_LOG2)
-#define PATCH_SIZE1 23.f
+#define PATCH_SIZE1 7.f
 #define PATCH_SIZE2 83.f
 #define PATCH_SIZE3 257.f
 

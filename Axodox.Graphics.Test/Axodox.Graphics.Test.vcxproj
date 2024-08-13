@@ -109,7 +109,7 @@
     <ClInclude Include="pch.h" />
     <ClInclude Include="QuadTree.h" />
     <ClInclude Include="Typedefs.h" />
-    <ClInclude Include="WaterMath.h" />
+    <ClInclude Include="Simulation.h" />
   </ItemGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest">
@@ -124,6 +124,7 @@
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="QuadTree.cpp" />
+    <ClCompile Include="Simulation.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\ELTE\GPGPU\GPGPU-Assignment\src\imgui.ini" />

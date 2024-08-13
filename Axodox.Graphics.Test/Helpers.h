@@ -37,34 +37,25 @@ GetDurationInFloatWithPrecision(const std::chrono::duration<T, Q> &inp) {
 }
 
 template <typename DataType>
-ImmutableTexture constexpr ImmutableTextureFromData(
-    const ResourceAllocationContext &context, const Format &f, const u32 width,
-    const u32 height, const u16 arraySize, const std::vector<DataType> &data) {
+TextureData constexpr CreateTextureData(const Format &f, const u32 width,
+                                        const u32 height, const u16 arraySize,
+                                        const std::vector<DataType> &data) {
   const u8 *dataPtr = reinterpret_cast<const u8 *>(data.data());
 
   std::size_t byteSize = data.size() * sizeof(DataType);
 
   const auto span = std::span<const u8>(dataPtr, byteSize);
-  return ImmutableTexture(context,
-                          TextureData(f, width, height, arraySize, span));
+  return TextureData(f, width, height, arraySize, span);
 }
 
 template <typename DataType>
-ImmutableTexture constexpr ImmutableTextureFromData(
-    const ResourceAllocationContext &context, const Format &f, const u32 width,
-    const u32 height, const u16 arraySize, std::span<const u8> span) {
-  return ImmutableTexture(context,
-                          TextureData(f, width, height, arraySize, span));
+TextureData constexpr CreateTextureData(const Format &f, const u32 width,
+                                        const u32 height, const u16 arraySize,
+                                        std::span<const u8> span) {
+  return TextureData(f, width, height, arraySize, span);
 }
 
-constexpr inline float4x4 float4x4FromXMFloat4x4(const XMFLOAT4X4 &temp) {
-  return winrt::Windows::Foundation::Numerics::float4x4{
-      temp._11, temp._12, temp._13, temp._14, temp._21, temp._22,
-      temp._23, temp._24, temp._31, temp._32, temp._33, temp._34,
-      temp._41, temp._42, temp._43, temp._44};
-}
-
-MeshDescription CreateQuadPatch() {
+inline MeshDescription CreateQuadPatch() {
 
   float size = 0.5f;
   MeshDescription result;
@@ -143,3 +134,10 @@ public:
 };
 
 inline float frac(float x) { return x - std::floor(x); }
+
+struct NeedToDo {
+  std::optional<RasterizerFlags> changeFlag;
+  bool PatchHighestChanged = false;
+  bool PatchMediumChanged = false;
+  bool PatchLowestChanged = false;
+};

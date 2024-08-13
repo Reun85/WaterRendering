@@ -1,13 +1,6 @@
 
 #pragma once
 #include "pch.h"
-#include "Camera.h"
-#include "QuadTree.h"
-#include <fstream>
-#include <string.h>
-#include "Defaults.h"
-#include "WaterMath.h"
-#include "Helpers.h"
 
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;

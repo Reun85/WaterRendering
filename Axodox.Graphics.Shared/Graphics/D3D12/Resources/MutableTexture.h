@@ -8,6 +8,8 @@ public:
   MutableTexture(const ResourceAllocationContext &context);
   MutableTexture(const ResourceAllocationContext &context,
                  const TextureDefinition &definition);
+  MutableTexture(const ResourceAllocationContext &context,
+                 const TextureData &definition);
 
   const TextureDefinition *Definition() const;
 

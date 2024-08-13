@@ -158,7 +158,8 @@ void ConstQuadTreeLeafIteratorDepthFirst::IterateTillLeaf() {
 
 void QuadTree::Build(const float3 center, const float2 fullSizeXZ,
                      const float3 camEye, const Frustum &f,
-                     const XMMATRIX &mMatrix, const float distanceThreshold) {
+                     const XMMATRIX &mMatrix,
+                     const float quadTreeDistanceThreshold) {
 
   // zero it out, especially the children part
   memset(&nodes[0], 0, sizeof(Node) * nodes.size());
@@ -166,7 +167,8 @@ void QuadTree::Build(const float3 center, const float2 fullSizeXZ,
   nodes[0] = {{center.x, center.z}, {fullSizeXZ.x, fullSizeXZ.y}};
   count = 1;
   height = 0;
-  BuildRecursively(0, center.y, camEye, distanceThreshold, 0, f, mMatrix);
+  BuildRecursively(0, center.y, camEye, quadTreeDistanceThreshold, 0, f,
+                   mMatrix);
 }
 inline bool IsInViewFrustum(const Node &node, const float &yCoordinate,
                             const Frustum &f, const XMMATRIX &mMatrix) {
@@ -178,7 +180,7 @@ inline bool IsInViewFrustum(const Node &node, const float &yCoordinate,
 }
 void QuadTree::BuildRecursively(const uint index, const float yCoordinate,
                                 const float3 camEye,
-                                const float distanceThreshold,
+                                const float quadTreeDistanceThreshold,
                                 const Depth depth, const Frustum &f,
                                 const XMMATRIX &mMatrix) {
   if (depth > height)
@@ -197,10 +199,10 @@ void QuadTree::BuildRecursively(const uint index, const float yCoordinate,
   double dist = sqrt(diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
   dist *= dist;
 
-  bool cont = dist / (node.size.x * node.size.y) < distanceThreshold;
+  bool cont = dist / (node.size.x * node.size.y) < quadTreeDistanceThreshold;
   // bool cont = dist / (std::max(node.size.x, node.size.y)) <
-  // distanceThreshold;
-  //  bool cont = dist < distanceThreshold;
+  // quadTreeDistanceThreshold;
+  //  bool cont = dist < quadTreeDistanceThreshold;
   if ((cont || depth < minDepth) &&
       IsInViewFrustum(node, yCoordinate, f, mMatrix)) {
     for (uint i = 0; i < 4; i++) {
@@ -212,8 +214,8 @@ void QuadTree::BuildRecursively(const uint index, const float yCoordinate,
       curr.parent = index;
       curr.size = node2.size / 2;
       curr.center = node2.center + Node::childDirections[i] * (curr.size / 2);
-      BuildRecursively(id, yCoordinate, camEye, distanceThreshold, depth + 1, f,
-                       mMatrix);
+      BuildRecursively(id, yCoordinate, camEye, quadTreeDistanceThreshold,
+                       depth + 1, f, mMatrix);
     }
   }
 }

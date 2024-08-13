@@ -93,10 +93,10 @@ class QuadTree {
 public:
   QuadTree(const uint allocation = Defaults::QuadTree::allocation)
       : nodes(allocation) {}
-  void
-  Build(const float3 center, const float2 fullSizeXZ, const float3 camEye,
-        const Frustum &f, const XMMATRIX &mMatrix,
-        const float distanceThreshold = Defaults::QuadTree::distanceThreshold);
+  void Build(const float3 center, const float2 fullSizeXZ, const float3 camEye,
+             const Frustum &f, const XMMATRIX &mMatrix,
+             const float quadTreeDistanceThreshold =
+                 Defaults::QuadTree::quadTreeDistanceThreshold);
   const value_type &GetRoot() const { return nodes[0]; }
   const_iterator begin() const {
     return ConstQuadTreeLeafIteratorDepthFirst(0, height, *this);
@@ -108,7 +108,8 @@ public:
 private:
   friend class const_iterator;
   void BuildRecursively(const uint index, const float height,
-                        const float3 camEye, const float distanceThreshold,
+                        const float3 camEye,
+                        const float quadTreeDistanceThreshold,
                         const Depth depth, const Frustum &f,
                         const XMMATRIX &mMatrix);
 

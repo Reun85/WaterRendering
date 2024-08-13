@@ -38,8 +38,8 @@ struct Volume {
 };
 
 struct AABB : public Volume {
-  XMVECTOR center{0.f, 0.f, 0.f};
-  XMVECTOR extents{0.f, 0.f, 0.f};
+  XMVECTOR center{0.f, 0.f, 0.f, 1};
+  XMVECTOR extents{0.f, 0.f, 0.f, 1};
 
   AABB(const XMVECTOR &min, const XMVECTOR &max)
       : Volume{}, center{(max + min) * 0.5f},

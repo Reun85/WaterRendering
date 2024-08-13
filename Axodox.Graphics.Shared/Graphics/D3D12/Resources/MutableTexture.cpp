@@ -15,6 +15,21 @@ MutableTexture::MutableTexture(const ResourceAllocationContext &context,
   Allocate(definition);
 }
 
+MutableTexture::MutableTexture(const ResourceAllocationContext &context,
+                               const TextureData &textureData)
+    : _context(context) {
+
+  Reset();
+  TextureData x = textureData;
+  _texture = context.ResourceAllocator->CreateTexture(x.Definition());
+
+  _allocatedSubscription =
+      _texture->Allocated([this, context, data = move(x)](Resource *resource) {
+        context.ResourceUploader->EnqueueUploadTask(resource, &data);
+        OnAllocated(resource);
+      });
+}
+
 const TextureDefinition *MutableTexture::Definition() const {
   return _definition.get();
 }

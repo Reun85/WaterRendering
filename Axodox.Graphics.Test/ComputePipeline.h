@@ -1,14 +1,6 @@
 #pragma once
 #include "pch.h"
-#include "Camera.h"
-#include "QuadTree.h"
-#include <fstream>
-#include <string.h>
-#include "ConstantGPUBuffer.h"
-#include "Defaults.h"
-#include "WaterMath.h"
-#include "Helpers.h"
-#include "pix3.h"
+#include "Simulation.h"
 
 using namespace std;
 using namespace winrt;
@@ -26,11 +18,9 @@ using namespace Axodox::Storage;
 using namespace DirectX;
 using namespace DirectX::PackedVector;
 
+template <typename T, typename TypeA, typename TypeB>
+concept Either = std::same_as<T, TypeA> || std::same_as<T, TypeB>;
 struct SimulationStage {
-  struct TimeData {
-    float deltaTime;
-    float timeSinceLaunch;
-  };
   struct SpektrumRootDescription : public RootSignatureMask {
     // In
     RootDescriptorTable<1> Tildeh0;
@@ -175,19 +165,42 @@ struct SimulationStage {
     }
   };
 
+  template <typename TextureTy = MutableTexture>
+    requires Either<TextureTy, MutableTexture, ImmutableTexture>
   struct ConstantGpuSources {
     struct LODData {
-      ImmutableTexture Tildeh0;
-      ImmutableTexture Frequencies;
+      TextureTy Tildeh0;
+      TextureTy Frequencies;
+      LODData(ResourceAllocationContext &context,
+              const SimulationData::PatchData &inp)
+          : Tildeh0(TextureTy(context, CreateTextureData<std::complex<f32>>(
+                                           Format::R32G32_Float, inp.N, inp.M,
+                                           0u, CalculateTildeh0<f32>(inp)))),
+            Frequencies(TextureTy(
+                context,
+                CreateTextureData<f32>(Format::R32_Float, inp.N, inp.M, 0u,
+                                       CalculateFrequencies<f32>(inp)))) {}
     };
     LODData Highest;
     LODData Medium;
     LODData Lowest;
     const std::array<const LODData *const, 3> LODs = {&Highest, &Medium,
                                                       &Lowest};
+    ConstantGpuSources(ResourceAllocationContext &context,
+                       const SimulationData &inp)
+        : Highest(context, inp.Highest), Medium(context, inp.Medium),
+          Lowest(context, inp.Lowest) {}
     // ImmutableTexture PerlinNoise;
   };
   struct GpuSources {
     MutableTexture Foam;
+
+    GpuSources(ResourceAllocationContext &context, const SimulationData &inp)
+        :
+
+          Foam(MutableTexture(context, TextureDefinition::TextureDefinition(
+                                           Format::R32G32_Float, inp.N, inp.M,
+                                           0, TextureFlags::UnorderedAccess))) {
+    }
   };
 };
