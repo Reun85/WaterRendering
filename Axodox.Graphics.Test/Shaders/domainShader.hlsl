@@ -53,6 +53,7 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
     if (useDisplacement == 0)
     {
         float4 disp = _heightmap.SampleLevel(_sampler, texCoord, 0);
+        disp.xz *= 0.4;
         localPos += disp.xyz;
     }
     

@@ -7,6 +7,10 @@ struct cameraConstants
     float4x4 vpMatrix;
     float3 cameraPos;
 };
+struct DebugValues
+{
+    float4 swizzleOrder;
+};
 
 struct TimeConstants
 {

@@ -87,7 +87,7 @@ public:
     QUALIFIER float2 WindDirection = float2(-0.4f, -0.9f);
 
     // A constant that scales the waves
-    QUALIFIER f32 Amplitude = 0.85e-1f;
+    QUALIFIER f32 Amplitude = 0.85e-2f;
 
     static_assert(isPowerOfTwo(N));
   };
