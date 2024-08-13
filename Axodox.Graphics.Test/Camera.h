@@ -124,7 +124,7 @@ private:
 
   // projection parameters
   float m_zNear = 0.01f;
-  float m_zFar = 10000.0f;
+  float m_zFar = 1000.0f;
 
   float m_angle = XMConvertToRadians(27.0f);
   float m_aspect = 640.0f / 480.0f;

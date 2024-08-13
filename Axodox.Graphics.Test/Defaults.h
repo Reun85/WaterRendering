@@ -32,7 +32,6 @@ constexpr bool divides_within_eps(float a, float b, float epsilon) noexcept {
   float diff = back > 0 ? back : -back;
   return diff < epsilon;
 }
-
 struct Defaults {
 public:
   struct Cam {
@@ -42,7 +41,7 @@ public:
 
   struct App {
     CONST_QUALIFIER u16 maxInstances = ShaderConstantCompat::numInstances;
-    QUALIFIER f32 oceanSize = 100000.f;
+    QUALIFIER f32 oceanSize = 1000.f;
 
     QUALIFIER XMFLOAT4 clearColor = {37.f / 255.f, 37.f / 255.f, 37.f / 255.f,
                                      0};
@@ -76,21 +75,20 @@ public:
     };
 
     /// Have to change in common.hlsli as well
-    CONST_QUALIFIER f32 patchSize = ShaderConstantCompat::patchSize;
-    static_assert(divides_within_eps(App::oceanSize, patchSize, 0.001f),
-                  "Ocean size has to be multiple of patch size");
+    CONST_QUALIFIER f32 patchSize1 = ShaderConstantCompat::patchSize1;
+    CONST_QUALIFIER f32 patchSize2 = ShaderConstantCompat::patchSize2;
+    CONST_QUALIFIER f32 patchSize3 = ShaderConstantCompat::patchSize3;
     CONST_QUALIFIER u32 N = ComputeShader::heightMapDimensions;
     QUALIFIER f32 Depth = 100;
 
     QUALIFIER f32 gravity = 9.81f;
 
-    QUALIFIER f32 WindForce = 30 * 6.f;
+    QUALIFIER f32 WindForce = 0.4f * 6.f;
     QUALIFIER float2 WindDirection = float2(-0.4f, -0.9f);
 
     // A constant that scales the waves
-    QUALIFIER f32 Amplitude = 0.45e-6f;
+    QUALIFIER f32 Amplitude = 0.85e-2f;
 
-    QUALIFIER f32 timeStep = 1.0f / 60.0f;
     static_assert(isPowerOfTwo(N));
   };
 };

@@ -6,8 +6,8 @@ RWTexture2D<float4> gradients : register(u0);
 void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
 
-    float TILE_SIZE_X2 =  PATCH_SIZE * 2.0f / float(DISP_MAP_SIZE);
-    float INV_TILE_SIZE = DISP_MAP_SIZE /  PATCH_SIZE;
+    float TILE_SIZE_X2 =  PATCH_SIZE1 * 2.0f / float(DISP_MAP_SIZE);
+    float INV_TILE_SIZE = DISP_MAP_SIZE /  PATCH_SIZE1;
 
     int2 loc = int2(dispatchThreadID.xy);
 
@@ -28,6 +28,7 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     float J = (1.0 + dDx.x) * (1.0 + dDy.y) - dDx.y * dDy.x;
 
-    float3 grad = float3(gradient.y, TILE_SIZE_X2, gradient.x);
+    float3 grad = float3(gradient.y, TILE_SIZE_X2/2, gradient.x);
+
     gradients[loc] = float4(normalize(grad), J);
 }

@@ -7,6 +7,16 @@ struct cameraConstants
     float4x4 vpMatrix;
     float3 cameraPos;
 };
+struct DebugValues
+{
+    float4 swizzleOrder;
+};
+
+struct TimeConstants
+{
+    float deltaTime;
+    float timeSinceLaunch;
+};
 
 inline float2 ComplexMul(float2 a, float2 b)
 {

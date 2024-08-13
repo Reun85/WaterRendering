@@ -10,7 +10,6 @@ template <typename Prec = f32>
   requires std::is_floating_point_v<Prec>
 constexpr Prec PhilipsSpektrum(const float2 &k, const Prec &Amplitude,
                                const Prec &largestHeight, const float2 &wind) {
-
   // Smaller than these waves
   const float l = largestHeight / 1000.f;
 
@@ -33,7 +32,6 @@ template <typename Prec = f32>
 constexpr std::complex<Prec>
 tilde_h0(const float2 &k, const Prec &xi_real, const Prec &xi_im,
          const Prec &Amplitude, const Prec &largestHeight, const float2 &wind) {
-
   constexpr static const Prec one_over_sqrt_2 = 1 / std::numbers::sqrt2_v<Prec>;
 
   std::complex res = std::complex<Prec>(xi_real, xi_im);
@@ -61,20 +59,28 @@ constexpr u32 Indexing(const u32 i, const u32 j, const u32 _, const u32 M) {
 };
 } // namespace Inner
 
+struct SimulationData {
+  u32 N;
+  u32 M;
+  float2 windDirection;
+  f32 WindForce;
+  f32 gravity;
+  f32 Amplitude;
+  f32 patchSize;
+  f32 Depth;
+};
+
 template <typename Prec = float>
   requires std::is_floating_point_v<Prec>
-std::vector<std::complex<Prec>>
-CalculateTildeh0FromDefaults(std::random_device &rd, const u32 _N,
-                             const u32 _M) {
-
-  const auto N = (i32)_N;
-  const auto M = (i32)_M;
-  using Def = Defaults::Simulation;
-  const auto &wind = normalize(Def::WindDirection);
-  const auto &gravity = Def::gravity;
-  const auto &WindForce = Def::WindForce;
-  const auto &Amplitude = Def::Amplitude;
-  const auto &L = Def::patchSize;
+std::vector<std::complex<Prec>> CalculateTildeh0(std::random_device &rd,
+                                                 const SimulationData &dat) {
+  const auto N = (i32)dat.N;
+  const auto M = (i32)dat.M;
+  const auto &wind = normalize(dat.windDirection);
+  const auto &gravity = dat.gravity;
+  const auto &WindForce = dat.WindForce;
+  const auto &Amplitude = dat.Amplitude;
+  const auto &L = dat.patchSize;
 
   std::mt19937 gen(rd());
   std::normal_distribution<Prec> dis(0, 1);
@@ -100,17 +106,14 @@ CalculateTildeh0FromDefaults(std::random_device &rd, const u32 _N,
 
 template <typename Prec = float>
   requires std::is_floating_point_v<Prec>
-constexpr std::vector<Prec> CalculateFrequenciesFromDefaults(const u32 _N,
-                                                             const u32 _M) {
-
+constexpr std::vector<Prec> CalculateFrequencies(const SimulationData &dat) {
   // w^2(k) = gktanh(kD)
-  using Def = Defaults::Simulation;
-  const auto &gravity = Def::gravity;
-  const auto &D = Def::Depth;
-  const auto &L = Def::patchSize;
+  const auto &gravity = dat.gravity;
+  const auto &D = dat.Depth;
+  const auto &L = dat.patchSize;
 
-  const i32 N = (i32)_N;
-  const i32 M = (i32)_M;
+  const i32 N = (i32)dat.N;
+  const i32 M = (i32)dat.M;
   const i32 Nx2 = N / 2;
   const i32 Mx2 = M / 2;
 

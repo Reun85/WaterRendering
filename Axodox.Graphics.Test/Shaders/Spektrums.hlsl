@@ -10,7 +10,7 @@ RWTexture2D<float2> tilde_D : register(u1);
 
 cbuffer Constants : register(b0)
 {
-    float time;
+    TimeConstants timeData;
 }
 
 
@@ -30,6 +30,7 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3
     float w_k = frequencies[loc1].r;
 
     // Height spectrum
+    const float time = timeData.timeSinceLaunch;
     float cos_wt = cos(w_k * time);
     float sin_wt = sin(w_k * time);
 
