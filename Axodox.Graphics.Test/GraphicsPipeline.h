@@ -85,3 +85,17 @@ private:
   StaticSampler _textureSampler;
   StaticSampler _heightmapSamplerForDomain;
 };
+
+struct FrameResources {
+  CommandAllocator Allocator;
+  CommandFence Fence;
+  CommandFenceMarker Marker;
+  DynamicBufferManager DynamicBuffer;
+
+  MutableTexture DepthBuffer;
+  descriptor_ptr<ShaderResourceView> ScreenResourceView;
+
+  explicit FrameResources(const ResourceAllocationContext &context)
+      : Allocator(*context.Device), Fence(*context.Device),
+        DynamicBuffer(*context.Device), DepthBuffer(context) {}
+};

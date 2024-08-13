@@ -40,19 +40,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     // ?
   }
 
-  struct FrameResources {
-    CommandAllocator Allocator;
-    CommandFence Fence;
-    CommandFenceMarker Marker;
-    DynamicBufferManager DynamicBuffer;
-
-    MutableTexture DepthBuffer;
-    descriptor_ptr<ShaderResourceView> ScreenResourceView;
-
-    explicit FrameResources(const ResourceAllocationContext &context)
-        : Allocator(*context.Device), Fence(*context.Device),
-          DynamicBuffer(*context.Device), DepthBuffer(context) {}
-  };
   struct RuntimeSettings {
     enum class Mode : u8 {
       Full = 0,
@@ -146,6 +133,10 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         ImGuiDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
     return ImGuiDescriptorHeap;
   }
+
+  struct NeedToDo {
+    std::optional<RasterizerFlags> changeFlag;
+  };
 
   void Run() const {
     CoreWindow window = CoreWindow::GetForCurrentThread();
@@ -276,12 +267,12 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     ImmutableMesh planeMesh{immutableAllocationContext, CreateQuadPatch()};
 
+    //  Acquire memory
+    groupedResourceAllocator.Build();
+
     auto mutableAllocationContext = immutableAllocationContext;
     CommittedResourceAllocator committedResourceAllocator{device};
     mutableAllocationContext.ResourceAllocator = &committedResourceAllocator;
-
-    //  Acquire memory
-    groupedResourceAllocator.Build();
 
     array<FrameResources, 2> frameResources{
         FrameResources(mutableAllocationContext),
