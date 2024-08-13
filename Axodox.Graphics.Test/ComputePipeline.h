@@ -104,7 +104,7 @@ struct SimulationStage {
     DynamicBufferManager DynamicBuffer;
 
 #define useDifferentFFTOutputBuffers true
-    struct LODData {
+    struct LODDataBuffers {
       MutableTextureWithState tildeh;
       MutableTextureWithState tildeD;
 #if useDifferentFFTOutputBuffers
@@ -118,9 +118,10 @@ struct SimulationStage {
       MutableTextureWithState tildeDBuffer;
       MutableTextureWithState displacementMap;
       MutableTextureWithState gradients;
+      MutableTexture Foam;
 
-      LODData(const ResourceAllocationContext &context, const u32 N,
-              const u32 M)
+      LODDataBuffers(const ResourceAllocationContext &context, const u32 N,
+                     const u32 M)
           : tildeh(context, TextureDefinition::TextureDefinition(
                                 Format::R32G32_Float, N, M, 0,
                                 TextureFlags::UnorderedAccess)),
@@ -146,33 +147,36 @@ struct SimulationStage {
                                          TextureFlags::UnorderedAccess)),
             gradients(context, TextureDefinition::TextureDefinition(
                                    Format::R16G16B16A16_Float, N, M, 0,
-                                   TextureFlags::UnorderedAccess)) {
+                                   TextureFlags::UnorderedAccess)),
+            Foam(MutableTexture(context, TextureDefinition::TextureDefinition(
+                                             Format::R32G32_Float, N, M, 0,
+                                             TextureFlags::UnorderedAccess))) {
       }
     };
 
-    LODData Highest;
-    LODData Medium;
-    LODData Lowest;
-    const std::array<const LODData *const, 3> LODs = {&Highest, &Medium,
-                                                      &Lowest};
+    LODDataBuffers HighestBuffer;
+    LODDataBuffers MediumBuffer;
+    LODDataBuffers LowestBuffer;
+    const std::array<const LODDataBuffers *const, 3> LODs = {
+        &HighestBuffer, &MediumBuffer, &LowestBuffer};
 
     explicit SimulationResources(const ResourceAllocationContext &context,
                                  const u32 N, const u32 M)
         : Allocator(*context.Device),
 
           Fence(*context.Device), DynamicBuffer(*context.Device),
-          Highest(context, N, M), Medium(context, N, M), Lowest(context, N, M) {
-    }
+          HighestBuffer(context, N, M), MediumBuffer(context, N, M),
+          LowestBuffer(context, N, M) {}
   };
 
   template <typename TextureTy = MutableTexture>
     requires Either<TextureTy, MutableTexture, ImmutableTexture>
   struct ConstantGpuSources {
-    struct LODData {
+    struct LODDataSource {
       TextureTy Tildeh0;
       TextureTy Frequencies;
-      LODData(ResourceAllocationContext &context,
-              const SimulationData::PatchData &inp)
+      LODDataSource(ResourceAllocationContext &context,
+                    const SimulationData::PatchData &inp)
           : Tildeh0(TextureTy(context, CreateTextureData<std::complex<f32>>(
                                            Format::R32G32_Float, inp.N, inp.M,
                                            0u, CalculateTildeh0<f32>(inp)))),
@@ -181,26 +185,105 @@ struct SimulationStage {
                 CreateTextureData<f32>(Format::R32_Float, inp.N, inp.M, 0u,
                                        CalculateFrequencies<f32>(inp)))) {}
     };
-    LODData Highest;
-    LODData Medium;
-    LODData Lowest;
-    const std::array<const LODData *const, 3> LODs = {&Highest, &Medium,
-                                                      &Lowest};
+    LODDataSource Highest;
+    LODDataSource Medium;
+    LODDataSource Lowest;
+    const std::array<const LODDataSource *const, 3> LODs = {&Highest, &Medium,
+                                                            &Lowest};
     ConstantGpuSources(ResourceAllocationContext &context,
                        const SimulationData &inp)
         : Highest(context, inp.Highest), Medium(context, inp.Medium),
           Lowest(context, inp.Lowest) {}
     // ImmutableTexture PerlinNoise;
   };
-  struct GpuSources {
-    MutableTexture Foam;
 
-    GpuSources(ResourceAllocationContext &context, const SimulationData &inp)
-        :
+  struct FullPipeline {
+    RootSignature<SimulationStage::SpektrumRootDescription>
+        spektrumRootDescription;
+    RootSignature<SimulationStage::FFTDescription> FFTRootDescription;
+    RootSignature<SimulationStage::DisplacementDescription>
+        displacementRootDescription;
+    RootSignature<SimulationStage::GradientDescription> gradientRootDescription;
+    RootSignature<SimulationStage::FoamDecayDescription>
+        foamDecayRootDescription;
 
-          Foam(MutableTexture(context, TextureDefinition::TextureDefinition(
-                                           Format::R32G32_Float, inp.N, inp.M,
-                                           0, TextureFlags::UnorderedAccess))) {
+    PipelineState spektrumPipeline;
+    PipelineState FFTPipeline;
+    PipelineState displacementPipeline;
+    PipelineState gradientPipeline;
+    PipelineState foamDecayPipeline;
+
+    static FullPipeline Create(GraphicsDevice &device,
+                               PipelineStateProvider &pipelineStateProvider) {
+      union x {
+        FullPipeline result;
+      };
+
+      ComputeShader spektrum{app_folder() / L"Spektrums.cso"};
+      ComputeShader FFT{app_folder() / L"FFT.cso"};
+      ComputeShader displacement{app_folder() / L"displacement.cso"};
+      ComputeShader gradient{app_folder() / L"gradient.cso"};
+      ComputeShader foamDecay{app_folder() / L"foamDecay.cso"};
+
+      RootSignature<SimulationStage::SpektrumRootDescription>
+          spektrumRootDescription{device};
+      ComputePipelineStateDefinition spektrumRootStateDefinition{
+          .RootSignature = &spektrumRootDescription,
+          .ComputeShader = &spektrum,
+      };
+      auto spektrumPipelineState =
+          pipelineStateProvider.CreatePipelineStateAsync(
+              spektrumRootStateDefinition);
+
+      RootSignature<SimulationStage::FFTDescription> FFTRootDescription{device};
+      ComputePipelineStateDefinition FFTStateDefinition{
+          .RootSignature = &FFTRootDescription,
+          .ComputeShader = &FFT,
+      };
+      auto FFTPipelineState =
+          pipelineStateProvider.CreatePipelineStateAsync(FFTStateDefinition);
+
+      RootSignature<SimulationStage::DisplacementDescription>
+          displacementRootDescription{device};
+      ComputePipelineStateDefinition displacementRootStateDefinition{
+          .RootSignature = &displacementRootDescription,
+          .ComputeShader = &displacement,
+      };
+      auto displacementPipelineState =
+          pipelineStateProvider.CreatePipelineStateAsync(
+              displacementRootStateDefinition);
+
+      RootSignature<SimulationStage::GradientDescription>
+          gradientRootDescription{device};
+      ComputePipelineStateDefinition gradientRootStateDefinition{
+          .RootSignature = &gradientRootDescription,
+          .ComputeShader = &gradient,
+      };
+      auto gradientPipelineState =
+          pipelineStateProvider.CreatePipelineStateAsync(
+              gradientRootStateDefinition);
+      RootSignature<SimulationStage::FoamDecayDescription>
+          foamDecayRootDescription{device};
+      ComputePipelineStateDefinition foamDecayRootStateDefinition{
+          .RootSignature = &foamDecayRootDescription,
+          .ComputeShader = &foamDecay,
+      };
+      auto foamDecayPipelineState =
+          pipelineStateProvider.CreatePipelineStateAsync(
+              foamDecayRootStateDefinition);
+
+      return FullPipeline{
+          .spektrumRootDescription = spektrumRootDescription,
+          .FFTRootDescription = FFTRootDescription,
+          .displacementRootDescription = displacementRootDescription,
+          .gradientRootDescription = gradientRootDescription,
+          .foamDecayRootDescription = foamDecayRootDescription,
+          .spektrumPipeline = spektrumPipelineState.get(),
+          .FFTPipeline = FFTPipelineState.get(),
+          .displacementPipeline = displacementPipelineState.get(),
+          .gradientPipeline = gradientPipelineState.get(),
+          .foamDecayPipeline = foamDecayPipelineState.get(),
+      };
     }
   };
 };

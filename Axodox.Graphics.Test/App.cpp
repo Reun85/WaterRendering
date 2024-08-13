@@ -294,11 +294,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     CoreDispatcher dispatcher = window.Dispatcher();
 
     GraphicsDevice device{};
-    CommandQueue graphicsQueue{device};
-    CommandQueue computeQueue{device};
-    computeQueue.get()->SetName(L"Compute Queue");
-    graphicsQueue.get()->SetName(L"Graphics Queue");
-    CoreSwapChain swapChain{graphicsQueue, window,
+    CommandQueue directQueue{device};
+    CoreSwapChain swapChain{directQueue, window,
                             SwapChainFlags::IsShaderResource};
 
     PipelineStateProvider pipelineStateProvider{device};
@@ -330,63 +327,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     // Compute pipeline
 
-    ComputeShader spektrum{app_folder() / L"Spektrums.cso"};
-
-    RootSignature<SimulationStage::SpektrumRootDescription>
-        spektrumRootDescription{device};
-    ComputePipelineStateDefinition spektrumRootStateDefinition{
-        .RootSignature = &spektrumRootDescription,
-        .ComputeShader = &spektrum,
-    };
-    auto spektrumPipelineState =
-        pipelineStateProvider
-            .CreatePipelineStateAsync(spektrumRootStateDefinition)
-            .get();
-
-    ComputeShader FFT{app_folder() / L"FFT.cso"};
-    RootSignature<SimulationStage::FFTDescription> FFTRootDescription{device};
-    ComputePipelineStateDefinition FFTStateDefinition{
-        .RootSignature = &FFTRootDescription,
-        .ComputeShader = &FFT,
-    };
-    auto FFTPipelineState =
-        pipelineStateProvider.CreatePipelineStateAsync(FFTStateDefinition)
-            .get();
-
-    RootSignature<SimulationStage::DisplacementDescription>
-        displacementRootDescription{device};
-    ComputeShader displacement{app_folder() / L"displacement.cso"};
-    ComputePipelineStateDefinition displacementRootStateDefinition{
-        .RootSignature = &displacementRootDescription,
-        .ComputeShader = &displacement,
-    };
-    auto displacementPipelineState =
-        pipelineStateProvider
-            .CreatePipelineStateAsync(displacementRootStateDefinition)
-            .get();
-
-    RootSignature<SimulationStage::GradientDescription> gradientRootDescription{
-        device};
-    ComputeShader gradient{app_folder() / L"gradient.cso"};
-    ComputePipelineStateDefinition gradientRootStateDefinition{
-        .RootSignature = &gradientRootDescription,
-        .ComputeShader = &gradient,
-    };
-    auto gradientPipelineState =
-        pipelineStateProvider
-            .CreatePipelineStateAsync(gradientRootStateDefinition)
-            .get();
-    RootSignature<SimulationStage::FoamDecayDescription>
-        foamDecayRootDescription{device};
-    ComputeShader foamDecay{app_folder() / L"foamDecay.cso"};
-    ComputePipelineStateDefinition foamDecayRootStateDefinition{
-        .RootSignature = &foamDecayRootDescription,
-        .ComputeShader = &foamDecay,
-    };
-    auto foamDecayPipelineState =
-        pipelineStateProvider
-            .CreatePipelineStateAsync(foamDecayRootStateDefinition)
-            .get();
+    auto fullSimPipeline =
+        SimulationStage::FullPipeline::Create(device, pipelineStateProvider);
 
     // Group together allocations
     GroupedResourceAllocator groupedResourceAllocator{device};
@@ -413,9 +355,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     SimulationStage::ConstantGpuSources simulationConstantSources(
         mutableAllocationContext, simData);
-
-    SimulationStage::GpuSources simulationSources(mutableAllocationContext,
-                                                  simData);
 
     array<FrameResources, 2> frameResources{
         FrameResources(mutableAllocationContext),
@@ -465,8 +404,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
       // Get frame frameResource
       frameCounter++;
-      // Prev frames resources
-      auto &PREVframeResource = frameResources[(frameCounter + 1u) & 0x1u];
       // Current frames resources
       auto &frameResource = frameResources[frameCounter & 0x1u];
       // Simulation resources for drawing.
@@ -478,29 +415,31 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       auto renderTargetView = swapChain.RenderTargetView();
 
       std::optional<std::future<PipelineState>> newPipelineState;
-      std::optional<SimulationStage::ConstantGpuSources<>::LODData>
+      std::optional<SimulationStage::ConstantGpuSources<>::LODDataSource>
           newHighestData;
-      std::optional<SimulationStage::ConstantGpuSources<>::LODData>
+      std::optional<SimulationStage::ConstantGpuSources<>::LODDataSource>
           newMediumData;
-      std::optional<SimulationStage::ConstantGpuSources<>::LODData>
+      std::optional<SimulationStage::ConstantGpuSources<>::LODDataSource>
           newLowestData;
-      if (beforeNextFrame.changeFlag) {
-        graphicsPipelineStateDefinition.RasterizerState.Flags =
-            *beforeNextFrame.changeFlag;
-        newPipelineState = pipelineStateProvider.CreatePipelineStateAsync(
-            graphicsPipelineStateDefinition);
-      }
-      if (beforeNextFrame.PatchHighestChanged) {
-        newHighestData = SimulationStage::ConstantGpuSources<>::LODData(
-            mutableAllocationContext, simData.Highest);
-      }
-      if (beforeNextFrame.PatchMediumChanged) {
-        newMediumData = SimulationStage::ConstantGpuSources<>::LODData(
-            mutableAllocationContext, simData.Medium);
-      }
-      if (beforeNextFrame.PatchLowestChanged) {
-        newLowestData = SimulationStage::ConstantGpuSources<>::LODData(
-            mutableAllocationContext, simData.Lowest);
+      {
+        if (beforeNextFrame.changeFlag) {
+          graphicsPipelineStateDefinition.RasterizerState.Flags =
+              *beforeNextFrame.changeFlag;
+          newPipelineState = pipelineStateProvider.CreatePipelineStateAsync(
+              graphicsPipelineStateDefinition);
+        }
+        if (beforeNextFrame.PatchHighestChanged) {
+          newHighestData = SimulationStage::ConstantGpuSources<>::LODDataSource(
+              mutableAllocationContext, simData.Highest);
+        }
+        if (beforeNextFrame.PatchMediumChanged) {
+          newMediumData = SimulationStage::ConstantGpuSources<>::LODDataSource(
+              mutableAllocationContext, simData.Medium);
+        }
+        if (beforeNextFrame.PatchLowestChanged) {
+          newLowestData = SimulationStage::ConstantGpuSources<>::LODDataSource(
+              mutableAllocationContext, simData.Lowest);
+        }
       }
 
       // Wait until buffers can be used
@@ -509,8 +448,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       if (drawingSimResource.FrameDoneMarker)
         drawingSimResource.Fence.Await(drawingSimResource.FrameDoneMarker);
       // This is necessary for the compute queue
-      if (PREVframeResource.Marker)
-        PREVframeResource.Fence.Await(PREVframeResource.Marker);
 
       if (beforeNextFrame.changeFlag || newPipelineState) {
         graphicsPipelineState = newPipelineState->get();
@@ -563,66 +500,76 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         commonDescriptorHeap.Build();
       }
 
-      auto &computeAllocator = calculatingSimResource.Allocator;
-      computeAllocator.Reset();
-      computeAllocator.BeginList();
-      if (newHighestData || newMediumData || newLowestData) {
-        auto copyRes = [&computeAllocator](MutableTexture &src,
-                                           MutableTexture &dst) {
-          computeAllocator.TransitionResources(
-              {{src, ResourceStates::Common, ResourceStates::CopySource},
-               {dst, ResourceStates::NonPixelShaderResource,
-                ResourceStates::CopyDest}});
-          computeAllocator.CopyResource(src, dst);
-          computeAllocator.TransitionResources(
-              {{dst, ResourceStates::CopyDest,
-                ResourceStates::NonPixelShaderResource}});
-        };
-        auto copyLOD =
-            [&copyRes](SimulationStage::ConstantGpuSources<>::LODData &src,
-                       SimulationStage::ConstantGpuSources<>::LODData &dst) {
-              copyRes(src.Tildeh0, dst.Tildeh0);
-              copyRes(src.Frequencies, dst.Frequencies);
-            };
-        if (newHighestData) {
-          copyLOD(*newHighestData, simulationConstantSources.Highest);
-          beforeNextFrame.PatchHighestChanged = false;
-        }
-        if (newMediumData) {
-          copyLOD(*newMediumData, simulationConstantSources.Medium);
-          beforeNextFrame.PatchMediumChanged = false;
-        }
-        if (newLowestData) {
-          copyLOD(*newLowestData, simulationConstantSources.Lowest);
-          beforeNextFrame.PatchLowestChanged = false;
-        }
-      }
       // Compute shader stage
       {
 
         auto &simResource = calculatingSimResource;
-
+        auto &computeAllocator = simResource.Allocator;
+        computeAllocator.Reset();
+        computeAllocator.BeginList();
         commonDescriptorHeap.Set(computeAllocator);
+        if (newHighestData || newMediumData || newLowestData) {
+          auto copyRes = [&computeAllocator](const MutableTexture &src,
+                                             const MutableTexture &dst) {
+            computeAllocator.TransitionResources(
+                {{src, ResourceStates::Common, ResourceStates::CopySource},
+                 {dst, ResourceStates::NonPixelShaderResource,
+                  ResourceStates::CopyDest}});
+            computeAllocator.CopyResource(src, dst);
+            computeAllocator.TransitionResources(
+                {{dst, ResourceStates::CopyDest,
+                  ResourceStates::NonPixelShaderResource}});
+          };
+          auto copyLOD =
+              [&copyRes](
+                  const SimulationStage::ConstantGpuSources<>::LODDataSource
+                      &src,
+                  const SimulationStage::ConstantGpuSources<>::LODDataSource
+                      &dst) {
+                copyRes(src.Tildeh0, dst.Tildeh0);
+                copyRes(src.Frequencies, dst.Frequencies);
+              };
+          if (newHighestData) {
+            copyLOD(*newHighestData, simulationConstantSources.Highest);
+            beforeNextFrame.PatchHighestChanged = false;
+          }
+          if (newMediumData) {
+            copyLOD(*newMediumData, simulationConstantSources.Medium);
+            beforeNextFrame.PatchMediumChanged = false;
+          }
+          if (newLowestData) {
+            copyLOD(*newLowestData, simulationConstantSources.Lowest);
+            beforeNextFrame.PatchLowestChanged = false;
+          }
+        }
+
         GpuVirtualAddress timeDataBuffer =
             simResource.DynamicBuffer.AddBuffer(timeConstants);
+
+        struct LODData {
+          SimulationStage::SimulationResources::LODDataBuffers &buffers;
+          SimulationStage::ConstantGpuSources<>::LODDataSource &sources;
+        };
+        std::array<LODData, 3> lodData = {
+            LODData{simResource.HighestBuffer,
+                    simulationConstantSources.Highest},
+            LODData{simResource.MediumBuffer, simulationConstantSources.Medium},
+            LODData{simResource.LowestBuffer,
+                    simulationConstantSources.Lowest}};
         // Spektrums
-        {
-          spektrumPipelineState.Apply(computeAllocator);
-          auto mask = spektrumRootDescription.Set(computeAllocator,
-                                                  RootSignatureUsage::Compute);
+        fullSimPipeline.spektrumPipeline.Apply(computeAllocator);
+        for (const LODData &dat : lodData) {
+          auto mask = fullSimPipeline.spektrumRootDescription.Set(
+              computeAllocator, RootSignatureUsage::Compute);
           // Inputs
           mask.timeDataBuffer = timeDataBuffer;
 
-          mask.Tildeh0 =
-              *simulationConstantSources.Highest.Tildeh0.ShaderResource();
-          mask.Frequencies =
-              *simulationConstantSources.Highest.Frequencies.ShaderResource();
+          mask.Tildeh0 = *dat.sources.Tildeh0.ShaderResource();
+          mask.Frequencies = *dat.sources.Frequencies.ShaderResource();
 
           // Outputs
-          mask.Tildeh =
-              *simResource.Highest.tildeh.UnorderedAccess(computeAllocator);
-          mask.TildeD =
-              *simResource.Highest.tildeD.UnorderedAccess(computeAllocator);
+          mask.Tildeh = *dat.buffers.tildeh.UnorderedAccess(computeAllocator);
+          mask.TildeD = *dat.buffers.tildeD.UnorderedAccess(computeAllocator);
 
           const auto xGroupSize = 16;
           const auto yGroupSize = 16;
@@ -633,140 +580,162 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         }
         //  FFT
         {
-          struct FFTData {
-            MutableTextureWithState &Input;
-            MutableTextureWithState &Output;
+          const auto doFFT = [&computeAllocator, &N,
+                              &fullSimPipeline](MutableTextureWithState &inp,
+                                                MutableTextureWithState &out) {
+            auto mask = fullSimPipeline.FFTRootDescription.Set(
+                computeAllocator, RootSignatureUsage::Compute);
+
+            mask.Input = *inp.ShaderResource(computeAllocator);
+            mask.Output = *out.UnorderedAccess(computeAllocator);
+
+            const auto xGroupSize = 1;
+            const auto yGroupSize = 1;
+            const auto sizeX = N;
+            const auto sizeY = 1;
+            computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
+                                      (sizeY + yGroupSize - 1) / yGroupSize, 1);
           };
-          static constexpr const u32 FFTCOUNT = 2;
-          std::array<FFTData, FFTCOUNT> fftStage1 = {
-              FFTData{simResource.Highest.tildeh,
-                      simResource.Highest.tildehBuffer},
 
-              FFTData{simResource.Highest.tildeD,
-                      simResource.Highest.tildeDBuffer}};
-          std::array<FFTData, FFTCOUNT> fftStage2 = {
-              FFTData{simResource.Highest.tildeDBuffer,
-                      simResource.Highest.FFTTildeD},
-              FFTData{simResource.Highest.tildehBuffer,
-                      simResource.Highest.FFTTildeh}};
+          fullSimPipeline.FFTPipeline.Apply(computeAllocator);
+          // UAV+Transition
+          for (const LODData &dat : lodData) {
+            MutableTextureWithState &text = dat.buffers.tildeh;
+            computeAllocator.AddUAVBarrier(
+                *text.UnorderedAccess(computeAllocator));
+            text.ShaderResource(computeAllocator);
 
-          const auto doFFTStage =
-              [&computeAllocator, &N, &FFTRootDescription](
-                  const std::array<FFTData, FFTCOUNT> &stage) {
-                for (const auto &data : stage) {
-                  computeAllocator.AddUAVBarrier(
-                      *data.Input.UnorderedAccess(computeAllocator));
-                  data.Input.ShaderResource(computeAllocator);
-                }
-                for (const auto &data : stage) {
-                  auto mask = FFTRootDescription.Set(
-                      computeAllocator, RootSignatureUsage::Compute);
+            MutableTextureWithState &text2 = dat.buffers.tildeD;
+            computeAllocator.AddUAVBarrier(
+                *text2.UnorderedAccess(computeAllocator));
+            text2.ShaderResource(computeAllocator);
+          }
+          // Stage1
+          for (const LODData &dat : lodData) {
+            doFFT(dat.buffers.tildeh, dat.buffers.tildehBuffer);
+            doFFT(dat.buffers.tildeD, dat.buffers.tildeDBuffer);
+          }
+          // UAV+Transition
+          for (const LODData &dat : lodData) {
+            MutableTextureWithState &text = dat.buffers.tildehBuffer;
+            computeAllocator.AddUAVBarrier(
+                *text.UnorderedAccess(computeAllocator));
+            text.ShaderResource(computeAllocator);
 
-                  mask.Input = *data.Input.ShaderResource(computeAllocator);
-                  mask.Output = *data.Output.UnorderedAccess(computeAllocator);
-
-                  const auto xGroupSize = 1;
-                  const auto yGroupSize = 1;
-                  const auto sizeX = N;
-                  const auto sizeY = 1;
-                  computeAllocator.Dispatch(
-                      (sizeX + xGroupSize - 1) / xGroupSize,
-                      (sizeY + yGroupSize - 1) / yGroupSize, 1);
-                }
-              };
-
-          FFTPipelineState.Apply(computeAllocator);
-          doFFTStage(fftStage1);
-          doFFTStage(fftStage2);
+            MutableTextureWithState &text2 = dat.buffers.tildeDBuffer;
+            computeAllocator.AddUAVBarrier(
+                *text2.UnorderedAccess(computeAllocator));
+            text2.ShaderResource(computeAllocator);
+          }
+          // Stage2
+          for (const LODData &dat : lodData) {
+            doFFT(dat.buffers.tildehBuffer, dat.buffers.FFTTildeh);
+            doFFT(dat.buffers.tildeDBuffer, dat.buffers.FFTTildeD);
+          }
         }
 
         // Calculate final displacements
         {
-          computeAllocator.AddUAVBarrier(
-              *simResource.Highest.FFTTildeh.UnorderedAccess(computeAllocator));
-          computeAllocator.AddUAVBarrier(
-              *simResource.Highest.FFTTildeD.UnorderedAccess(computeAllocator));
-          displacementPipelineState.Apply(computeAllocator);
-          auto mask = displacementRootDescription.Set(
-              computeAllocator, RootSignatureUsage::Compute);
+          fullSimPipeline.displacementPipeline.Apply(computeAllocator);
+          // UAV
+          for (const LODData &dat : lodData) {
 
-          mask.Height =
-              *simResource.Highest.FFTTildeh.ShaderResource(computeAllocator);
-          mask.Choppy =
-              *simResource.Highest.FFTTildeD.ShaderResource(computeAllocator);
-          mask.Output = *simResource.Highest.displacementMap.UnorderedAccess(
-              computeAllocator);
+            computeAllocator.AddUAVBarrier(
+                *dat.buffers.FFTTildeh.UnorderedAccess(computeAllocator));
+            computeAllocator.AddUAVBarrier(
+                *dat.buffers.FFTTildeD.UnorderedAccess(computeAllocator));
+          }
+          for (const LODData &dat : lodData) {
 
-          const auto xGroupSize = 16;
-          const auto yGroupSize = 16;
-          const auto sizeX = N;
-          const auto sizeY = N;
-          computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
-                                    (sizeY + yGroupSize - 1) / yGroupSize, 1);
+            auto mask = fullSimPipeline.displacementRootDescription.Set(
+                computeAllocator, RootSignatureUsage::Compute);
+
+            mask.Height =
+                *dat.buffers.FFTTildeh.ShaderResource(computeAllocator);
+            mask.Choppy =
+                *dat.buffers.FFTTildeD.ShaderResource(computeAllocator);
+            mask.Output =
+                *dat.buffers.displacementMap.UnorderedAccess(computeAllocator);
+
+            const auto xGroupSize = 16;
+            const auto yGroupSize = 16;
+            const auto sizeX = N;
+            const auto sizeY = N;
+            computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
+                                      (sizeY + yGroupSize - 1) / yGroupSize, 1);
+          }
         }
 
         // Calculate gradients
         {
-          gradientPipelineState.Apply(computeAllocator);
-          auto mask = gradientRootDescription.Set(computeAllocator,
-                                                  RootSignatureUsage::Compute);
 
-          computeAllocator.AddUAVBarrier(
-              *simResource.Highest.displacementMap.UnorderedAccess(
-                  computeAllocator));
+          fullSimPipeline.gradientPipeline.Apply(computeAllocator);
+          // UAV
+          for (const LODData &dat : lodData) {
 
-          mask.Displacement =
-              *simResource.Highest.displacementMap.ShaderResource(
-                  computeAllocator);
-          mask.Output =
-              *simResource.Highest.gradients.UnorderedAccess(computeAllocator);
+            computeAllocator.AddUAVBarrier(
+                *dat.buffers.displacementMap.UnorderedAccess(computeAllocator));
+          }
+          for (const LODData &dat : lodData) {
 
-          const auto xGroupSize = 16;
-          const auto yGroupSize = 16;
-          const auto sizeX = N;
-          const auto sizeY = N;
-          computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
-                                    (sizeY + yGroupSize - 1) / yGroupSize, 1);
+            auto mask = fullSimPipeline.gradientRootDescription.Set(
+                computeAllocator, RootSignatureUsage::Compute);
+
+            mask.Displacement =
+                *dat.buffers.displacementMap.ShaderResource(computeAllocator);
+            mask.Output =
+                *dat.buffers.gradients.UnorderedAccess(computeAllocator);
+
+            const auto xGroupSize = 16;
+            const auto yGroupSize = 16;
+            const auto sizeX = N;
+            const auto sizeY = N;
+            computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
+                                      (sizeY + yGroupSize - 1) / yGroupSize, 1);
+          }
         }
-
         // Foam Calculations
 
         {
-          foamDecayPipelineState.Apply(computeAllocator);
-          auto mask = foamDecayRootDescription.Set(computeAllocator,
-                                                   RootSignatureUsage::Compute);
+          fullSimPipeline.foamDecayPipeline.Apply(computeAllocator);
+          for (const LODData &dat : lodData) {
 
-          computeAllocator.AddUAVBarrier(
-              *simResource.Highest.gradients.UnorderedAccess(computeAllocator));
+            computeAllocator.AddUAVBarrier(
+                *dat.buffers.gradients.UnorderedAccess(computeAllocator));
+          }
+          for (const LODData &dat : lodData) {
+            auto mask = fullSimPipeline.foamDecayRootDescription.Set(
+                computeAllocator, RootSignatureUsage::Compute);
 
-          mask.Gradients =
-              *simResource.Highest.gradients.UnorderedAccess(computeAllocator);
+            mask.Gradients =
+                *dat.buffers.gradients.UnorderedAccess(computeAllocator);
 
-          mask.Foam = *simulationSources.Foam.UnorderedAccess();
-          mask.timeBuffer = timeDataBuffer;
+            mask.Foam = *dat.buffers.Foam.UnorderedAccess();
+            mask.timeBuffer = timeDataBuffer;
 
-          const auto xGroupSize = 16;
-          const auto yGroupSize = 16;
-          const auto sizeX = N;
-          const auto sizeY = N;
-          computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
-                                    (sizeY + yGroupSize - 1) / yGroupSize, 1);
+            const auto xGroupSize = 16;
+            const auto yGroupSize = 16;
+            const auto sizeX = N;
+            const auto sizeY = N;
+            computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
+                                      (sizeY + yGroupSize - 1) / yGroupSize, 1);
+          }
         }
 
         // Upload queue
         {
-          PIXScopedEvent(computeQueue.get(), 0, "asdadwadsdawddawdsdzxc");
+          PIXScopedEvent(directQueue.get(), 0, "asdadwadsdawddawdsdzxc");
           auto commandList = computeAllocator.EndList();
           computeAllocator.BeginList();
           simResource.DynamicBuffer.UploadResources(computeAllocator);
           resourceUploader.UploadResourcesAsync(computeAllocator);
           auto initCommandList = computeAllocator.EndList();
 
-          computeQueue.Execute(initCommandList);
-          computeQueue.Execute(commandList);
+          directQueue.Execute(initCommandList);
+          directQueue.Execute(commandList);
 
           simResource.FrameDoneMarker =
-              simResource.Fence.EnqueueSignal(computeQueue);
+              simResource.Fence.EnqueueSignal(directQueue);
         }
       }
 
@@ -829,10 +798,10 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
               break;
 
             case DebugValues::Mode::Displacement1:
-              usedTexture = &drawingSimResource.Highest.displacementMap;
+              usedTexture = &drawingSimResource.HighestBuffer.displacementMap;
               break;
             case DebugValues::Mode::Gradients1:
-              usedTexture = &drawingSimResource.Highest.gradients;
+              usedTexture = &drawingSimResource.HighestBuffer.gradients;
               break;
             }
 
@@ -856,11 +825,12 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
           // Pre translate resources
           GpuVirtualAddress displacementMapAddress =
-              *drawingSimResource.Highest.displacementMap.ShaderResource(
+              *drawingSimResource.HighestBuffer.displacementMap.ShaderResource(
                   allocator);
 
           GpuVirtualAddress gradientsAddress =
-              *drawingSimResource.Highest.gradients.ShaderResource(allocator);
+              *drawingSimResource.HighestBuffer.gradients.ShaderResource(
+                  allocator);
 
           float2 fullSizeXZ = {Defaults::App::oceanSize,
                                Defaults::App::oceanSize};
@@ -884,9 +854,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
           runtimeResults.qtNodes += qt.GetSize();
 
-          // The best choice is to upload planeBottomLeft and planeTopRight and
-          // kinda of UV coordinate that can go outside [0,1] and the fract is
-          // the actual UV value.
+          // The best choice is to upload planeBottomLeft and
+          // planeTopRight and kinda of UV coordinate that can go
+          // outside [0,1] and the fract is the actual UV value.
 
           u16 instanceCount = 0;
 
@@ -980,8 +950,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
           // Retransition simulation resources
 
-          drawingSimResource.Highest.gradients.UnorderedAccess(allocator);
-          drawingSimResource.Highest.displacementMap.UnorderedAccess(allocator);
+          drawingSimResource.HighestBuffer.gradients.UnorderedAccess(allocator);
+          drawingSimResource.HighestBuffer.displacementMap.UnorderedAccess(
+              allocator);
           if (usedTexture)
             (*usedTexture)->UnorderedAccess(allocator);
         }
@@ -1034,10 +1005,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           resourceUploader.UploadResourcesAsync(allocator);
           auto initCommandList = allocator.EndList();
 
-          graphicsQueue.Execute(initCommandList);
-          graphicsQueue.Execute(drawCommandList);
-          frameResource.Marker =
-              frameResource.Fence.EnqueueSignal(graphicsQueue);
+          directQueue.Execute(initCommandList);
+          directQueue.Execute(drawCommandList);
+          frameResource.Marker = frameResource.Fence.EnqueueSignal(directQueue);
         }
       }
 
