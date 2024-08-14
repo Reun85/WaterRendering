@@ -295,8 +295,10 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     GraphicsDevice device{};
     CommandQueue directQueue{device};
+    // CoreSwapChain swapChain{directQueue, window,
+    //                         SwapChainFlags::IsShaderResource};
     CoreSwapChain swapChain{directQueue, window,
-                            SwapChainFlags::IsShaderResource};
+                            SwapChainFlags::IsTearingAllowed};
 
     PipelineStateProvider pipelineStateProvider{device};
 
