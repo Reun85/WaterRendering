@@ -7,13 +7,12 @@ using namespace Axodox::Threading;
 using namespace std;
 using namespace winrt;
 
-namespace Axodox::Graphics::D3D12
-{
-  ResourceUploader::ResourceUploader(const GraphicsDevice& device, uint64_t bufferSize) :
-    _device(device),
-    _allocator(bufferSize > 0 ? bufferSize : 128 * 1024 * 1024),
-    _fence(device)
-  {
+namespace Axodox::Graphics::D3D12 {
+ResourceUploader::ResourceUploader(const GraphicsDevice &device,
+                                   uint64_t bufferSize)
+    : _device(device),
+      _allocator(bufferSize > 0 ? bufferSize : 5 * 128 * 1024 * 1024),
+      _fence(device) {
     D3D12_HEAP_DESC description{
       .SizeInBytes = _allocator.size(),
       .Properties = {

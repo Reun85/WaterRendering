@@ -29,12 +29,8 @@ namespace Axodox::Graphics::D3D12
     void Build();
     void Clean();
 
-  protected:
-    GraphicsDevice _device;
-
-    template<typename T, typename... TArgs>
-    descriptor_ptr<T> CreateDescriptor(TArgs&&... args)
-    {
+  template <typename T, typename... TArgs>
+  descriptor_ptr<T> CreateDescriptor(TArgs &&...args) {
       auto descriptor = std::make_unique<T>(this, std::forward<TArgs>(args)...);
       auto handle = descriptor_ptr<T>(descriptor.get());
 
@@ -43,6 +39,9 @@ namespace Axodox::Graphics::D3D12
       _isDirty = true;
       return handle;
     }
+
+protected:
+  GraphicsDevice _device;
 
     virtual void OnHeapBuilt(ID3D12DescriptorHeap* heap, uint32_t descriptorCount);
     int64_t GetHandleOffset(D3D12_CPU_DESCRIPTOR_HANDLE handle) const;

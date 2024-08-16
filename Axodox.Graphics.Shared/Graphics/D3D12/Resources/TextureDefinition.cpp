@@ -115,10 +115,9 @@ TextureData::TextureData(Format format, uint32_t width, uint32_t height,
                          uint16_t arraySize, std::span<const uint8_t> data)
     : TextureData(format, width, height, arraySize) {
 
-  std::span<uint8_t> span = AsRawSpan();
-  assert(span.size_bytes() == data.size_bytes());
+  assert(_buffer.size() == data.size_bytes());
 
-  std::memcpy(span.data(), data.data(), data.size_bytes());
+  std::memcpy(_buffer.data(), data.data(), data.size_bytes());
 }
 
 TextureData::TextureData(TextureData &&other) { *this = move(other); }
