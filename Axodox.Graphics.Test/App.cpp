@@ -9,6 +9,7 @@
 #include "pix3.h"
 #include "ComputePipeline.h"
 #include "GraphicsPipeline.h"
+#include "SkyboxPipeline.hpp"
 
 using namespace std;
 using namespace winrt;
@@ -66,17 +67,33 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     enum class Mode : u8 {
       Full = 0,
-      Displacement1,
-      Displacement2,
-      Displacement3,
-      Gradients1,
-      Gradients2,
-      Gradients3,
+      DisplacementHighest,
+      DisplacementMedium,
+      DisplacementLowest,
+      GradientsHighest,
+      GradientsMedium,
+      GradientsLowest,
     };
 
     XMFLOAT4 pixelMult = XMFLOAT4(1, 1, 1, 1);
-    Mode mode = Mode::Full;
     XMUINT4 swizzleorder = XMUINT4(0, 1, 2, 3);
+    XMFLOAT3 displacementMult = XMFLOAT3(0.6, 0.6, 0.6);
+    XMFLOAT4 blendDistances = XMFLOAT4(40.f, 150, 1000, 5000);
+
+    bool useFoam = true;
+    bool useChannel1 = true;
+    bool useChannel2 = false;
+    bool useChannel3 = false;
+    bool onlyShowNormals = false;
+    const static u32 DebugBitsStart = 24;
+    const static u32 DebugBitsEnd = 31;
+    std::array<bool, DebugBitsEnd - DebugBitsStart + 1> DebugBits{false};
+    const static constexpr std::array<std::optional<const char *>,
+                                      DebugBitsEnd - DebugBitsStart + 1>
+        DebugBitsNames{"Normal overflow", "Display Foam", std::nullopt};
+
+    Mode mode = Mode::Full;
+
     RasterizerFlags rasterizerFlags = RasterizerFlags::CullNone;
     void DrawImGui(NeedToDo &out, bool exclusiveWindow = true) {
 
@@ -84,10 +101,79 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       if (exclusiveWindow)
         cont = ImGui::Begin("Debug Values");
       if (cont) {
+        // useTexture
+        useTextureImGuiDraw();
+        // Culling
+        CullingImGuiDraw(out);
 
+        ImGui::Checkbox("Use foam", &useFoam);
+        ImGui::Checkbox("Use channel Highest", &useChannel1);
+        ImGui::Checkbox("Use channel Medium", &useChannel2);
+        ImGui::Checkbox("Use channel Lowest", &useChannel3);
+        ImGui::InputFloat3("Displacement Mult", (float *)&displacementMult);
+        ImGui::InputFloat4("Blend Distances", (float *)&blendDistances);
+        for (u32 i = DebugBitsStart; i <= DebugBitsEnd; i++) {
+          if (DebugBitsNames[i - DebugBitsStart])
+            ImGui::Checkbox(*DebugBitsNames[i - DebugBitsStart],
+                            &DebugBits[i - DebugBitsStart]);
+          else
+            ImGui::Checkbox(std::format("Debug Bit {}", i).c_str(),
+                            &DebugBits[i - DebugBitsStart]);
+        }
+      }
+      if (exclusiveWindow)
+        ImGui::End();
+    }
+
+  private:
+    void CullingImGuiDraw(NeedToDo &out) {
+      {
+        static const std::array<std::string, 3> items = {
+            "CullClockwise", "CullNone", "WireFrame"};
+        static uint itemsIndex =
+            rasterizerFlags == RasterizerFlags::CullNone
+                ? 1
+                : (rasterizerFlags == RasterizerFlags::CullClockwise ? 0 : 2);
+
+        if (ImGui::BeginCombo("Render State", items[itemsIndex].c_str())) {
+          for (uint i = 0; i < items.size(); i++) {
+            bool isSelected = (itemsIndex == i);
+            if (ImGui::Selectable(items[i].c_str(), isSelected)) {
+              itemsIndex = i;
+              switch (itemsIndex) {
+                using enum Axodox::Graphics::D3D12::RasterizerFlags;
+              case 1:
+                rasterizerFlags = CullNone;
+                break;
+              case 2:
+                rasterizerFlags = Wireframe;
+                break;
+              default:
+                rasterizerFlags = CullClockwise;
+                break;
+              }
+              out.changeFlag = rasterizerFlags;
+            }
+            if (isSelected) {
+              ImGui::SetItemDefaultFocus();
+            }
+          }
+          ImGui::EndCombo();
+        }
+      }
+    }
+
+  private:
+    void useTextureImGuiDraw() {
+      {
         static const std::array<std::string, 7> modeitems = {
-            "Full",       "Displacement1", "Displacement2", "Displacement3",
-            "Gradients1", "Gradients2",    "Gradients3"};
+            "Full",
+            "DisplacementHighest",
+            "DisplacementMedium",
+            "DisplacementLowest",
+            "GradientsHighest",
+            "GradientsMedium",
+            "GradientsLowest"};
         if (ImGui::BeginCombo("Mode", modeitems[(u32)(mode)].c_str())) {
           for (uint i = 0; i < modeitems.size(); i++) {
             bool isSelected = ((u32)(mode) == i);
@@ -130,44 +216,76 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             }
           }
         }
-
-        static const std::array<std::string, 3> items = {
-            "CullClockwise", "CullNone", "WireFrame"};
-        static uint itemsIndex =
-            rasterizerFlags == RasterizerFlags::CullNone
-                ? 1
-                : (rasterizerFlags == RasterizerFlags::CullClockwise ? 0 : 2);
-
-        if (ImGui::BeginCombo("Render State", items[itemsIndex].c_str())) {
-          for (uint i = 0; i < items.size(); i++) {
-            bool isSelected = (itemsIndex == i);
-            if (ImGui::Selectable(items[i].c_str(), isSelected)) {
-              itemsIndex = i;
-              switch (itemsIndex) {
-                using enum Axodox::Graphics::D3D12::RasterizerFlags;
-              case 1:
-                rasterizerFlags = CullNone;
-                break;
-              case 2:
-                rasterizerFlags = Wireframe;
-                break;
-              default:
-                rasterizerFlags = CullClockwise;
-                break;
-              }
-              out.changeFlag = rasterizerFlags;
-            }
-            if (isSelected) {
-              ImGui::SetItemDefaultFocus();
-            }
-          }
-          ImGui::EndCombo();
-        }
       }
-      if (exclusiveWindow)
-        ImGui::End();
     }
   };
+
+  struct DebugGPUBufferStuff {
+
+    XMFLOAT4 pixelMult;
+    XMFLOAT4 blendDistances;
+    XMUINT4 swizzleOrder;
+    XMFLOAT3 patchSizes;
+    // 0: use displacement
+    // 1: use normal
+    // 2: use foam
+    // 3: use channel1
+    // 4: use channel2
+    // 5: use channel3
+    // 6: display texture instead of shader
+    // 7: transform texture values from [-1,1] to [0,1]
+    uint flags = 0; // Its here because padding
+    XMFLOAT3 displacementMult;
+  };
+  static void set_flag(uint &flag, uint flagIndex, bool flagValue = true) {
+    if (flagValue) {
+      flag |= 1 << flagIndex;
+    } else {
+      flag &= ~(1 << flagIndex);
+    }
+  }
+  static DebugGPUBufferStuff From(const DebugValues &deb,
+                                  const SimulationData &simData) {
+    DebugGPUBufferStuff res;
+    res.pixelMult = XMFLOAT4(deb.pixelMult.x, deb.pixelMult.y, deb.pixelMult.z,
+                             deb.pixelMult.w);
+    res.swizzleOrder = deb.swizzleorder;
+    res.blendDistances = deb.blendDistances;
+    res.patchSizes =
+        XMFLOAT3(simData.Highest.patchSize, simData.Medium.patchSize,
+                 simData.Lowest.patchSize);
+    res.displacementMult = deb.displacementMult;
+    set_flag(res.flags, 6, true);
+    set_flag(res.flags, 0, false);
+    set_flag(res.flags, 2, deb.useFoam);
+    set_flag(res.flags, 3, deb.useChannel1);
+    set_flag(res.flags, 4, deb.useChannel2);
+    set_flag(res.flags, 5, deb.useChannel3);
+
+    for (int i = 0; i < deb.DebugBits.size(); i++) {
+      set_flag(res.flags, i + DebugValues::DebugBitsStart, deb.DebugBits[i]);
+    }
+
+    switch (deb.mode) {
+    case DebugValues::Mode::Full:
+      set_flag(res.flags, 0, true);
+      set_flag(res.flags, 6, false);
+      break;
+    case DebugValues::Mode::GradientsHighest:
+      set_flag(res.flags, 0, true);
+      set_flag(res.flags, 7, true);
+      break;
+    case DebugValues::Mode::GradientsMedium:
+      set_flag(res.flags, 0, true);
+      set_flag(res.flags, 7, true);
+      break;
+    case DebugValues::Mode::GradientsLowest:
+      set_flag(res.flags, 0, true);
+      set_flag(res.flags, 7, true);
+      break;
+    }
+    return res;
+  }
 
   struct RuntimeResults {
     uint qtNodes = 0;
@@ -243,15 +361,16 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         });
   }
 
-  static ID3D12DescriptorHeap *
+  inline static ID3D12DescriptorHeap *
   InitImGui(const Axodox::Graphics::D3D12::GraphicsDevice &device,
-            u8 framesInFlight) {
+            u8 framesInFlight, const string &iniPath) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
-    (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     ImGui::StyleColorsDark();
+
+    io.IniFilename = iniPath.c_str();
 
     // Setup Platform/Renderer bindings
     ImGui_ImplUwp_InitForCurrentView();
@@ -268,9 +387,46 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         device.get(), static_cast<int>(framesInFlight),
         DXGI_FORMAT_B8G8R8A8_UNORM, ImGuiDescriptorHeap,
         ImGuiDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
-
         ImGuiDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
     return ImGuiDescriptorHeap;
+  }
+
+  static void DrawImGuiForPSResources(
+      WaterGraphicRootDescription::PixelShaderPBRData &waterData,
+      WaterGraphicRootDescription::PixelLighting &sunData,
+      bool exclusiveWindow = true) {
+    bool cont = true;
+    if (exclusiveWindow) {
+      cont = ImGui::Begin("PS Data");
+    }
+    if (cont) {
+      ImGui::SliderFloat3("Surface Color", (float *)&waterData.SurfaceColor, 0,
+                          1);
+      ImGui::SliderFloat("Roughness", &waterData.Roughness, 0, 1);
+      ImGui::SliderFloat("Subsurface Scattering",
+                         &waterData.SubsurfaceScattering, 0, 1);
+      ImGui::SliderFloat("Sheen", &waterData.Sheen, 0, 1);
+      ImGui::SliderFloat("Sheen Tint", &waterData.SheenTint, 0, 1);
+      ImGui::SliderFloat("Anisotropic", &waterData.Anisotropic, 0, 1);
+      ImGui::SliderFloat("Specular Strength", &waterData.SpecularStrength, 0,
+                         1);
+      ImGui::SliderFloat("Metallic", &waterData.Metallic, 0, 1);
+      ImGui::SliderFloat("Specular Tint", &waterData.SpecularTint, 0, 1);
+      ImGui::SliderFloat("Clearcoat", &waterData.Clearcoat, 0, 1);
+      ImGui::SliderFloat("Clearcoat Gloss", &waterData.ClearcoatGloss, 0, 1);
+
+      ImGui::Separator();
+      ImGui::Text("Sun Data");
+      ImGui::SliderFloat3("Light Pos", (float *)&sunData.lights[0].lightPos, -1,
+                          1);
+
+      ImGui::SliderFloat3("Light Color", (float *)&sunData.lights[0].lightColor,
+                          0, 1);
+      ImGui::SliderFloat("Light Intensity",
+                         (float *)&sunData.lights[0].lightColor.w, 0, 10);
+    }
+    if (exclusiveWindow)
+      ImGui::End();
   }
 
   void Run() const {
@@ -303,15 +459,15 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     PipelineStateProvider pipelineStateProvider{device};
 
     // Graphics pipeline
-    RootSignature<SimpleGraphicsRootDescription> simpleRootSignature{device};
+    RootSignature<WaterGraphicRootDescription> waterRootSignature{device};
 
     VertexShader simpleVertexShader{app_folder() / L"VertexShader.cso"};
     PixelShader simplePixelShader{app_folder() / L"PixelShader.cso"};
     HullShader hullShader{app_folder() / L"hullShader.cso"};
     DomainShader domainShader{app_folder() / L"domainShader.cso"};
 
-    GraphicsPipelineStateDefinition graphicsPipelineStateDefinition{
-        .RootSignature = &simpleRootSignature,
+    GraphicsPipelineStateDefinition waterPipelineStateDefinition{
+        .RootSignature = &waterRootSignature,
         .VertexShader = &simpleVertexShader,
         .DomainShader = &domainShader,
         .HullShader = &hullShader,
@@ -322,10 +478,34 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         .TopologyType = PrimitiveTopologyType::Patch,
         .RenderTargetFormats = {Format::B8G8R8A8_UNorm},
         .DepthStencilFormat = Format::D32_Float};
-    Axodox::Graphics::D3D12::PipelineState graphicsPipelineState =
+    Axodox::Graphics::D3D12::PipelineState waterPipelineState =
         pipelineStateProvider
-            .CreatePipelineStateAsync(graphicsPipelineStateDefinition)
+            .CreatePipelineStateAsync(waterPipelineStateDefinition)
             .get();
+
+    VertexShader atmosphereVS{app_folder() / L"AtmosphereVS.cso"};
+    PixelShader atmospherePS{app_folder() / L"AtmospherePS.cso"};
+    RootSignature<SkyboxRootDescription> skyboxRootSignature{device};
+    DepthStencilState skyboxDepthStencilState{DepthStencilMode::ReadDepth};
+    skyboxDepthStencilState.Comparison = ComparisonFunction::LessOrEqual;
+    GraphicsPipelineStateDefinition skyboxPipelineStateDefinition{
+        .RootSignature = &skyboxRootSignature,
+        .VertexShader = &atmosphereVS,
+        .PixelShader = &atmospherePS,
+        .RasterizerState = RasterizerFlags::CullNone,
+        .DepthStencilState = skyboxDepthStencilState,
+        .InputLayout = VertexPositionNormalTexture::Layout,
+        .RenderTargetFormats = {Format::B8G8R8A8_UNorm},
+        .DepthStencilFormat = Format::D32_Float};
+    Axodox::Graphics::D3D12::PipelineState skyboxPipelineState =
+        pipelineStateProvider
+            .CreatePipelineStateAsync(skyboxPipelineStateDefinition)
+            .get();
+
+    WaterGraphicRootDescription::PixelShaderPBRData waterData =
+        WaterGraphicRootDescription::PixelShaderPBRData::WaterData();
+    WaterGraphicRootDescription::PixelLighting sunData =
+        WaterGraphicRootDescription::PixelLighting::SunData();
 
     // Compute pipeline
 
@@ -348,6 +528,14 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     ImmutableMesh planeMesh{immutableAllocationContext, CreateQuadPatch()};
 
+    ImmutableMesh skyboxMesh{immutableAllocationContext, CreateCube(2)};
+
+    const std::array<const std::filesystem::path, 6> paths = {
+        "Assets/skybox/right.jpg", "Assets/skybox/left.jpg",
+        "Assets/skybox/top.jpg",   "Assets/skybox/bottom.jpg",
+        "Assets/skybox/front.jpg", "Assets/skybox/back.jpg"};
+    CubeMapTexture skyboxTexture{immutableAllocationContext, paths};
+
     //  Acquire memory
     groupedResourceAllocator.Build();
 
@@ -367,6 +555,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                                              simData.N, simData.M),
         SimulationStage::SimulationResources(mutableAllocationContext,
                                              simData.N, simData.M)};
+
+    committedResourceAllocator.Build();
     const u32 &N = simData.N;
 
     swapChain.Resizing(
@@ -376,8 +566,19 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           commonDescriptorHeap.Clean();
         });
 
+    std::string ImGuiIniPath;
+    {
+      auto localFolder = winrt::Windows::Storage::ApplicationData::Current()
+                             .LocalFolder()
+                             .Path();
+      std::wstring localFolderWstr = localFolder.c_str();
+      ImGuiIniPath =
+          std::string(localFolderWstr.begin(), localFolderWstr.end()) +
+          "\\imgui.ini";
+    }
+
     ID3D12DescriptorHeap *ImGuiDescriptorHeap =
-        InitImGui(device, frameResources.size());
+        InitImGui(device, frameResources.size(), ImGuiIniPath);
     ImGuiIO const &io = ImGui::GetIO();
 
     // Time counter
@@ -425,10 +626,10 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           newLowestData;
       {
         if (beforeNextFrame.changeFlag) {
-          graphicsPipelineStateDefinition.RasterizerState.Flags =
+          waterPipelineStateDefinition.RasterizerState.Flags =
               *beforeNextFrame.changeFlag;
           newPipelineState = pipelineStateProvider.CreatePipelineStateAsync(
-              graphicsPipelineStateDefinition);
+              waterPipelineStateDefinition);
         }
         if (beforeNextFrame.PatchHighestChanged) {
           newHighestData = SimulationStage::ConstantGpuSources<>::LODDataSource(
@@ -452,7 +653,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       // This is necessary for the compute queue
 
       if (beforeNextFrame.changeFlag || newPipelineState) {
-        graphicsPipelineState = newPipelineState->get();
+        waterPipelineState = newPipelineState->get();
         beforeNextFrame.changeFlag = std::nullopt;
       }
 
@@ -551,13 +752,20 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         struct LODData {
           SimulationStage::SimulationResources::LODDataBuffers &buffers;
           SimulationStage::ConstantGpuSources<>::LODDataSource &sources;
+          GpuVirtualAddress constantBuffer;
         };
+
         std::array<LODData, 3> lodData = {
             LODData{simResource.HighestBuffer,
-                    simulationConstantSources.Highest},
-            LODData{simResource.MediumBuffer, simulationConstantSources.Medium},
-            LODData{simResource.LowestBuffer,
-                    simulationConstantSources.Lowest}};
+                    simulationConstantSources.Highest,
+                    simResource.DynamicBuffer.AddBuffer(
+                        SimulationStage::LODComputeBuffer(simData.Highest))},
+            LODData{simResource.MediumBuffer, simulationConstantSources.Medium,
+                    simResource.DynamicBuffer.AddBuffer(
+                        SimulationStage::LODComputeBuffer(simData.Medium))},
+            LODData{simResource.LowestBuffer, simulationConstantSources.Lowest,
+                    simResource.DynamicBuffer.AddBuffer(
+                        SimulationStage::LODComputeBuffer(simData.Lowest))}};
         // Spektrums
         fullSimPipeline.spektrumPipeline.Apply(computeAllocator);
         for (const LODData &dat : lodData) {
@@ -652,6 +860,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             auto mask = fullSimPipeline.displacementRootDescription.Set(
                 computeAllocator, RootSignatureUsage::Compute);
 
+            mask.constantBuffer = dat.constantBuffer;
             mask.Height =
                 *dat.buffers.FFTTildeh.ShaderResource(computeAllocator);
             mask.Choppy =
@@ -683,6 +892,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             auto mask = fullSimPipeline.gradientRootDescription.Set(
                 computeAllocator, RootSignatureUsage::Compute);
 
+            mask.constantBuffer = dat.constantBuffer;
             mask.Displacement =
                 *dat.buffers.displacementMap.ShaderResource(computeAllocator);
             mask.Output =
@@ -709,6 +919,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             auto mask = fullSimPipeline.foamDecayRootDescription.Set(
                 computeAllocator, RootSignatureUsage::Compute);
 
+            mask.constantBuffer = dat.constantBuffer;
             mask.Gradients =
                 *dat.buffers.gradients.UnorderedAccess(computeAllocator);
 
@@ -750,6 +961,14 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           allocator.TransitionResource(*renderTargetView,
                                        ResourceStates::Present,
                                        ResourceStates::RenderTarget);
+          // static bool firstTime = true;
+
+          // if (firstTime) {
+          //   allocator.TransitionResource(*skyboxTexture.ShaderResource(),
+          //                                ResourceStates::Common,
+          //                                ResourceStates::PixelShaderResource);
+          //   firstTime = false;
+          // }
 
           committedResourceAllocator.Build();
           depthStencilDescriptorHeap.Build();
@@ -763,15 +982,14 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         // Draw Ocean
         RuntimeResults runtimeResults;
 
+        GpuVirtualAddress cameraConstantBuffer;
+        GpuVirtualAddress debugConstantBuffer;
+        GpuVirtualAddress sunDataBuffer;
         {
-          SimpleGraphicsRootDescription::VertexConstants vertexConstants{};
-          SimpleGraphicsRootDescription::HullConstants hullConstants{};
-          SimpleGraphicsRootDescription::DomainConstants domainConstants{};
-          SimpleGraphicsRootDescription::PixelConstants pixelConstants{};
-          SimpleGraphicsRootDescription::cameraConstants cameraConstants{};
-          SimpleGraphicsRootDescription::ModelConstants modelConstants{};
 
-          auto modelMatrix = XMMatrixIdentity();
+          WaterGraphicRootDescription::cameraConstants cameraConstants{};
+          DebugGPUBufferStuff debugBufferContent =
+              /*DebugGPUBufferStuff::*/ From(debugValues, simData);
 
           XMStoreFloat3(&cameraConstants.cameraPos, cam.GetEye());
           XMStoreFloat4x4(&cameraConstants.vMatrix,
@@ -780,6 +998,19 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                           XMMatrixTranspose(cam.GetProj()));
           XMStoreFloat4x4(&cameraConstants.vpMatrix,
                           XMMatrixTranspose(cam.GetViewProj()));
+          cameraConstantBuffer =
+              frameResource.DynamicBuffer.AddBuffer(cameraConstants);
+          debugConstantBuffer =
+              frameResource.DynamicBuffer.AddBuffer(debugBufferContent);
+          sunDataBuffer = frameResource.DynamicBuffer.AddBuffer(sunData);
+        }
+
+        {
+          WaterGraphicRootDescription::VertexConstants vertexConstants{};
+          WaterGraphicRootDescription::HullConstants hullConstants{};
+          WaterGraphicRootDescription::ModelConstants modelConstants{};
+
+          auto modelMatrix = XMMatrixIdentity();
 
           XMStoreFloat4x4(&modelConstants.mMatrix,
                           XMMatrixTranspose(modelMatrix));
@@ -788,50 +1019,62 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           std::optional<MutableTextureWithState *> usedTexture;
           // Debug stuff
           {
-            pixelConstants.swizzleorder = debugValues.swizzleorder;
-
-            domainConstants.useDisplacement = 1;
-            pixelConstants.useTexture = 0;
 
             switch (debugValues.mode) {
-            case DebugValues::Mode::Full:
-              pixelConstants.useTexture = 1;
-              domainConstants.useDisplacement = 0;
-              break;
 
-            case DebugValues::Mode::Displacement1:
+            case DebugValues::Mode::DisplacementHighest:
               usedTexture = &drawingSimResource.HighestBuffer.displacementMap;
               break;
-            case DebugValues::Mode::Gradients1:
+            case DebugValues::Mode::GradientsHighest:
               usedTexture = &drawingSimResource.HighestBuffer.gradients;
+              break;
+            case DebugValues::Mode::DisplacementMedium:
+              usedTexture = &drawingSimResource.MediumBuffer.displacementMap;
+              break;
+            case DebugValues::Mode::GradientsMedium:
+              usedTexture = &drawingSimResource.MediumBuffer.gradients;
+              break;
+            case DebugValues::Mode::DisplacementLowest:
+              usedTexture = &drawingSimResource.LowestBuffer.displacementMap;
+              break;
+            case DebugValues::Mode::GradientsLowest:
+              usedTexture = &drawingSimResource.LowestBuffer.gradients;
+              break;
+            default:
               break;
             }
 
             if (usedTexture) {
               usedTextureAddress = *(*usedTexture)->ShaderResource(allocator);
             }
-
-            pixelConstants.mult = debugValues.pixelMult;
           }
 
           // Upload absolute contants
-          GpuVirtualAddress cameraConstantBuffer =
-              frameResource.DynamicBuffer.AddBuffer(cameraConstants);
-          GpuVirtualAddress domainConstantBuffer =
-              frameResource.DynamicBuffer.AddBuffer(domainConstants);
-          GpuVirtualAddress pixelConstantBuffer =
-              frameResource.DynamicBuffer.AddBuffer(pixelConstants);
 
           GpuVirtualAddress modelBuffer =
               frameResource.DynamicBuffer.AddBuffer(modelConstants);
 
+          GpuVirtualAddress waterDataBuffer =
+              frameResource.DynamicBuffer.AddBuffer(waterData);
+
           // Pre translate resources
-          GpuVirtualAddress displacementMapAddress =
+          GpuVirtualAddress displacementMapAddress1 =
               *drawingSimResource.HighestBuffer.displacementMap.ShaderResource(
                   allocator);
-
-          GpuVirtualAddress gradientsAddress =
+          GpuVirtualAddress gradientsAddress1 =
               *drawingSimResource.HighestBuffer.gradients.ShaderResource(
+                  allocator);
+          GpuVirtualAddress displacementMapAddress2 =
+              *drawingSimResource.MediumBuffer.displacementMap.ShaderResource(
+                  allocator);
+          GpuVirtualAddress gradientsAddress2 =
+              *drawingSimResource.MediumBuffer.gradients.ShaderResource(
+                  allocator);
+          GpuVirtualAddress displacementMapAddress3 =
+              *drawingSimResource.LowestBuffer.displacementMap.ShaderResource(
+                  allocator);
+          GpuVirtualAddress gradientsAddress3 =
+              *drawingSimResource.LowestBuffer.gradients.ShaderResource(
                   allocator);
 
           float2 fullSizeXZ = {Defaults::App::oceanSize,
@@ -864,10 +1107,42 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
           allocator.SetRenderTargets({renderTargetView},
                                      frameResource.DepthBuffer.DepthStencil());
-          graphicsPipelineState.Apply(allocator);
+          waterPipelineState.Apply(allocator);
           start = std::chrono::high_resolution_clock::now();
           // Draw calls
           {
+
+            auto drawCollected = [&]() {
+              auto mask = waterRootSignature.Set(allocator,
+                                                 RootSignatureUsage::Graphics);
+
+              if (usedTextureAddress)
+                mask.texture = *usedTextureAddress;
+
+              mask.skybox = skyboxTexture;
+
+              mask.heightMap1 = displacementMapAddress1;
+              mask.gradients1 = gradientsAddress1;
+              mask.heightMap2 = displacementMapAddress2;
+              mask.gradients2 = gradientsAddress2;
+              mask.heightMap3 = displacementMapAddress3;
+              mask.gradients3 = gradientsAddress3;
+
+              mask.waterPBRBuffer = waterDataBuffer;
+              mask.lightingBuffer = sunDataBuffer;
+
+              mask.hullBuffer =
+                  frameResource.DynamicBuffer.AddBuffer(hullConstants);
+              mask.vertexBuffer =
+                  frameResource.DynamicBuffer.AddBuffer(vertexConstants);
+              mask.debugBuffer = debugConstantBuffer;
+              mask.cameraBuffer = cameraConstantBuffer;
+              mask.modelBuffer = modelBuffer;
+
+              planeMesh.Draw(allocator, instanceCount);
+              instanceCount = 0;
+            };
+
             for (auto it = qt.begin(); it != qt.end(); ++it) {
               runtimeResults.NavigatingTheQuadTree +=
                   std::chrono::duration_cast<
@@ -902,51 +1177,13 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
               instanceCount++;
               if (instanceCount == Defaults::App::maxInstances) {
-                auto mask = simpleRootSignature.Set(
-                    allocator, RootSignatureUsage::Graphics);
-
-                if (usedTextureAddress)
-                  mask.texture = *usedTextureAddress;
-
-                mask.heightMapForDomain = displacementMapAddress;
-                mask.gradientsForPixel = gradientsAddress;
-
-                mask.hullBuffer =
-                    frameResource.DynamicBuffer.AddBuffer(hullConstants);
-                mask.vertexBuffer =
-                    frameResource.DynamicBuffer.AddBuffer(vertexConstants);
-                mask.domainBuffer = domainConstantBuffer;
-                mask.pixelBuffer = pixelConstantBuffer;
-                mask.cameraBuffer = cameraConstantBuffer;
-                mask.modelBuffer = modelBuffer;
-
-                planeMesh.Draw(allocator, instanceCount);
-                instanceCount = 0;
+                drawCollected();
               }
 
               start = std::chrono::high_resolution_clock::now();
-            }
+            } // loop end
             if (instanceCount != 0) {
-              auto mask = simpleRootSignature.Set(allocator,
-                                                  RootSignatureUsage::Graphics);
-
-              if (usedTextureAddress)
-                mask.texture = *usedTextureAddress;
-
-              mask.heightMapForDomain = displacementMapAddress;
-              mask.gradientsForPixel = gradientsAddress;
-
-              mask.hullBuffer =
-                  frameResource.DynamicBuffer.AddBuffer(hullConstants);
-              mask.vertexBuffer =
-                  frameResource.DynamicBuffer.AddBuffer(vertexConstants);
-              mask.domainBuffer = domainConstantBuffer;
-              mask.pixelBuffer = pixelConstantBuffer;
-              mask.cameraBuffer = cameraConstantBuffer;
-              mask.modelBuffer = modelBuffer;
-
-              planeMesh.Draw(allocator, instanceCount);
-              instanceCount = 0;
+              drawCollected();
             }
           }
 
@@ -955,8 +1192,28 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           drawingSimResource.HighestBuffer.gradients.UnorderedAccess(allocator);
           drawingSimResource.HighestBuffer.displacementMap.UnorderedAccess(
               allocator);
+          drawingSimResource.MediumBuffer.gradients.UnorderedAccess(allocator);
+          drawingSimResource.MediumBuffer.displacementMap.UnorderedAccess(
+              allocator);
+          drawingSimResource.LowestBuffer.gradients.UnorderedAccess(allocator);
+          drawingSimResource.LowestBuffer.displacementMap.UnorderedAccess(
+              allocator);
           if (usedTexture)
             (*usedTexture)->UnorderedAccess(allocator);
+        }
+
+        // skybox
+        {
+
+          skyboxPipelineState.Apply(allocator);
+          auto mask =
+              skyboxRootSignature.Set(allocator, RootSignatureUsage::Graphics);
+
+          mask.skybox = skyboxTexture;
+
+          mask.cameraBuffer = cameraConstantBuffer;
+
+          skyboxMesh.Draw(allocator);
         }
 
         auto CPURenderEnd = std::chrono::high_resolution_clock::now();
@@ -986,6 +1243,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           }
           ImGui::End();
           simData.DrawImGui(beforeNextFrame);
+          DrawImGuiForPSResources(waterData, sunData, true);
 
           ImGui::Render();
 

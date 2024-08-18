@@ -1,8 +1,10 @@
+
 #include "common.hlsli"
 Texture2D<float4> _texture : register(t0);
-Texture2D<float4> _gradients : register(t1);
+TextureCube<float4> _skybox : register(t1);
 SamplerState _sampler : register(s0);
 
+#define PI 3.14159265359
 
 cbuffer CameraBuffer : register(b0)
 {
@@ -10,99 +12,234 @@ cbuffer CameraBuffer : register(b0)
 }
 
 
-cbuffer Constants : register(b1)
+cbuffer DebugBuffer : register(b9)
 {
-    float4 mult;
-    uint4 swizzleorder;
-    int useTexture;
+    DebugValues debugValues;
 }
+
+
+
+struct PixelLightData
+{
+    float4 lightPos;
+    float4 lightColor;
+};
+cbuffer PixelLighting : register(b1)
+{
+    PixelLightData lights[MAX_LIGHT_COUNT];
+    int lightCount;
+};
+
+
 
 struct input_t
 {
     float4 Screen : SV_Position;
     float3 localPos : POSITION;
-    float2 TextureCoord : TEXCOORD;
+    float2 planeCoord : PLANECOORD;
+    float4 grad : GRADIENTS;
 };
 
 
 
-float4 main(input_t input,bool frontFacing : SV_IsFrontFace) : SV_TARGET
+cbuffer MaterialProperties : register(b2)
+{
+    float3 SurfaceColor;
+    float Roughness;
+    float SubsurfaceScattering;
+    float Sheen;
+    float SheenTint;
+    float Anisotropic;
+    float SpecularStrength;
+    float Metallic;
+    float SpecularTint;
+    float Clearcoat;
+    float ClearcoatGloss;
+};
+
+
+
+// Utility Functions
+float3 SchlickFresnel(float3 f0, float3 f90, float VdotH)
+{
+    return f0 + (f90 - f0) * pow(1.0 - VdotH, 5.0);
+}
+
+float D_GGX(float NdotH, float roughness)
+{
+    float alpha = roughness * roughness;
+    float alpha2 = alpha * alpha;
+    float denom = NdotH * NdotH * (alpha2 - 1.0) + 1.0;
+    return alpha2 / (PI * denom * denom);
+}
+
+float G_Smith(float NdotL, float NdotV, float roughness)
+{
+    float alpha = roughness * roughness;
+    float k = alpha * 0.5;
+    float G_V = NdotV / (NdotV * (1.0 - k) + k);
+    float G_L = NdotL / (NdotL * (1.0 - k) + k);
+    return G_V * G_L;
+}
+
+float3 F_Schlick(float3 f0, float3 f90, float VdotH)
+{
+    return f0 + (f90 - f0) * pow(1.0 - VdotH, 5.0);
+}
+
+// Disney BRDF Functions
+float3 DisneyDiffuse(float NdotL, float NdotV, float LdotH, float LdotN)
+{
+    float energyBias = 0.5 * Roughness;
+    float energyFactor = lerp(1.0, 1.0 / 1.51, Roughness);
+
+    float fd90 = energyBias + 2.0 * LdotH * LdotH * Roughness;
+    float lightScatter = 1.0 + (fd90 - 1.0) * pow(1.0 - NdotL, 5.0);
+    float viewScatter = 1.0 + (fd90 - 1.0) * pow(1.0 - NdotV, 5.0);
+
+    return lightScatter * viewScatter * energyFactor;
+}
+
+float3 Subsurface(float NdotL, float NdotV, float LdotH)
+{
+    float FL = 1.0 - pow(1.0 - NdotL, 5.0);
+    float FV = 1.0 - pow(1.0 - NdotV, 5.0);
+    return FL * FV * (1.0 / PI);
+}
+
+float3 SheenBRDF(float3 normal, float3 viewDir, float3 lightDir, float3 H)
+{
+    float NdotL = saturate(dot(normal, lightDir));
+    float NdotV = saturate(dot(normal, viewDir));
+    float HdotV = saturate(dot(H, viewDir));
+
+    float3 sheenColor = lerp(float3(1.0, 1.0, 1.0), SurfaceColor, SheenTint);
+
+    return Sheen * sheenColor * SchlickFresnel(float3(0.0, 0.0, 0.0), sheenColor, HdotV);
+}
+
+// Pixel Shader
+float3 PBRShader(float3 localPos, float3 normal, float3 LightDirection, float3 LightColor, float LightIntensity)
+{
+    
+    
+    normal = normalize(normal);
+    float3 viewDir = normalize(camConstants.cameraPos - localPos);
+    float3 lightDir = normalize(LightDirection);
+
+    // Sample base color
+    float3 baseColor = SurfaceColor;
+
+    float3 H = normalize(lightDir + viewDir);
+
+    float NdotL = saturate(dot(normal, lightDir));
+    float NdotV = saturate(dot(normal, viewDir));
+    float NdotH = saturate(dot(normal, H));
+    float LdotH = saturate(dot(lightDir, H));
+
+    // Diffuse
+    float3 diffuseColor = baseColor;
+    float3 diffuse = (1.0 - Metallic) * DisneyDiffuse(NdotL, NdotV, LdotH, NdotL) * diffuseColor;
+
+    // Subsurface Scattering
+    float3 subsurface = SubsurfaceScattering * Subsurface(NdotL, NdotV, LdotH) * diffuseColor;
+
+    // Specular
+    float3 F0 = lerp(float3(0.04, 0.04, 0.04), diffuseColor, Metallic);
+    float3 F = F_Schlick(F0, float3(1.0, 1.0, 1.0), NdotH);
+    float D = D_GGX(NdotH, Roughness);
+    float G = G_Smith(NdotL, NdotV, Roughness);
+
+    float3 specular = F * G * D / (4.0 * NdotL * NdotV);
+
+    // Sheen
+    float3 sheen = SheenBRDF(normal, viewDir, lightDir, H);
+
+    // Clearcoat
+    float3 clearcoat = Clearcoat * D_GGX(NdotH, ClearcoatGloss) * lerp(0.04, 1.0, NdotH);
+
+    // Reflection
+    float3 reflectionVector = reflect(-viewDir, normal);
+    float4 reflectionColor = _skybox.Sample(_sampler, reflectionVector);
+    reflectionColor *= SpecularStrength;
+    
+    
+    // Combine all contributions
+    float3 lighting = LightColor * LightIntensity * (diffuse + subsurface + sheen + specular + clearcoat * NdotL) + reflectionColor.xyz;
+
+
+    // Final color output
+    return lighting;
+}
+float3 PBRShader(float3 localPos, float3 normal, int lightIndex)
+{
+    float3 LightDirection = lights[lightIndex].lightPos.xyz;
+    float3 LightColor = lights[lightIndex].lightColor.xyz;
+    float LightIntensity = lights[lightIndex].lightColor.w;
+    return PBRShader(localPos, normal, LightDirection, LightColor, LightIntensity);
+}
+
+
+
+
+
+
+
+float4 main(input_t input, bool isFrontFacing : SV_IsFrontFace) : SV_TARGET
 {
 
-
-    if (useTexture == 0)
+    if (has_flag(debugValues.flags, 6))
     {
-        float4 text = _texture.Sample(_sampler, input.TextureCoord) * float4(mult.xyz, 1);
-        return Swizzle(text, swizzleorder);
+        float2 texCoord = GetTextureCoordFromPlaneCoordAndPatch(input.planeCoord, debugValues.patchSizes.r);
+        float4 text = _texture.Sample(_sampler, texCoord) * float4(debugValues.pixelMult.
+        xyz, 1);
+        if (has_flag(debugValues.flags, 7))
+        {
+            text.xyz = (text.xyz + 1) / 2;
+        }
+
+        return text;
+        return Swizzle(text, debugValues.swizzleOrder);
     }
     
     
-// Colors
-    const float3 sunColor = float3(1.0, 1.0, 0.47);
-    const float3 sunDir = float3(0.45, 0.1, -0.45);
-    const float3 waterColor = float3(0.1812f, 0.4678f, 0.5520f);
 
     
-    // Light
-    float3 La = float3(0.3, 0.3, 0.4); // Ambient light from the sky
-    float3 Ld = float3(1.0, 0.95, 0.8);
-    float3 Ls = float3(1.0, 1.0, 0.3);
-    const float lightConstantAttenuation = 1.0;
-// These are for point lights
-    const float lightLinearAttenuation = 0.0;
-    const float lightQuadraticAttenuation = 0.0;
-
-    // Water
-
-    float3 Ka = waterColor * 3;
-    float3 Kd = float3(0.2, 0.2, 0.2) * 4;
-    float3 Ks = float3(0.9, 0.9, 0.9) * 2;
-    float Shininess = 64.0;
 
     
     
-    //if (cameraPos.x < 0.0 == input.localPos.x < 0 && cameraPos.z < 0 == input.localPos.z < 0)
-    //if (input.localPos.x < 0 == sunDir.x < 0 && input.localPos.z < 0 == sunDir.z < 0)
-    //{
-    //    return float4(1, 0, 0, 1);
-    //}
+    float3 normal = input.grad.xyz;
+    // Why is it backwards??????????
+    normal = isFrontFacing ? -normal : normal;
+
+    float3 viewDir = normalize(camConstants.cameraPos - input.localPos);
+    if (has_flag(debugValues.flags, 24))
+    {
+        if (dot(normal, viewDir) < 0)
+            return float4(1, 0, 0, 1);
+        return float4(0, 1, 0, 1);
+    }
+    if (dot(normal, viewDir) < 0)
+    {
+        normal *= -1;
+    }
+
+    if (has_flag(debugValues.flags, 7))
+    {
+        return float4(normal / 2 + 0.5, 1);
+    }
+
+    float Jacobian = input.grad.w;
+    if (has_flag(debugValues.flags, 25))
+    {
+        return float4(Jacobian, Jacobian, Jacobian, 1);
+    }
+
+
+
+
      
-    float4 grad = _gradients.Sample(_sampler, input.TextureCoord);
-
-    float3 normal = normalize(grad.xyz);
-    normal *= frontFacing ? -1 : 1;
-	
-    float LightDistance = 0.0;
-	
-
-    float3 ToLight = normalize(sunDir);
-	
-    // Will be 1
-    float Attenuation = 1.0 / (lightConstantAttenuation + lightLinearAttenuation * LightDistance + lightQuadraticAttenuation * LightDistance * LightDistance);
-	
-    float3 Ambient = La * Ka;
-
-    float DiffuseFactor = max(dot(ToLight, normal), 0.0) * Attenuation;
-    float3 Diffuse = DiffuseFactor * Ld * Kd;
-
-    float3 viewDir = normalize(camConstants.cameraPos.xyz - (input.localPos.xyz));
-    float3 reflectDir = reflect(-ToLight, normal);
-	
-    float SpecularFactor = pow(max(dot(viewDir, reflectDir), 0.0), Shininess) * Attenuation;
-    float3 Specular = SpecularFactor * Ls * Ks;
-
-    
-    
-    float3 lighting = Ambient + Diffuse + Specular;
-    float3 baseColor = waterColor;
-    float foam= grad.w*10;
-    const float3 foamColor = float3(1, 1, 1);
-
-    baseColor += smoothstep(0, 1,foam) * foamColor;
-    float3 ret = baseColor * lighting;
-    
-   
-
-
-    return float4(ret, 1);
+    float3 ret = float3(0, 0, 0);
+    ret += PBRShader(input.localPos, normal, 0);
+    return float4(ret, 0.6);
 }

@@ -9,13 +9,83 @@ struct cameraConstants
 };
 struct DebugValues
 {
-    float4 swizzleOrder;
+    float4 pixelMult;
+    float4 blendDistances;
+    uint4 swizzleOrder;
+    float3 patchSizes;
+    // 0: use displacement
+    // 2: use foam
+    // 3: use channel1
+    // 4: use channel2
+    // 5: use channel3
+    // 6: display texture instead of shader
+    // 7: show normal
+    // Bits [24,31] are reversed for debug reasons
+    uint flags;
+    float3 displacementMult;
+
 };
+
+
+bool has_flag(uint flags, uint flagIndex)
+{
+    return (flags & (1u << flagIndex)) != 0;
+}
+
+float4 GetRemainingFraction(float4 value, float fraction)
+{
+    return fmod(value, fraction) / fraction;
+}
+float3 GetRemainingFraction(float3 value, float fraction)
+{
+    return fmod(value, fraction) / fraction;
+}
+float2 GetRemainingFraction(float2 value, float fraction)
+{
+    return fmod(value, fraction) / fraction;
+}
+float GetRemainingFraction(float value, float fraction)
+{
+    return fmod(value, fraction) / fraction;
+}
+
+
+float sqr(float x)
+{
+    return x * x;
+}
+
+float DotClamped(float3 x, float3 y)
+{
+    return max(0, dot(x, y));
+}
+float DotClamped(float2 x, float2 y)
+{
+    return max(0, dot(x, y));
+}
+float DotClamped(float x, float y)
+{
+    return max(0, dot(x, y));
+}
+
+
+float2 GetTextureCoordFromPlaneCoordAndPatch(float2 planeCoord, float patchSize)
+{
+    return GetRemainingFraction(planeCoord, patchSize) + 0.5.xx;
+}
 
 struct TimeConstants
 {
     float deltaTime;
     float timeSinceLaunch;
+};
+
+
+struct ComputeConstants
+{
+    float patchSize;
+    float displacementLambda;
+    float foamExponentialDecay;
 };
 
 inline float2 ComplexMul(float2 a, float2 b)

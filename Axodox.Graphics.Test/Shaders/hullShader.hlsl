@@ -12,7 +12,7 @@ struct HS_INPUT_PATCH
 {
     float4 Position : SV_POSITION;
     float3 localPos : POSITION;
-    float2 TexCoord : TEXCOORD;
+    float2 TexCoord : PLANECOORD;
     uint instanceID : InstanceID;
 };
 
@@ -20,7 +20,7 @@ struct HS_OUTPUT_PATCH
 {
     // The domain shader recalculates the screen position
     float3 localPos : POSITION;
-    float2 TexCoord : TEXCOORD;
+    float2 TexCoord : PLANECOORD;
 };
 
 // Ran once per control of input patch

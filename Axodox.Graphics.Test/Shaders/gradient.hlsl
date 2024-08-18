@@ -1,13 +1,17 @@
 #include "common.hlsli"
 Texture2D<float4> displacement : register(t0);
 RWTexture2D<float4> gradients : register(u0);
-
+cbuffer Test : register(b9)
+{
+    ComputeConstants constants;
+}
 [numthreads(16, 16, 1)]
 void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
 
-    float TILE_SIZE_X2 =  PATCH_SIZE1 * 2.0f / float(DISP_MAP_SIZE);
-    float INV_TILE_SIZE = DISP_MAP_SIZE /  PATCH_SIZE1;
+    const float PATCH_SIZE = constants.patchSize;
+    const float TILE_SIZE_X2 = PATCH_SIZE * 2.0f / float(DISP_MAP_SIZE);
+    const float INV_TILE_SIZE = DISP_MAP_SIZE / PATCH_SIZE;
 
     int2 loc = int2(dispatchThreadID.xy);
 
@@ -28,7 +32,7 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     float J = (1.0 + dDx.x) * (1.0 + dDy.y) - dDx.y * dDy.x;
 
-    float3 grad = float3(gradient.y, TILE_SIZE_X2/2, gradient.x);
+    float3 grad = float3(gradient.x, TILE_SIZE_X2, gradient.y);
 
     gradients[loc] = float4(normalize(grad), J);
 }

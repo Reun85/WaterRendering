@@ -1,8 +1,6 @@
 #pragma once
 #include "pch.h"
 #include <DirectXMath.h>
-using namespace winrt::Windows::UI::Core;
-using namespace DirectX;
 
 struct Plane {
   // unit vector
@@ -38,6 +36,7 @@ struct Volume {
 };
 
 struct AABB : public Volume {
+  // This is padded due to vtable. Cool
   XMVECTOR center{0.f, 0.f, 0.f, 1};
   XMVECTOR extents{0.f, 0.f, 0.f, 1};
 

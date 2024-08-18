@@ -12,20 +12,20 @@ struct SimulationData {
   const u32 M;
   struct PatchData {
     f32 patchSize;
+    f32 displacementLambda;
+    f32 foamExponentialDecay;
+    f32 Amplitude;
 
+    f32 WindForce;
     const u32 &N;
     const u32 &M;
     const float2 &windDirection;
-    const f32 &WindForce;
     const f32 &gravity;
-    const f32 &Amplitude;
     const f32 &Depth;
-    bool DrawImGui();
+    bool DrawImGui(std::string_view ID);
   };
   float2 windDirection;
-  f32 WindForce;
   f32 gravity;
-  f32 Amplitude;
   f32 Depth;
   PatchData Highest;
   PatchData Medium;
@@ -46,7 +46,7 @@ constexpr Prec PhilipsSpektrum(const float2 &k, const Prec &Amplitude,
   // Smaller than these waves
   const float l = largestHeight / 1000.f;
 
-  const float kdotw = dot(k, wind);
+  const float kdotw = dot(k, normalize(wind));
   const float klengthsq = dot(k, k);
   float P_h = Amplitude *
               (std::expf(-1.0f / (klengthsq * largestHeight * largestHeight))) /
@@ -86,7 +86,8 @@ constexpr u32 RowMajorIndexing(const u32 i, const u32 j, const u32 M) {
 constexpr u32 ColumnMajorIndexing(const u32 i, const u32 j, const u32 N) {
   return i + j * N;
 };
-constexpr u32 Indexing(const u32 i, const u32 j, const u32 _, const u32 M) {
+constexpr u32 Indexing(const u32 i, const u32 j, [[maybe_unused]] const u32 _,
+                       const u32 M) {
   // return ColumnMajorIndexing(i, j, N);
   return RowMajorIndexing(i, j, M);
 };
@@ -113,9 +114,9 @@ CalculateTildeh0(const SimulationData::PatchData &dat) {
   std::vector<std::complex<Prec>> res(N * M);
   float2 k(0, 0);
   for (i32 i = 0; i < N; ++i) {
-    k.x = 2 * std::numbers::pi_v<Prec> * (Nx2 - i) / L;
+    k.x = 2.f * std::numbers::pi_v<Prec> * static_cast<float>(Nx2 - i) / L;
     for (i32 j = 0; j < M; j++) {
-      k.y = 2 * std::numbers::pi_v<Prec> * (Mx2 - j) / L;
+      k.y = 2.f * std::numbers::pi_v<Prec> * static_cast<float>(Mx2 - j) / L;
 
       const auto index = Inner::Indexing(i, j, N, M);
 

@@ -102,12 +102,15 @@
     <ClInclude Include="ComputePipeline.h" />
     <ClInclude Include="ConstantGPUBuffer.h" />
     <ClInclude Include="constants.h" />
+    <ClInclude Include="CubeMap.h" />
     <ClInclude Include="Defaults.h" />
     <ClInclude Include="Frustum.hpp" />
     <ClInclude Include="GraphicsPipeline.h" />
     <ClInclude Include="Helpers.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="QuadTree.h" />
+    <ClInclude Include="Shaders\DebugValues.h" />
+    <ClInclude Include="SkyboxPipeline.hpp" />
     <ClInclude Include="Typedefs.h" />
     <ClInclude Include="Simulation.h" />
   </ItemGroup>
@@ -120,6 +123,7 @@
     <ClCompile Include="App.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="ConstantGPUBuffer.cpp" />
+    <ClCompile Include="CubeMap.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
@@ -127,7 +131,6 @@
     <ClCompile Include="Simulation.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\ELTE\GPGPU\GPGPU-Assignment\src\imgui.ini" />
     <None Include="packages.config" />
     <None Include="PropertySheet.props" />
     <None Include="Shaders\common.hlsli" />
@@ -135,6 +138,26 @@
     <Text Include="readme.txt" />
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="Shaders\PixelShadeaaaaaaaaaar.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="Shaders\AtmospherePS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="Shaders\AtmosphereVS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
+    </FxCompile>
+    <FxCompile Include="Shaders\PixelShader.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="Shaders\PixelShader3.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+    </FxCompile>
     <FxCompile Include="Shaders\displacement.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
@@ -164,7 +187,7 @@
     <FxCompile Include="PostProcessingComputeShader.hlsl">
       <ShaderType>Compute</ShaderType>
     </FxCompile>
-    <FxCompile Include="Shaders\PixelShader.hlsl">
+    <FxCompile Include="Shaders\PixelShader2.hlsl">
       <ShaderType>Pixel</ShaderType>
     </FxCompile>
     <FxCompile Include="Shaders\VertexShader.hlsl">
@@ -185,6 +208,12 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="Assets\LockScreenLogo.scale-200.png" />
+    <Image Include="Assets\skybox\back.jpg" />
+    <Image Include="Assets\skybox\bottom.jpg" />
+    <Image Include="Assets\skybox\front.jpg" />
+    <Image Include="Assets\skybox\left.jpg" />
+    <Image Include="Assets\skybox\right.jpg" />
+    <Image Include="Assets\skybox\top.jpg" />
     <Image Include="Assets\SplashScreen.scale-200.png" />
     <Image Include="Assets\Square150x150Logo.scale-200.png" />
     <Image Include="Assets\Square44x44Logo.scale-200.png" />

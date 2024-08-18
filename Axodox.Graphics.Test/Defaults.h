@@ -75,19 +75,28 @@ public:
     };
 
     /// Have to change in common.hlsli as well
-    CONST_QUALIFIER f32 patchSize1 = ShaderConstantCompat::patchSize1;
-    CONST_QUALIFIER f32 patchSize2 = ShaderConstantCompat::patchSize2;
-    CONST_QUALIFIER f32 patchSize3 = ShaderConstantCompat::patchSize3;
+    QUALIFIER f32 patchSize1 = 7.f;
+    QUALIFIER f32 patchSize2 = 27.f;
+    QUALIFIER f32 patchSize3 = 87.f;
     CONST_QUALIFIER u32 N = ComputeShader::heightMapDimensions;
+
+    QUALIFIER f32 displacementLambda = 1.3f;
+    QUALIFIER f32 exponentialDecay = 0.3f;
+
     QUALIFIER f32 Depth = 100;
 
     QUALIFIER f32 gravity = 9.81f;
 
-    QUALIFIER f32 WindForce = 0.4f * 6.f;
     QUALIFIER float2 WindDirection = float2(-0.4f, -0.9f);
 
     // A constant that scales the waves
-    QUALIFIER f32 Amplitude = 0.85e-2f;
+    QUALIFIER f32 Amplitude1 = 0.45e-1f;
+    QUALIFIER f32 Amplitude2 = 0.45e-2f;
+    QUALIFIER f32 Amplitude3 = 0.45e-3f;
+
+    QUALIFIER f32 WindForce1 = 3.f;
+    QUALIFIER f32 WindForce2 = 4.f;
+    QUALIFIER f32 WindForce3 = 8.f;
 
     static_assert(isPowerOfTwo(N));
   };
