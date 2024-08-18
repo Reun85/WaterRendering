@@ -3,12 +3,16 @@ Texture2D<float2> heightfield : register(t0);
 Texture2D<float2> choppyfield : register(t1);
 RWTexture2D<float4> displacement : register(u0);
 
+cbuffer Test : register(b9)
+{
+    ComputeConstants constants;
+}
 
 [numthreads(16, 16, 1)]
 void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3 LTid : SV_GroupID)
 {
 
-    const float lambda = DISPLACEMENT_LAMBDA;
+    const float lambda = constants.displacementLambda;
     int2 loc = int2(DTid.xy);
 
     // Required due to interval change

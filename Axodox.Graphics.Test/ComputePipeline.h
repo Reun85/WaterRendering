@@ -21,6 +21,16 @@ using namespace DirectX::PackedVector;
 template <typename T, typename TypeA, typename TypeB>
 concept Either = std::same_as<T, TypeA> || std::same_as<T, TypeB>;
 struct SimulationStage {
+  struct LODComputeBuffer {
+    f32 patchSize;
+    f32 displacementLambda;
+    f32 foamExponentialDecay;
+
+    explicit LODComputeBuffer(const SimulationData::PatchData &patchData)
+        : patchSize(patchData.patchSize),
+          displacementLambda(patchData.displacementLambda),
+          foamExponentialDecay(patchData.foamExponentialDecay) {}
+  };
   struct SpektrumRootDescription : public RootSignatureMask {
     // In
     RootDescriptorTable<1> Tildeh0;
@@ -57,6 +67,8 @@ struct SimulationStage {
     // In
     RootDescriptorTable<1> Height;
     RootDescriptorTable<1> Choppy;
+    RootDescriptor<RootDescriptorType::ConstantBuffer> constantBuffer;
+
     // Out
     RootDescriptorTable<1> Output;
 
@@ -64,6 +76,7 @@ struct SimulationStage {
         : RootSignatureMask(context),
           Height(this, {DescriptorRangeType::ShaderResource, 0}),
           Choppy(this, {DescriptorRangeType::ShaderResource, 1}),
+          constantBuffer(this, {9}),
           Output(this, {DescriptorRangeType::UnorderedAccess, 0}) {
       Flags = RootSignatureFlags::None;
     }
@@ -71,12 +84,14 @@ struct SimulationStage {
   struct GradientDescription : public RootSignatureMask {
     // In
     RootDescriptorTable<1> Displacement;
+    RootDescriptor<RootDescriptorType::ConstantBuffer> constantBuffer;
     // Out
     RootDescriptorTable<1> Output;
 
     explicit GradientDescription(const RootSignatureContext &context)
         : RootSignatureMask(context),
           Displacement(this, {DescriptorRangeType::ShaderResource, 0}),
+          constantBuffer(this, {9}),
           Output(this, {DescriptorRangeType::UnorderedAccess, 0}) {
       Flags = RootSignatureFlags::None;
     }
@@ -84,6 +99,7 @@ struct SimulationStage {
   struct FoamDecayDescription : public RootSignatureMask {
     // In-Out
     RootDescriptorTable<1> Gradients;
+    RootDescriptor<RootDescriptorType::ConstantBuffer> constantBuffer;
     // In
     RootDescriptorTable<1> Foam;
     RootDescriptor<RootDescriptorType::ConstantBuffer> timeBuffer;
@@ -91,6 +107,7 @@ struct SimulationStage {
     explicit FoamDecayDescription(const RootSignatureContext &context)
         : RootSignatureMask(context),
           Gradients(this, {DescriptorRangeType::UnorderedAccess, 0}),
+          constantBuffer(this, {9}),
           Foam(this, {DescriptorRangeType::UnorderedAccess, 1}),
           timeBuffer(this, {0}) {
       Flags = RootSignatureFlags::None;

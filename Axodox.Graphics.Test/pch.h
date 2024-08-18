@@ -8,6 +8,7 @@
 #include <winrt/Windows.UI.Core.h>
 #include <winrt/Windows.UI.Composition.h>
 #include <winrt/Windows.UI.Input.h>
+#include <winrt/Windows.Storage.h>
 
 #define PLATFORM_WINDOWS
 #include "../Axodox.Graphics.Shared/Include/Axodox.Graphics.D3D12.h"
@@ -16,3 +17,4 @@
 
 #include "Typedefs.h"
 #include "ConstantGPUBuffer.h"
+#include "CubeMap.h"
