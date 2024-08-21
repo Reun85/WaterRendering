@@ -70,8 +70,7 @@ SimulationData SimulationData::Default() {
                      .Depth = Depth,
                      .Highest =
                          {
-                             .displacementLambda = float3(displacementLambda, 1,
-                                                          displacementLambda),
+                             .displacementLambda = displacementLambda,
                              .patchSize = patchSize1,
                              .foamExponentialDecay = exponentialDecay,
                              .Amplitude = Amplitude1,
@@ -84,8 +83,7 @@ SimulationData SimulationData::Default() {
                          },
                      .Medium =
                          {
-                             .displacementLambda = float3(displacementLambda, 1,
-                                                          displacementLambda),
+                             .displacementLambda = displacementLambda,
                              .patchSize = patchSize2,
                              .foamExponentialDecay = exponentialDecay,
                              .Amplitude = Amplitude2,
@@ -97,8 +95,7 @@ SimulationData SimulationData::Default() {
                              .Depth = res.Depth,
                          },
                      .Lowest = {
-                         .displacementLambda =
-                             float3(displacementLambda, 1, displacementLambda),
+                         .displacementLambda = displacementLambda,
                          .patchSize = patchSize3,
                          .foamExponentialDecay = exponentialDecay,
                          .Amplitude = Amplitude3,

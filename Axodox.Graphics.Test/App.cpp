@@ -75,7 +75,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     XMFLOAT4 pixelMult = XMFLOAT4(1, 1, 1, 1);
     XMUINT4 swizzleorder = XMUINT4(0, 1, 2, 3);
-    XMFLOAT3 displacementMult = XMFLOAT3(0.6, 0.6, 0.6);
     XMFLOAT4 blendDistances = XMFLOAT4(40.f, 150, 1000, 5000);
     XMFLOAT3 foamColor = XMFLOAT3(1, 1, 1);
     f32 foamDepthAttenuation = 2.f;
@@ -109,7 +108,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         ImGui::Checkbox("Use channel Highest", &useChannel1);
         ImGui::Checkbox("Use channel Medium", &useChannel2);
         ImGui::Checkbox("Use channel Lowest", &useChannel3);
-        ImGui::InputFloat3("Displacement Mult", (float *)&displacementMult);
         ImGui::InputFloat4("Blend Distances", (float *)&blendDistances);
         ImGui::InputFloat3("Foam Color", (float *)&foamColor);
         ImGui::InputFloat("Foam Depth Attenuation", &foamDepthAttenuation);
@@ -235,7 +233,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     // 6: display texture instead of shader
     // 7: transform texture values from [-1,1] to [0,1]
     uint flags = 0; // Its here because padding
-    XMFLOAT4 displacementMult;
     XMFLOAT4 foamInfo;
   };
   static void set_flag(uint &flag, uint flagIndex, bool flagValue = true) {
@@ -255,9 +252,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     res.patchSizes =
         XMFLOAT3(simData.Highest.patchSize, simData.Medium.patchSize,
                  simData.Lowest.patchSize);
-    res.displacementMult =
-        XMFLOAT4(deb.displacementMult.x, deb.displacementMult.y,
-                 deb.displacementMult.z, 1);
 
     res.foamInfo = XMFLOAT4(deb.foamColor.x, deb.foamColor.y, deb.foamColor.z,
                             deb.foamDepthAttenuation);

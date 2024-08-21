@@ -25,9 +25,9 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     float3 disp_bottom = displacement[bottom].xyz;
     float3 disp_top = displacement[top].xyz;
     
-    float3 du = disp_right - disp_left + float3(TILE_SIZE_X2, 0, 0);
-    float3 dv = disp_bottom - disp_top + float3(0, 0, TILE_SIZE_X2);
-    float3 grad = cross(du, dv) /constants.displacementLambda.xyz;
+    float3 dv = disp_right - disp_left + float3(TILE_SIZE_X2, 0, 0);
+    float3 du = disp_top - disp_bottom + float3(0, 0, TILE_SIZE_X2);
+    float3 grad = cross(du, dv);
     
 
     float2 dDx = (disp_right.xz - disp_left.xz) * INV_TILE_SIZE;

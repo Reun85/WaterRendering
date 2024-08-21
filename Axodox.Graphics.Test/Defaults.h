@@ -80,7 +80,7 @@ public:
     QUALIFIER f32 patchSize3 = 87.f;
     CONST_QUALIFIER u32 N = ComputeShader::heightMapDimensions;
 
-    QUALIFIER f32 displacementLambda = 1.3f;
+    QUALIFIER float3 displacementLambda = float3(0.78, 0.6, 0.78);
     QUALIFIER f32 exponentialDecay = 0.3f;
 
     QUALIFIER f32 Depth = 100;

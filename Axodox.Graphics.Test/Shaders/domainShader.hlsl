@@ -106,7 +106,6 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
             disp += _heightmap3.SampleLevel(_sampler, texCoord, 0) * LowestMult;
             grad += gradients3.SampleLevel(_sampler, texCoord, 0) * LowestMult;
         }
-        disp.xyz *= debugValues.displacementMult;
         localPos += disp.xyz;
     }
     else
