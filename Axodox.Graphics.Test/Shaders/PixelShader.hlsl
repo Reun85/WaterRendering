@@ -193,11 +193,7 @@ float4 main(input_t input, bool isFrontFacing : SV_IsFrontFace) : SV_TARGET
         float2 texCoord = GetTextureCoordFromPlaneCoordAndPatch(input.planeCoord, debugValues.patchSizes.r);
         float4 text = _texture.Sample(_sampler, texCoord) * float4(debugValues.pixelMult.
         xyz, 1);
-        if (has_flag(debugValues.flags, 7))
-        {
-            text.xyz = (text.xyz + 1) / 2;
-        }
-
+      
         return text;
         return Swizzle(text, debugValues.swizzleOrder);
     }
@@ -210,9 +206,10 @@ float4 main(input_t input, bool isFrontFacing : SV_IsFrontFace) : SV_TARGET
     
     float3 normal = input.grad.xyz;
     // Why is it backwards??????????
-    normal = isFrontFacing ? -normal : normal;
+    //normal = isFrontFacing ? normal : -normal;
 
-    float3 viewDir = normalize(camConstants.cameraPos - input.localPos);
+    const float3 viewVec = camConstants.cameraPos - input.localPos;
+    float3 viewDir = normalize(viewVec);
     if (has_flag(debugValues.flags, 24))
     {
         if (dot(normal, viewDir) < 0)
@@ -226,7 +223,7 @@ float4 main(input_t input, bool isFrontFacing : SV_IsFrontFace) : SV_TARGET
 
     if (has_flag(debugValues.flags, 7))
     {
-        return float4(normal / 2 + 0.5, 1);
+        return float4(normal , 1);
     }
 
     float Jacobian = input.grad.w;
@@ -236,10 +233,26 @@ float4 main(input_t input, bool isFrontFacing : SV_IsFrontFace) : SV_TARGET
     }
 
 
+    
+    const float depthsqr = dot(viewVec, viewVec);
+    const float3 foamColor = debugValues.FoamInfo.xyz;
+    const float foamDepthAttenuation = debugValues.FoamInfo.w;
+    float foam=0;
+    if (has_flag(debugValues.flags, 2))
+    {
+     foam = lerp(0.0f, saturate(Jacobian), pow(depthsqr, foamDepthAttenuation/2));
+    }
 
 
      
     float3 ret = float3(0, 0, 0);
+
+    float3 samp = _skybox.Sample(_sampler, normal).xyz;
     ret += PBRShader(input.localPos, normal, 0);
-    return float4(ret, 0.6);
+    //ret += PBRShader(input.localPos, normal, normal, samp,1);
+    //ret /= 2;
+
+    ret = lerp(ret, foamColor, saturate(foam));
+    
+    return float4(ret, 1);
 }

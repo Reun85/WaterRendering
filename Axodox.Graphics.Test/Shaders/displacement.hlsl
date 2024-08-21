@@ -12,7 +12,6 @@ cbuffer Test : register(b9)
 void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3 LTid : SV_GroupID)
 {
 
-    const float lambda = constants.displacementLambda;
     int2 loc = int2(DTid.xy);
 
     // Required due to interval change
@@ -22,5 +21,5 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3
     float2 D = sign_correction * choppyfield[loc].xy;
 
     // Why are we using float4?
-    displacement[loc] = float4(D.x * lambda, h, D.y * lambda, 0.0);
+    displacement[loc] = float4(D.x, h, D.y, 0.0)*constants.displacementLambda;
 }

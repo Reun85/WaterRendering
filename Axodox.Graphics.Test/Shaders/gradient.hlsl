@@ -11,7 +11,7 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     const float PATCH_SIZE = constants.patchSize;
     const float TILE_SIZE_X2 = PATCH_SIZE * 2.0f / float(DISP_MAP_SIZE);
-    const float INV_TILE_SIZE = DISP_MAP_SIZE / PATCH_SIZE;
+    const float INV_TILE_SIZE = float(DISP_MAP_SIZE) / PATCH_SIZE;
 
     int2 loc = int2(dispatchThreadID.xy);
 
@@ -24,15 +24,17 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     float3 disp_right = displacement[right].xyz;
     float3 disp_bottom = displacement[bottom].xyz;
     float3 disp_top = displacement[top].xyz;
-
-    float2 gradient = float2(disp_left.y - disp_right.y, disp_bottom.y - disp_top.y);
+    
+    float3 du = disp_right - disp_left + float3(TILE_SIZE_X2, 0, 0);
+    float3 dv = disp_bottom - disp_top + float3(0, 0, TILE_SIZE_X2);
+    float3 grad = cross(du, dv) /constants.displacementLambda.xyz;
+    
 
     float2 dDx = (disp_right.xz - disp_left.xz) * INV_TILE_SIZE;
     float2 dDy = (disp_top.xz - disp_bottom.xz) * INV_TILE_SIZE;
 
     float J = (1.0 + dDx.x) * (1.0 + dDy.y) - dDx.y * dDy.x;
 
-    float3 grad = float3(gradient.x, TILE_SIZE_X2, gradient.y);
 
     gradients[loc] = float4(normalize(grad), J);
 }

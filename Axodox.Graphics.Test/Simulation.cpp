@@ -38,7 +38,7 @@ bool SimulationData::PatchData::DrawImGui(std::string_view ID) {
   const std::string text2 = "Foam Decay##" + std::string(ID);
   change |= ImGui::SliderFloat(text2.c_str(), &foamExponentialDecay, 0, 1);
   const std::string text3 = "Displacement Lambda##" + std::string(ID);
-  change |= ImGui::InputFloat(text3.c_str(), &displacementLambda);
+  change |= ImGui::InputFloat3(text3.c_str(), (float *)&displacementLambda);
   const std::string text4 = "Amplitude##" + std::string(ID);
   change |= ImGui::InputFloat(text4.c_str(), &Amplitude, 0, 0, "%.5f");
   const std::string text5 = "WindForce##" + std::string(ID);
@@ -47,7 +47,6 @@ bool SimulationData::PatchData::DrawImGui(std::string_view ID) {
 }
 
 SimulationData SimulationData::Default() {
-
   const auto &N = Defaults::Simulation::N;
   const auto &M = Defaults::Simulation::N;
   const auto &wind = Defaults::Simulation::WindDirection;
@@ -71,8 +70,9 @@ SimulationData SimulationData::Default() {
                      .Depth = Depth,
                      .Highest =
                          {
+                             .displacementLambda = float3(displacementLambda, 1,
+                                                          displacementLambda),
                              .patchSize = patchSize1,
-                             .displacementLambda = displacementLambda,
                              .foamExponentialDecay = exponentialDecay,
                              .Amplitude = Amplitude1,
                              .WindForce = WindForce1,
@@ -84,8 +84,9 @@ SimulationData SimulationData::Default() {
                          },
                      .Medium =
                          {
+                             .displacementLambda = float3(displacementLambda, 1,
+                                                          displacementLambda),
                              .patchSize = patchSize2,
-                             .displacementLambda = displacementLambda,
                              .foamExponentialDecay = exponentialDecay,
                              .Amplitude = Amplitude2,
                              .WindForce = WindForce2,
@@ -96,8 +97,9 @@ SimulationData SimulationData::Default() {
                              .Depth = res.Depth,
                          },
                      .Lowest = {
+                         .displacementLambda =
+                             float3(displacementLambda, 1, displacementLambda),
                          .patchSize = patchSize3,
-                         .displacementLambda = displacementLambda,
                          .foamExponentialDecay = exponentialDecay,
                          .Amplitude = Amplitude3,
                          .WindForce = WindForce3,
@@ -106,7 +108,6 @@ SimulationData SimulationData::Default() {
                          .windDirection = res.windDirection,
                          .gravity = res.gravity,
                          .Depth = res.Depth,
-
                      }};
 
   return res;

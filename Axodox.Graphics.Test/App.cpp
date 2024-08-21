@@ -50,7 +50,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     XMFLOAT4 clearColor = Defaults::App::clearColor;
     bool quit = false;
     void DrawImGui(NeedToDo &out, bool exclusiveWindow = false) {
-
       bool cont = true;
       if (exclusiveWindow)
         cont = ImGui::Begin("Runtime Settings");
@@ -64,7 +63,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   };
 
   struct DebugValues {
-
     enum class Mode : u8 {
       Full = 0,
       DisplacementHighest,
@@ -79,8 +77,10 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     XMUINT4 swizzleorder = XMUINT4(0, 1, 2, 3);
     XMFLOAT3 displacementMult = XMFLOAT3(0.6, 0.6, 0.6);
     XMFLOAT4 blendDistances = XMFLOAT4(40.f, 150, 1000, 5000);
+    XMFLOAT3 foamColor = XMFLOAT3(1, 1, 1);
+    f32 foamDepthAttenuation = 2.f;
 
-    bool useFoam = true;
+    bool useFoam = false;
     bool useChannel1 = true;
     bool useChannel2 = false;
     bool useChannel3 = false;
@@ -96,7 +96,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     RasterizerFlags rasterizerFlags = RasterizerFlags::CullNone;
     void DrawImGui(NeedToDo &out, bool exclusiveWindow = true) {
-
       bool cont = true;
       if (exclusiveWindow)
         cont = ImGui::Begin("Debug Values");
@@ -112,6 +111,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         ImGui::Checkbox("Use channel Lowest", &useChannel3);
         ImGui::InputFloat3("Displacement Mult", (float *)&displacementMult);
         ImGui::InputFloat4("Blend Distances", (float *)&blendDistances);
+        ImGui::InputFloat3("Foam Color", (float *)&foamColor);
+        ImGui::InputFloat("Foam Depth Attenuation", &foamDepthAttenuation);
         for (u32 i = DebugBitsStart; i <= DebugBitsEnd; i++) {
           if (DebugBitsNames[i - DebugBitsStart])
             ImGui::Checkbox(*DebugBitsNames[i - DebugBitsStart],
@@ -221,7 +222,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   };
 
   struct DebugGPUBufferStuff {
-
     XMFLOAT4 pixelMult;
     XMFLOAT4 blendDistances;
     XMUINT4 swizzleOrder;
@@ -235,7 +235,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     // 6: display texture instead of shader
     // 7: transform texture values from [-1,1] to [0,1]
     uint flags = 0; // Its here because padding
-    XMFLOAT3 displacementMult;
+    XMFLOAT4 displacementMult;
+    XMFLOAT4 foamInfo;
   };
   static void set_flag(uint &flag, uint flagIndex, bool flagValue = true) {
     if (flagValue) {
@@ -254,7 +255,12 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     res.patchSizes =
         XMFLOAT3(simData.Highest.patchSize, simData.Medium.patchSize,
                  simData.Lowest.patchSize);
-    res.displacementMult = deb.displacementMult;
+    res.displacementMult =
+        XMFLOAT4(deb.displacementMult.x, deb.displacementMult.y,
+                 deb.displacementMult.z, 1);
+
+    res.foamInfo = XMFLOAT4(deb.foamColor.x, deb.foamColor.y, deb.foamColor.z,
+                            deb.foamDepthAttenuation);
     set_flag(res.flags, 6, true);
     set_flag(res.flags, 0, false);
     set_flag(res.flags, 2, deb.useFoam);
@@ -274,14 +280,26 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     case DebugValues::Mode::GradientsHighest:
       set_flag(res.flags, 0, true);
       set_flag(res.flags, 7, true);
+      set_flag(res.flags, 6, false);
+      set_flag(res.flags, 3, true);
+      set_flag(res.flags, 4, false);
+      set_flag(res.flags, 5, false);
       break;
     case DebugValues::Mode::GradientsMedium:
       set_flag(res.flags, 0, true);
       set_flag(res.flags, 7, true);
+      set_flag(res.flags, 6, false);
+      set_flag(res.flags, 3, false);
+      set_flag(res.flags, 4, true);
+      set_flag(res.flags, 5, false);
       break;
     case DebugValues::Mode::GradientsLowest:
       set_flag(res.flags, 0, true);
       set_flag(res.flags, 7, true);
+      set_flag(res.flags, 6, false);
+      set_flag(res.flags, 3, false);
+      set_flag(res.flags, 4, false);
+      set_flag(res.flags, 5, true);
       break;
     }
     return res;
@@ -299,7 +317,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       if (exclusiveWindow)
         cont = ImGui::Begin("Results");
       if (cont) {
-
         ImGui::Text("QuadTree Nodes = %d", qtNodes);
 
         ImGui::Text("QuadTree buildtime %.3f ms/frame",
@@ -545,6 +562,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     SimulationStage::ConstantGpuSources simulationConstantSources(
         mutableAllocationContext, simData);
+    SimulationStage::MutableGpuSources simulationMutableSources(
+        mutableAllocationContext, simData);
 
     array<FrameResources, 2> frameResources{
         FrameResources(mutableAllocationContext),
@@ -664,6 +683,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         deltaTime = GetDurationInFloatWithPrecision<std::chrono::seconds,
                                                     std::chrono::milliseconds>(
             newFrameStart - frameStart);
+        deltaTime /= 10;
         frameStart = newFrameStart;
         if (settings.timeRunning) {
           gameTime += deltaTime;
@@ -705,7 +725,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
       // Compute shader stage
       {
-
         auto &simResource = calculatingSimResource;
         auto &computeAllocator = simResource.Allocator;
         computeAllocator.Reset();
@@ -752,18 +771,22 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         struct LODData {
           SimulationStage::SimulationResources::LODDataBuffers &buffers;
           SimulationStage::ConstantGpuSources<>::LODDataSource &sources;
+          MutableTexture &Foam;
           GpuVirtualAddress constantBuffer;
         };
 
         std::array<LODData, 3> lodData = {
             LODData{simResource.HighestBuffer,
                     simulationConstantSources.Highest,
+                    simulationMutableSources.Highest.Foam,
                     simResource.DynamicBuffer.AddBuffer(
                         SimulationStage::LODComputeBuffer(simData.Highest))},
             LODData{simResource.MediumBuffer, simulationConstantSources.Medium,
+                    simulationMutableSources.Medium.Foam,
                     simResource.DynamicBuffer.AddBuffer(
                         SimulationStage::LODComputeBuffer(simData.Medium))},
             LODData{simResource.LowestBuffer, simulationConstantSources.Lowest,
+                    simulationMutableSources.Lowest.Foam,
                     simResource.DynamicBuffer.AddBuffer(
                         SimulationStage::LODComputeBuffer(simData.Lowest))}};
         // Spektrums
@@ -849,14 +872,12 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           fullSimPipeline.displacementPipeline.Apply(computeAllocator);
           // UAV
           for (const LODData &dat : lodData) {
-
             computeAllocator.AddUAVBarrier(
                 *dat.buffers.FFTTildeh.UnorderedAccess(computeAllocator));
             computeAllocator.AddUAVBarrier(
                 *dat.buffers.FFTTildeD.UnorderedAccess(computeAllocator));
           }
           for (const LODData &dat : lodData) {
-
             auto mask = fullSimPipeline.displacementRootDescription.Set(
                 computeAllocator, RootSignatureUsage::Compute);
 
@@ -879,16 +900,13 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
         // Calculate gradients
         {
-
           fullSimPipeline.gradientPipeline.Apply(computeAllocator);
           // UAV
           for (const LODData &dat : lodData) {
-
             computeAllocator.AddUAVBarrier(
                 *dat.buffers.displacementMap.UnorderedAccess(computeAllocator));
           }
           for (const LODData &dat : lodData) {
-
             auto mask = fullSimPipeline.gradientRootDescription.Set(
                 computeAllocator, RootSignatureUsage::Compute);
 
@@ -911,7 +929,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         {
           fullSimPipeline.foamDecayPipeline.Apply(computeAllocator);
           for (const LODData &dat : lodData) {
-
             computeAllocator.AddUAVBarrier(
                 *dat.buffers.gradients.UnorderedAccess(computeAllocator));
           }
@@ -923,7 +940,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             mask.Gradients =
                 *dat.buffers.gradients.UnorderedAccess(computeAllocator);
 
-            mask.Foam = *dat.buffers.Foam.UnorderedAccess();
+            mask.Foam = *dat.Foam.UnorderedAccess();
             mask.timeBuffer = timeDataBuffer;
 
             const auto xGroupSize = 16;
@@ -986,7 +1003,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         GpuVirtualAddress debugConstantBuffer;
         GpuVirtualAddress sunDataBuffer;
         {
-
           WaterGraphicRootDescription::cameraConstants cameraConstants{};
           DebugGPUBufferStuff debugBufferContent =
               /*DebugGPUBufferStuff::*/ From(debugValues, simData);
@@ -1019,9 +1035,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           std::optional<MutableTextureWithState *> usedTexture;
           // Debug stuff
           {
-
             switch (debugValues.mode) {
-
             case DebugValues::Mode::DisplacementHighest:
               usedTexture = &drawingSimResource.HighestBuffer.displacementMap;
               break;
@@ -1111,7 +1125,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           start = std::chrono::high_resolution_clock::now();
           // Draw calls
           {
-
             auto drawCollected = [&]() {
               auto mask = waterRootSignature.Set(allocator,
                                                  RootSignatureUsage::Graphics);
@@ -1204,7 +1217,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
         // skybox
         {
-
           skyboxPipelineState.Apply(allocator);
           auto mask =
               skyboxRootSignature.Set(allocator, RootSignatureUsage::Graphics);
@@ -1239,9 +1251,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
             runtimeResults.DrawImGui(false);
             cam.DrawImGui(false);
-            debugValues.DrawImGui(beforeNextFrame);
           }
           ImGui::End();
+          debugValues.DrawImGui(beforeNextFrame);
           simData.DrawImGui(beforeNextFrame);
           DrawImGuiForPSResources(waterData, sunData, true);
 

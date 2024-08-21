@@ -22,13 +22,15 @@ template <typename T, typename TypeA, typename TypeB>
 concept Either = std::same_as<T, TypeA> || std::same_as<T, TypeB>;
 struct SimulationStage {
   struct LODComputeBuffer {
+    XMFLOAT4 displacementLambda;
     f32 patchSize;
-    f32 displacementLambda;
     f32 foamExponentialDecay;
 
     explicit LODComputeBuffer(const SimulationData::PatchData &patchData)
         : patchSize(patchData.patchSize),
-          displacementLambda(patchData.displacementLambda),
+          displacementLambda(XMFLOAT4(patchData.displacementLambda.z,
+                                      patchData.displacementLambda.y,
+                                      patchData.displacementLambda.z, 1)),
           foamExponentialDecay(patchData.foamExponentialDecay) {}
   };
   struct SpektrumRootDescription : public RootSignatureMask {
@@ -135,7 +137,6 @@ struct SimulationStage {
       MutableTextureWithState tildeDBuffer;
       MutableTextureWithState displacementMap;
       MutableTextureWithState gradients;
-      MutableTexture Foam;
 
       LODDataBuffers(const ResourceAllocationContext &context, const u32 N,
                      const u32 M)
@@ -164,10 +165,7 @@ struct SimulationStage {
                                          TextureFlags::UnorderedAccess)),
             gradients(context, TextureDefinition::TextureDefinition(
                                    Format::R16G16B16A16_Float, N, M, 0,
-                                   TextureFlags::UnorderedAccess)),
-            Foam(MutableTexture(context, TextureDefinition::TextureDefinition(
-                                             Format::R32G32_Float, N, M, 0,
-                                             TextureFlags::UnorderedAccess))) {
+                                   TextureFlags::UnorderedAccess)) {
       }
     };
 
@@ -212,6 +210,25 @@ struct SimulationStage {
         : Highest(context, inp.Highest), Medium(context, inp.Medium),
           Lowest(context, inp.Lowest) {}
     // ImmutableTexture PerlinNoise;
+  };
+
+  struct MutableGpuSources {
+    struct LODDataSource {
+      MutableTexture Foam;
+      LODDataSource(ResourceAllocationContext &context,
+                    const SimulationData &simData)
+          : Foam(MutableTexture(context,
+                                TextureDefinition::TextureDefinition(
+                                    Format::R32G32_Float, simData.N, simData.M,
+                                    0, TextureFlags::UnorderedAccess))) {}
+    };
+    LODDataSource Highest;
+    LODDataSource Medium;
+    LODDataSource Lowest;
+    MutableGpuSources(ResourceAllocationContext &context,
+                      const SimulationData &simData)
+        : Highest(context, simData), Medium(context, simData),
+          Lowest(context, simData) {}
   };
 
   struct FullPipeline {

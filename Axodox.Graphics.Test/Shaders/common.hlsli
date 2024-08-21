@@ -22,7 +22,9 @@ struct DebugValues
     // 7: show normal
     // Bits [24,31] are reversed for debug reasons
     uint flags;
-    float3 displacementMult;
+    float4 displacementMult;
+    // .xyz is foamColor, .w is foamDepthAttenuation
+    float4 FoamInfo;
 
 };
 
@@ -83,8 +85,8 @@ struct TimeConstants
 
 struct ComputeConstants
 {
+    float4 displacementLambda;
     float patchSize;
-    float displacementLambda;
     float foamExponentialDecay;
 };
 

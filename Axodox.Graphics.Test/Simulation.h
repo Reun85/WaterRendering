@@ -11,8 +11,8 @@ struct SimulationData {
   const u32 N;
   const u32 M;
   struct PatchData {
+    float3 displacementLambda;
     f32 patchSize;
-    f32 displacementLambda;
     f32 foamExponentialDecay;
     f32 Amplitude;
 
