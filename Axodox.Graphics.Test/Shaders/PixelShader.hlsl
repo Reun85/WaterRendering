@@ -204,7 +204,8 @@ float4 main(input_t input, bool isFrontFacing : SV_IsFrontFace) : SV_TARGET
 
     
     
-    float3 normal = input.grad.xyz;
+    float3 normal = normalize(input.grad.xyz);
+    
     // Why is it backwards??????????
     //normal = isFrontFacing ? normal : -normal;
 
@@ -223,7 +224,7 @@ float4 main(input_t input, bool isFrontFacing : SV_IsFrontFace) : SV_TARGET
 
     if (has_flag(debugValues.flags, 7))
     {
-        return float4(normal , 1);
+        return float4(normal, 1);
     }
 
     float Jacobian = input.grad.w;
@@ -237,10 +238,10 @@ float4 main(input_t input, bool isFrontFacing : SV_IsFrontFace) : SV_TARGET
     const float depthsqr = dot(viewVec, viewVec);
     const float3 foamColor = debugValues.FoamInfo.xyz;
     const float foamDepthAttenuation = debugValues.FoamInfo.w;
-    float foam=0;
+    float foam = 0;
     if (has_flag(debugValues.flags, 2))
     {
-     foam = lerp(0.0f, saturate(Jacobian), pow(depthsqr, foamDepthAttenuation/2));
+        foam = lerp(0.0f, saturate(Jacobian), pow(depthsqr, foamDepthAttenuation / 2));
     }
 
 
@@ -249,8 +250,8 @@ float4 main(input_t input, bool isFrontFacing : SV_IsFrontFace) : SV_TARGET
 
     float3 samp = _skybox.Sample(_sampler, normal).xyz;
     ret += PBRShader(input.localPos, normal, 0);
-    //ret += PBRShader(input.localPos, normal, normal, samp,1);
-    //ret /= 2;
+    ret += PBRShader(input.localPos, normal, normal, samp, 1);
+    ret /= 2;
 
     ret = lerp(ret, foamColor, saturate(foam));
     

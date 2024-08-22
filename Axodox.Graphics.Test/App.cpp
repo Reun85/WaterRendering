@@ -677,7 +677,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         deltaTime = GetDurationInFloatWithPrecision<std::chrono::seconds,
                                                     std::chrono::milliseconds>(
             newFrameStart - frameStart);
-        deltaTime /= 10;
         frameStart = newFrameStart;
         if (settings.timeRunning) {
           gameTime += deltaTime;
