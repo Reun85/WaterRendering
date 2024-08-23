@@ -15,8 +15,9 @@ struct SimulationData {
     f32 patchSize;
     f32 foamExponentialDecay;
     f32 Amplitude;
-
     f32 WindForce;
+
+    f32 foamMinValue;
     const u32 &N;
     const u32 &M;
     const float2 &windDirection;

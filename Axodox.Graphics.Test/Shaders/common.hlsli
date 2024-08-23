@@ -87,6 +87,7 @@ struct ComputeConstants
     float4 displacementLambda;
     float patchSize;
     float foamExponentialDecay;
+    float foamMinValue;
 };
 
 inline float2 ComplexMul(float2 a, float2 b)

@@ -24,7 +24,7 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     const float newval = grad.w < 0 ? -grad.w : 0;
     float old = foam[loc];
     old = old - decayRate * time.deltaTime * old;
-    const float res = old + (newval > 4.9 ? newval : 0);
+    const float res = old + (newval > constants.foamMinValue ? newval : 0);
     foam[loc] = res;
     gradients[loc] = float4(grad.xyz, res);
 }

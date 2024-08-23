@@ -59,25 +59,11 @@ public:
     QUALIFIER u32 minDepth = 0;
   };
   struct Simulation {
-    struct KnownToWork {
-      struct Large {
-        CONST_QUALIFIER f32 patchSize = 400.0f;
-        QUALIFIER f32 WindForce = 30 * 6.f;
-        QUALIFIER float2 WindDirection = float2(-0.4f, -0.9f);
-        QUALIFIER f32 Amplitude = 0.45e-6f;
-      };
-      struct Small {
-        CONST_QUALIFIER f32 patchSize = 40.0f;
-        QUALIFIER f32 WindForce = 6.f;
-        QUALIFIER float2 WindDirection = float2(-0.4f, -0.9f);
-        QUALIFIER f32 Amplitude = 0.45e-3f;
-      };
-    };
-
     /// Have to change in common.hlsli as well
     QUALIFIER f32 patchSize1 = 7.f;
     QUALIFIER f32 patchSize2 = 27.f;
     QUALIFIER f32 patchSize3 = 87.f;
+    QUALIFIER f32 foamMinValue = 1;
     CONST_QUALIFIER u32 N = ComputeShader::heightMapDimensions;
 
     QUALIFIER float3 displacementLambda = float3(0.78, 0.6, 0.78);

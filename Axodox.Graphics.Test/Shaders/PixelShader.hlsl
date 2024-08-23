@@ -241,7 +241,7 @@ float4 main(input_t input, bool isFrontFacing : SV_IsFrontFace) : SV_TARGET
     float foam = 0;
     if (has_flag(debugValues.flags, 2))
     {
-        foam = lerp(0.0f, saturate(Jacobian), pow(depthsqr, foamDepthAttenuation / 2));
+        foam = lerp(0.0f, saturate(Jacobian), saturate(pow(depthsqr, foamDepthAttenuation / 2)));
     }
 
 

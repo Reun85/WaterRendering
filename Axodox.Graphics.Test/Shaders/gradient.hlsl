@@ -30,10 +30,11 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     float3 grad = cross(du, dv);
     
 
-    float2 dDx = (disp_right.xz - disp_left.xz) * INV_TILE_SIZE;
-    float2 dDy = (disp_top.xz - disp_bottom.xz) * INV_TILE_SIZE;
+    float2 dDx = (dv.xz) * INV_TILE_SIZE;
+    float2 dDy = (du.xz) * INV_TILE_SIZE;
 
-    float J = (1.0 + dDx.x) * (1.0 + dDy.y) - dDx.y * dDy.x;
+    //float J = (1.0 + dDx.x) * (1.0 + dDy.y) - dDx.y * dDy.x;
+    float J = dDx.x * dDy.y - dDx.y * dDy.x;
 
 
     gradients[loc] = float4(normalize(grad), J);

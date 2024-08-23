@@ -25,13 +25,15 @@ struct SimulationStage {
     XMFLOAT4 displacementLambda;
     f32 patchSize;
     f32 foamExponentialDecay;
+    f32 foamMinValue;
 
     explicit LODComputeBuffer(const SimulationData::PatchData &patchData)
         : patchSize(patchData.patchSize),
           displacementLambda(XMFLOAT4(patchData.displacementLambda.z,
                                       patchData.displacementLambda.y,
                                       patchData.displacementLambda.z, 1)),
-          foamExponentialDecay(patchData.foamExponentialDecay) {}
+          foamExponentialDecay(patchData.foamExponentialDecay),
+          foamMinValue(patchData.foamMinValue) {}
   };
   struct SpektrumRootDescription : public RootSignatureMask {
     // In

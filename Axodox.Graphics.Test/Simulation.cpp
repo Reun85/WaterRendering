@@ -43,6 +43,8 @@ bool SimulationData::PatchData::DrawImGui(std::string_view ID) {
   change |= ImGui::InputFloat(text4.c_str(), &Amplitude, 0, 0, "%.5f");
   const std::string text5 = "WindForce##" + std::string(ID);
   change |= ImGui::InputFloat(text5.c_str(), &WindForce);
+  const std::string text6 = "FoamMinValue##" + std::string(ID);
+  change |= ImGui::InputFloat(text6.c_str(), &foamMinValue);
   return change;
 }
 
@@ -63,6 +65,7 @@ SimulationData SimulationData::Default() {
   const auto &Depth = Defaults::Simulation::Depth;
   const auto &exponentialDecay = Defaults::Simulation::exponentialDecay;
   const auto &displacementLambda = Defaults::Simulation::displacementLambda;
+  const auto &foamMinValue = Defaults::Simulation::foamMinValue;
   SimulationData res{.N = N,
                      .M = M,
                      .windDirection = wind,
@@ -75,6 +78,7 @@ SimulationData SimulationData::Default() {
                              .foamExponentialDecay = exponentialDecay,
                              .Amplitude = Amplitude1,
                              .WindForce = WindForce1,
+                             .foamMinValue = foamMinValue,
                              .N = res.N,
                              .M = res.M,
                              .windDirection = res.windDirection,
@@ -88,6 +92,7 @@ SimulationData SimulationData::Default() {
                              .foamExponentialDecay = exponentialDecay,
                              .Amplitude = Amplitude2,
                              .WindForce = WindForce2,
+                             .foamMinValue = foamMinValue,
                              .N = res.N,
                              .M = res.M,
                              .windDirection = res.windDirection,
@@ -100,6 +105,7 @@ SimulationData SimulationData::Default() {
                          .foamExponentialDecay = exponentialDecay,
                          .Amplitude = Amplitude3,
                          .WindForce = WindForce3,
+                         .foamMinValue = foamMinValue,
                          .N = res.N,
                          .M = res.M,
                          .windDirection = res.windDirection,
