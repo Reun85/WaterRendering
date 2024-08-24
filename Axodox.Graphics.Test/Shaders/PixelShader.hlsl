@@ -160,12 +160,14 @@ float3 PBRShader(float3 localPos, float3 normal, float3 LightDirection, float3 L
 
     // Reflection
     float3 reflectionVector = reflect(-viewDir, normal);
-    float4 reflectionColor = _skybox.Sample(_sampler, reflectionVector);
-    reflectionColor *= SpecularStrength;
+    float3 reflectionColor = _skybox.Sample(_sampler, reflectionVector).xyz;
+
+    float3 reflecitivity = F * (1 - Roughness);
+    reflectionColor *= reflecitivity;
     
     
     // Combine all contributions
-    float3 lighting = LightColor * LightIntensity * (diffuse + subsurface + sheen + specular + clearcoat * NdotL) + reflectionColor.xyz;
+    float3 lighting = LightColor * LightIntensity * (diffuse + subsurface + sheen + specular + clearcoat * NdotL) + reflectionColor;
 
 
     // Final color output
@@ -206,8 +208,6 @@ float4 main(input_t input, bool isFrontFacing : SV_IsFrontFace) : SV_TARGET
     
     float3 normal = normalize(input.grad.xyz);
     
-    // Why is it backwards??????????
-    //normal = isFrontFacing ? normal : -normal;
 
     const float3 viewVec = camConstants.cameraPos - input.localPos;
     float3 viewDir = normalize(viewVec);
