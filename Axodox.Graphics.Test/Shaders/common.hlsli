@@ -88,6 +88,8 @@ struct ComputeConstants
     float patchSize;
     float foamExponentialDecay;
     float foamMinValue;
+    float foamBias;
+    float foamMult;
 };
 
 inline float2 ComplexMul(float2 a, float2 b)
@@ -117,4 +119,18 @@ float4 Swizzle(float4 vec, uint4 order)
         GetComponentByIndex(vec, order.z),
         GetComponentByIndex(vec, order.w)
     );
+}
+
+float3 SampleSkyboxCommon(float3 dir)
+{
+    float3 negColor = float3(0.0, 0.0, 0.0);
+    float3 brightBlueSkyColor = float3(34, 87, 112) / 255;
+    float3 darkSkyColor =
+    float3(17, 45, 92) / 255;
+    float isneg = step(dir.y, 0);
+
+    float3 inp = lerp(brightBlueSkyColor, darkSkyColor, pow(dir.y, 2));
+    
+    return dir.y < 0 ? negColor : inp;
+    
 }

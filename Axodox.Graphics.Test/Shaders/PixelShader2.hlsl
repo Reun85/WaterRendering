@@ -1,8 +1,9 @@
 #include "common.hlsli"
 Texture2D<float4> _texture : register(t0);
-Texture2D<float4> _gradients : register(t1);
+TextureCube<float4> _skybox : register(t1);
 SamplerState _sampler : register(s0);
 
+#define PI 3.14159265359
 
 cbuffer CameraBuffer : register(b0)
 {
@@ -10,22 +11,50 @@ cbuffer CameraBuffer : register(b0)
 }
 
 
-cbuffer Constants : register(b1)
+cbuffer DebugBuffer : register(b9)
 {
-    float4 mult;
-    uint4 swizzleorder;
-    int useTexture;
+    DebugValues debugValues;
 }
+
+
+
+struct PixelLightData
+{
+    float4 lightPos;
+    float4 lightColor;
+};
+cbuffer PixelLighting : register(b1)
+{
+    PixelLightData lights[MAX_LIGHT_COUNT];
+    int lightCount;
+};
+
+
 
 struct input_t
 {
     float4 Screen : SV_Position;
     float3 localPos : POSITION;
-    float2 TextureCoord : TEXCOORD;
+    float2 planeCoord : PLANECOORD;
+    float4 grad : GRADIENTS;
 };
 
 
-#define PI 3.14159265359
+
+cbuffer MaterialProperties : register(b2)
+{
+    float3 SurfaceColor;
+    float Roughness;
+    float SubsurfaceScattering;
+    float Sheen;
+    float SheenTint;
+    float Anisotropic;
+    float SpecularStrength;
+    float Metallic;
+    float SpecularTint;
+    float Clearcoat;
+    float ClearcoatGloss;
+};
 float SchlickFresnel(float3 normal, float3 viewDir)
 {
 				// 0.02f comes from the reflectivity bias of water kinda idk it's from a paper somewhere i'm not gonna link it tho lmaooo
@@ -51,17 +80,13 @@ float4 main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
 {
 
 
-    if (useTexture == 0)
-    {
-        float4 text = _texture.Sample(_sampler, input.TextureCoord) * float4(mult.xyz, 1);
-        return Swizzle(text, swizzleorder);
-    }
-    
+    // Why is it backwards??????????
+    //normal = isFrontFacing ? normal : -normal;
     
 // Colors
-    const float3 sunColor = float3(1.0, 1.0, 0.47);
-    const float3 sunDir = float3(0.45, 0.1, -0.45);
-    const float3 waterColor = float3(0.1812f, 0.4678f, 0.5520f);
+    const float3 sunColor = lights[0].lightColor;
+    const float3 sunDir = lights[0].lightPos;
+    const float3 waterColor = SurfaceColor;
 
     
     // Other constants
@@ -78,58 +103,120 @@ float4 main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
     const float3 _TipColor = float3(0.8f, 0.9f, 1.0f);
     const float _TipAttenuation = 10.0f;
     const float3 _Ambient = float3(0.05f, 0.05f, 0.1f);
+    const float _NormalStrength = 1;
+
+    float normalDepthFalloff = 1.0f;
+
+
+    float shininess = 1.0f;
+
+    float specularNormalStrength = 1.0f;
+
+    float fresnelBias = 0.0f;
+
+    float fresnelStrength = 1.0f;
+
+    float fresnelShininess = 5.0f;
+
+    float fresnelNormalStrength = 1.0f;
+
+    float bubbleDensity = 1.0f;
+
+    float roughness = 0.1f;
+
+    float foamRoughnessModifier = 1.0f;
+
+    float heightModifier = 1.0f;
+
+    float wavePeakScatterStrength = 1.0f;
+    
+    float scatterStrength = 1.0f;
+
+    float scatterShadowStrength = 1.0f;
+
+    float environmentLightStrength = 1.0f;
+
+
+    float foamBias = -0.5f;
+
+    float foamThreshold = 0.0f;
+
+    float foamAdd = 0.5f;
+
+    float foamDecayRate = 0.05f;
+
+    float foamDepthFalloff = 1.0f;
+
+    const float _NormalDepthAttenuation = 1.0f;
+    
+    
+    
      
-    float4 grad = _gradients.Sample(_sampler, input.TextureCoord);
-
-    float3 normal = normalize(grad.xyz);
-    float Jacobian = grad.w;
-    normal *= frontFacing ? -1 : 1;
-
-    
-    return grad;
 	
-#if 0
+    if (has_flag(debugValues.flags, 6))
+    {
+        float2 texCoord = GetTextureCoordFromPlaneCoordAndPatch(input.planeCoord, debugValues.patchSizes.r);
+        float4 text = _texture.Sample(_sampler, texCoord) * float4(debugValues.pixelMult.
+        xyz, 1);
+      
+        return text;
+        return Swizzle(text, debugValues.swizzleOrder);
+    }
     
-    float3 lightDir = -normalize(_SunDirection);
-    float3 viewDir = normalize(_WorldSpaceCameraPos - f.data.worldPos);
+    
+
+    
+
+    
+    
+    float3 normal = normalize(input.grad.xyz);
+    
+
+    const float3 viewVec = camConstants.cameraPos - input.localPos;
+    float3 viewDir = normalize(viewVec);
+    if (has_flag(debugValues.flags, 24))
+    {
+        if (dot(normal, viewDir) < 0)
+            return float4(1, 0, 0, 1);
+        return float4(0, 1, 0, 1);
+    }
+    if (dot(normal, viewDir) < 0)
+    {
+        normal *= -1;
+    }
+
+    if (has_flag(debugValues.flags, 7))
+    {
+        return float4(normal, 1);
+    }
+
+    float Jacobian = input.grad.w;
+    if (has_flag(debugValues.flags, 25))
+    {
+        return float4(Jacobian, Jacobian, Jacobian, 1);
+    }
+    
+    float3 lightDir = -normalize(sunDir);
     float3 halfwayDir = normalize(lightDir + viewDir);
-    float depth = f.data.depth;
+    float depth = input.Screen.z / input.Screen.w;
     float LdotH = DotClamped(lightDir, halfwayDir);
     float VdotH = DotClamped(viewDir, halfwayDir);
 				
 				
-    float4 displacementFoam1 = UNITY_SAMPLE_TEX2DARRAY(_DisplacementTextures, float3(f.data.uv * _Tile0, 0)) * _DebugLayer0;
-    displacementFoam1.a += _FoamSubtract0;
-    float4 displacementFoam2 = UNITY_SAMPLE_TEX2DARRAY(_DisplacementTextures, float3(f.data.uv * _Tile1, 1)) * _DebugLayer1;
-    displacementFoam2.a += _FoamSubtract1;
-    float4 displacementFoam3 = UNITY_SAMPLE_TEX2DARRAY(_DisplacementTextures, float3(f.data.uv * _Tile2, 2)) * _DebugLayer2;
-    displacementFoam3.a += _FoamSubtract2;
-    float4 displacementFoam4 = UNITY_SAMPLE_TEX2DARRAY(_DisplacementTextures, float3(f.data.uv * _Tile3, 3)) * _DebugLayer3;
-    displacementFoam4.a += _FoamSubtract3;
-    float4 displacementFoam = displacementFoam1 + displacementFoam2 + displacementFoam3 + displacementFoam4;
 
 				
-    float2 slopes1 = UNITY_SAMPLE_TEX2DARRAY(_SlopeTextures, float3(f.data.uv * _Tile0, 0)) * _DebugLayer0;
-    float2 slopes2 = UNITY_SAMPLE_TEX2DARRAY(_SlopeTextures, float3(f.data.uv * _Tile1, 1)) * _DebugLayer1;
-    float2 slopes3 = UNITY_SAMPLE_TEX2DARRAY(_SlopeTextures, float3(f.data.uv * _Tile2, 2)) * _DebugLayer2;
-    float2 slopes4 = UNITY_SAMPLE_TEX2DARRAY(_SlopeTextures, float3(f.data.uv * _Tile3, 3)) * _DebugLayer3;
-    float2 slopes = slopes1 + slopes2 + slopes3 + slopes4;
 
 				
-    slopes *= _NormalStrength;
-    float foam = lerp(0.0f, saturate(displacementFoam.a), pow(depth, _FoamDepthAttenuation));
+    float foam = lerp(0.0f, saturate(Jacobian), pow(depth, foamDepthFalloff));
 
-#define NEW_LIGHTING
-#ifdef NEW_LIGHTING
     float3 macroNormal = float3(0, 1, 0);
-    float3 mesoNormal = normalize(float3(-slopes.x, 1.0f, -slopes.y));
-    mesoNormal = normalize(lerp(float3(0, 1, 0), mesoNormal, pow(saturate(depth), _NormalDepthAttenuation)));
-    mesoNormal = normalize(UnityObjectToWorldNormal(normalize(mesoNormal)));
+    float3 mesoNormal = normal;
+    mesoNormal = normalize(lerp(macroNormal, mesoNormal, pow(saturate(depth), _NormalDepthAttenuation)));
 
     float NdotL = DotClamped(mesoNormal, lightDir);
 
 				
-    float a = _Roughness + foam * _FoamRoughnessModifier;
+    float a = roughness + foam * foamRoughnessModifier;
     float ndoth = max(0.0001f, dot(mesoNormal, halfwayDir));
 
     float viewMask = SmithMaskingBeckmann(halfwayDir, viewDir, a);
@@ -171,80 +258,6 @@ float4 main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
     output = max(0.0f, output);
     output = lerp(output, _FoamColor, saturate(foam));
 
-#else
-    slopes *= _NormalStrength;
-    float3 normal = normalize(float3(-slopes.x, 1.0f, -slopes.y));
-    normal = normalize(UnityObjectToWorldNormal(normalize(normal)));
-
-    float ndotl = DotClamped(lightDir, normal);
-
-    float3 diffuseReflectance = _DiffuseReflectance / PI;
-    float3 diffuse = _LightColor0.rgb * ndotl * diffuseReflectance;
-
-				// Schlick Fresnel
-    float3 fresnelNormal = normal;
-    fresnelNormal.xz *= _FresnelNormalStrength;
-    fresnelNormal = normalize(fresnelNormal);
-    float base = 1 - dot(viewDir, fresnelNormal);
-    float exponential = pow(base, _FresnelShininess);
-    float R = exponential + _FresnelBias * (1.0f - exponential);
-    R *= _FresnelStrength;
-				
-    float3 fresnel = _FresnelColor * R;
-                
-    if (_UseEnvironmentMap)
-    {
-        float3 reflectedDir = reflect(-viewDir, normal);
-        float3 skyCol = texCUBE(_EnvironmentMap, reflectedDir).rgb;
-        float3 sun = _SunColor * pow(max(0.0f, DotClamped(reflectedDir, lightDir)), 500.0f);
-
-        fresnel = skyCol.rgb * R;
-        fresnel += sun * R;
-    }
-
-
-    float3 specularReflectance = _SpecularReflectance;
-    float3 specNormal = normal;
-    specNormal.xz *= _SpecularNormalStrength;
-    specNormal = normalize(specNormal);
-    float spec = pow(DotClamped(specNormal, halfwayDir), _Shininess) * ndotl;
-    float3 specular = _LightColor0.rgb * specularReflectance * spec;
-
-				// Schlick Fresnel but again for specular
-    base = 1 - DotClamped(viewDir, halfwayDir);
-    exponential = pow(base, 5.0f);
-    R = exponential + _FresnelBias * (1.0f - exponential);
-
-    specular *= R;
-				
-
-    float3 output = _Ambient + diffuse + specular + fresnel;
-    output = lerp(output, _TipColor, saturate(foam));
-#endif
-
-
-    if (_DebugTile0)
-    {
-        output = cos(f.data.uv.x * _Tile0 * PI) * cos(f.data.uv.y * _Tile0 * PI);
-    }
-
-    if (_DebugTile1)
-    {
-        output = cos(f.data.uv.x * _Tile1) * 1024 * cos(f.data.uv.y * _Tile1) * 1024;
-    }
-
-    if (_DebugTile2)
-    {
-        output = cos(f.data.uv.x * _Tile2) * 1024 * cos(f.data.uv.y * _Tile2) * 1024;
-    }
-
-    if (_DebugTile3)
-    {
-        output = cos(f.data.uv.x * _Tile3) * 1024 * cos(f.data.uv.y * _Tile3) * 1024;
-    }
-				
-    return float4(output, 1.0f);
-    
-#endif
+    return float4(output, 1);
     
 }

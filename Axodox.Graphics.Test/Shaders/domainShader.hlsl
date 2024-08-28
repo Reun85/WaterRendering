@@ -78,7 +78,6 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
     float highestaccountedfor = 0;
 
     
-    HighestMult = 1;
     float4 grad = float4(0, 0, 0, 0);
     // Use displacement
     if (has_flag(debugValues.flags, 0))

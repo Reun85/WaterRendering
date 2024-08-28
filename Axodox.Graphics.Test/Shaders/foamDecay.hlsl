@@ -20,11 +20,22 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     const float decayRate = constants.foamExponentialDecay * 60;
     const int2 loc = int2(dispatchThreadID.xy);
-    const float4 grad = gradients[loc];
-    const float newval = grad.w < 0 ? -grad.w : 0;
+
+    const float minEPS = 0.0001;
+
+    
     float old = foam[loc];
     old = old - decayRate * time.deltaTime * old;
+    
+    const float4 grad = gradients[loc];
+    float newval = -grad.w;
+    newval *= constants.foamMult;
+    newval += constants.foamBias;
+    newval = max(0, newval);
+    newval *= step(minEPS, time.deltaTime);
+
     const float res = old + (newval > constants.foamMinValue ? newval : 0);
+
     foam[loc] = res;
     gradients[loc] = float4(grad.xyz, res);
 }

@@ -21,6 +21,7 @@ void SimulationData::DrawImGui(NeedToDo &out, bool exclusiveWindow) {
     ImGui::Separator();
     ImGui::Text("Lowest");
     bool low = Lowest.DrawImGui("Lowest");
+    ImGui::Separator();
     change |= ImGui::InputFloat("QuadTree distanceThreshold",
                                 &quadTreeDistanceThreshold);
     ImGui::Separator();
@@ -43,8 +44,12 @@ bool SimulationData::PatchData::DrawImGui(std::string_view ID) {
   change |= ImGui::InputFloat(text4.c_str(), &Amplitude, 0, 0, "%.5f");
   const std::string text5 = "WindForce##" + std::string(ID);
   change |= ImGui::InputFloat(text5.c_str(), &WindForce);
-  const std::string text6 = "FoamMinValue##" + std::string(ID);
+  const std::string text6 = "Foam Min Value##" + std::string(ID);
   change |= ImGui::InputFloat(text6.c_str(), &foamMinValue);
+  const std::string text7 = "Foam Bias##" + std::string(ID);
+  change |= ImGui::InputFloat(text7.c_str(), &foamBias);
+  const std::string text8 = "Foam Mult##" + std::string(ID);
+  change |= ImGui::InputFloat(text8.c_str(), &foamMult);
   return change;
 }
 
@@ -53,19 +58,7 @@ SimulationData SimulationData::Default() {
   const auto &M = Defaults::Simulation::N;
   const auto &wind = Defaults::Simulation::WindDirection;
   const auto &gravity = Defaults::Simulation::gravity;
-  const auto &WindForce1 = Defaults::Simulation::WindForce1;
-  const auto &WindForce2 = Defaults::Simulation::WindForce2;
-  const auto &WindForce3 = Defaults::Simulation::WindForce3;
-  const auto &Amplitude1 = Defaults::Simulation::Amplitude1;
-  const auto &Amplitude2 = Defaults::Simulation::Amplitude2;
-  const auto &Amplitude3 = Defaults::Simulation::Amplitude3;
-  const auto &patchSize1 = Defaults::Simulation::patchSize1;
-  const auto &patchSize2 = Defaults::Simulation::patchSize2;
-  const auto &patchSize3 = Defaults::Simulation::patchSize3;
   const auto &Depth = Defaults::Simulation::Depth;
-  const auto &exponentialDecay = Defaults::Simulation::exponentialDecay;
-  const auto &displacementLambda = Defaults::Simulation::displacementLambda;
-  const auto &foamMinValue = Defaults::Simulation::foamMinValue;
   SimulationData res{.N = N,
                      .M = M,
                      .windDirection = wind,
@@ -73,12 +66,14 @@ SimulationData SimulationData::Default() {
                      .Depth = Depth,
                      .Highest =
                          {
-                             .displacementLambda = displacementLambda,
-                             .patchSize = patchSize1,
-                             .foamExponentialDecay = exponentialDecay,
-                             .Amplitude = Amplitude1,
-                             .WindForce = WindForce1,
-                             .foamMinValue = foamMinValue,
+                             .displacementLambda = float3(0.48f, 0.5, 0.48f),
+                             .patchSize = 21.f,
+                             .foamExponentialDecay = 0.3f,
+                             .Amplitude = 0.01e-0f,
+                             .WindForce = 3,
+                             .foamMinValue = 0.4f,
+                             .foamBias = 0.2f,
+                             .foamMult = 1,
                              .N = res.N,
                              .M = res.M,
                              .windDirection = res.windDirection,
@@ -87,12 +82,14 @@ SimulationData SimulationData::Default() {
                          },
                      .Medium =
                          {
-                             .displacementLambda = displacementLambda,
-                             .patchSize = patchSize2,
-                             .foamExponentialDecay = exponentialDecay,
-                             .Amplitude = Amplitude2,
-                             .WindForce = WindForce2,
-                             .foamMinValue = foamMinValue,
+                             .displacementLambda = float3(0.48f, 0.5, 0.48f),
+                             .patchSize = 91.f,
+                             .foamExponentialDecay = 0.3f,
+                             .Amplitude = 0.35e-3f,
+                             .WindForce = 3,
+                             .foamMinValue = 0.4f,
+                             .foamBias = 0.2f,
+                             .foamMult = 1,
                              .N = res.N,
                              .M = res.M,
                              .windDirection = res.windDirection,
@@ -100,12 +97,14 @@ SimulationData SimulationData::Default() {
                              .Depth = res.Depth,
                          },
                      .Lowest = {
-                         .displacementLambda = displacementLambda,
-                         .patchSize = patchSize3,
-                         .foamExponentialDecay = exponentialDecay,
-                         .Amplitude = Amplitude3,
-                         .WindForce = WindForce3,
-                         .foamMinValue = foamMinValue,
+                         .displacementLambda = float3(0.48f, 0.5, 0.48f),
+                         .patchSize = 383,
+                         .foamExponentialDecay = 0.3f,
+                         .Amplitude = 0.00003,
+                         .WindForce = 6,
+                         .foamMinValue = 0.4f,
+                         .foamBias = 0.2f,
+                         .foamMult = 1,
                          .N = res.N,
                          .M = res.M,
                          .windDirection = res.windDirection,

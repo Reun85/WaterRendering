@@ -43,8 +43,9 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
     static constexpr PixelLighting SunData() {
       PixelLighting data;
       data.lightCount = 1;
-      data.lights[0].lightPos = XMFLOAT4(-0.217, 0.393, -0.379, 0);
-      data.lights[0].lightColor = XMFLOAT4(0.6, 0.4, 0.259, 3.787f);
+      data.lights[0].lightPos = XMFLOAT4(1, 0.109, 0.964, 0);
+      data.lights[0].lightColor =
+          XMFLOAT4(230.f / 255.f, 214.f / 255.f, 167.f / 255.f, 0.290);
       return data;
     }
   };
@@ -75,9 +76,30 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
       data.Metallic = 0.0f;
       data.SpecularTint = 0.0f;
       data.Clearcoat = 0.157f;
-      data.ClearcoatGloss = 0.323;
+      data.ClearcoatGloss = 0.323f;
       return data;
     }
+  };
+
+  struct NewPixelShaderData {
+
+    float3 SurfaceColor = float3(0.109, 0.340, 0.589);
+    float Roughness = 0.192;
+    float3 _TipColor = float3(231.f, 231.f, 231.f) / 255.f;
+    float foamDepthFalloff = 0.245;
+    // float3 _ScatterColor = float3(4.f / 255.f, 22.f / 255.f, 33.f / 255.f);
+    // float3 _ScatterColor = float3(10.f, 18.f, 29.f) / 255.f;
+    // float3 _ScatterColor = float3(5.f, 18.f, 34.f) / 255.f;
+    float3 _ScatterColor = float3(0.f, 11.f, 25.f) / 255.f;
+    float foamRoughnessModifier = 5.0f;
+    float3 _AmbientColor = float3(53, 111, 111) / 255.f;
+    float _AmbientMult = 0.639f;
+    float NormalDepthAttenuation = 1;
+    float _HeightModifier = 13.f;
+    float _WavePeakScatterStrength = 2.629f;
+    float _ScatterStrength = 0.78f;
+    float _ScatterShadowStrength = 4.460f;
+    float _EnvMapMult = 2.696f;
   };
 
   RootDescriptor<RootDescriptorType::ConstantBuffer> vertexBuffer;
@@ -87,9 +109,11 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
   RootDescriptor<RootDescriptorType::ConstantBuffer> debugBuffer;
   RootDescriptor<RootDescriptorType::ConstantBuffer> lightingBuffer;
   RootDescriptor<RootDescriptorType::ConstantBuffer> waterPBRBuffer;
-  RootDescriptorTable<1> texture;
 
   RootDescriptorTable<1> skybox;
+  // Optional
+  RootDescriptorTable<1> texture;
+
   RootDescriptorTable<1> heightMap1;
   RootDescriptorTable<1> heightMap2;
   RootDescriptorTable<1> heightMap3;

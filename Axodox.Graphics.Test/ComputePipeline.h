@@ -22,18 +22,24 @@ template <typename T, typename TypeA, typename TypeB>
 concept Either = std::same_as<T, TypeA> || std::same_as<T, TypeB>;
 struct SimulationStage {
   struct LODComputeBuffer {
-    XMFLOAT4 displacementLambda;
-    f32 patchSize;
-    f32 foamExponentialDecay;
-    f32 foamMinValue;
+    float4 displacementLambda;
+    float patchSize;
+    float foamExponentialDecay;
+    float foamMinValue;
+    float foamBias;
+    float foamMult;
 
     explicit LODComputeBuffer(const SimulationData::PatchData &patchData)
-        : patchSize(patchData.patchSize),
-          displacementLambda(XMFLOAT4(patchData.displacementLambda.z,
-                                      patchData.displacementLambda.y,
-                                      patchData.displacementLambda.z, 1)),
+        : displacementLambda(patchData.displacementLambda.z,
+                             patchData.displacementLambda.y,
+                             patchData.displacementLambda.z, 1),
+          patchSize(patchData.patchSize),
+
           foamExponentialDecay(patchData.foamExponentialDecay),
-          foamMinValue(patchData.foamMinValue) {}
+          foamMinValue(patchData.foamMinValue), foamBias(patchData.foamBias),
+          foamMult(patchData.foamMult)
+
+    {}
   };
   struct SpektrumRootDescription : public RootSignatureMask {
     // In

@@ -1,6 +1,6 @@
 
 #define NUM_INSTANCES (1 << 12)
-#define DISP_MAP_LOG2 8
+#define DISP_MAP_LOG2 10
 #define DISP_MAP_SIZE (1<<DISP_MAP_LOG2)
 #define MAX_LIGHT_COUNT 1
 

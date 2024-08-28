@@ -18,6 +18,8 @@ struct SimulationData {
     f32 WindForce;
 
     f32 foamMinValue;
+    f32 foamBias;
+    f32 foamMult;
     const u32 &N;
     const u32 &M;
     const float2 &windDirection;

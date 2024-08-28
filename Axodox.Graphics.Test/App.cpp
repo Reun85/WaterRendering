@@ -79,9 +79,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     XMFLOAT3 foamColor = XMFLOAT3(1, 1, 1);
     f32 foamDepthAttenuation = 2.f;
 
-    bool useFoam = false;
+    bool useFoam = true;
     bool useChannel1 = true;
-    bool useChannel2 = false;
+    bool useChannel2 = true;
     bool useChannel3 = false;
     bool onlyShowNormals = false;
     const static u32 DebugBitsStart = 24;
@@ -403,6 +403,50 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   }
 
   static void DrawImGuiForPSResources(
+      WaterGraphicRootDescription::NewPixelShaderData &waterData,
+      WaterGraphicRootDescription::PixelLighting &sunData,
+      bool exclusiveWindow = true) {
+    bool cont = true;
+    if (exclusiveWindow) {
+      cont = ImGui::Begin("PS Data");
+    }
+    if (cont) {
+      ImGui::ColorEdit3("Surface Color", &waterData.SurfaceColor.x);
+      ImGui::SliderFloat("Roughness", &waterData.Roughness, 0.0f, 1.0f);
+
+      ImGui::ColorEdit3("Tip Color", &waterData._TipColor.x);
+      ImGui::ColorEdit3("Scatter Color", &waterData._ScatterColor.x);
+      ImGui::ColorEdit3("Ambient Color", &waterData._AmbientColor.x);
+      ImGui::SliderFloat("Ambient Mult", &waterData._AmbientMult, 0.0f, 10.0f);
+      ImGui::SliderFloat("Normal Depth Attenuation",
+                         &waterData.NormalDepthAttenuation, 0, 2);
+      ImGui::SliderFloat("Foam Roughness Modifier",
+                         &waterData.foamRoughnessModifier, 0.0f, 10.0f);
+      ImGui::SliderFloat("Foam Depth Falloff", &waterData.foamDepthFalloff,
+                         0.0f, 10.0f);
+      ImGui::SliderFloat("Height Modifier", &waterData._HeightModifier, 0.0f,
+                         10.0f);
+      ImGui::SliderFloat("Wave Peak Scatter Strength",
+                         &waterData._WavePeakScatterStrength, 0.0f, 10.0f);
+      ImGui::SliderFloat("Scatter Strength", &waterData._ScatterStrength, 0.0f,
+                         10.0f);
+      ImGui::SliderFloat("Scatter Shadow Strength",
+                         &waterData._ScatterShadowStrength, 0.0f, 10.0f);
+      ImGui::SliderFloat("Env Map Mult", &waterData._EnvMapMult, 0.0f, 10.0f);
+
+      ImGui::Separator();
+      ImGui::Text("Sun Data");
+      ImGui::SliderFloat3("Light Pos", (float *)&sunData.lights[0].lightPos, -1,
+                          1);
+
+      ImGui::ColorEdit3("Light Color", (float *)&sunData.lights[0].lightColor);
+      ImGui::SliderFloat("Light Intensity", &sunData.lights[0].lightColor.w, 0,
+                         10);
+    }
+    if (exclusiveWindow)
+      ImGui::End();
+  }
+  static void DrawImGuiForPSResources(
       WaterGraphicRootDescription::PixelShaderPBRData &waterData,
       WaterGraphicRootDescription::PixelLighting &sunData,
       bool exclusiveWindow = true) {
@@ -411,8 +455,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       cont = ImGui::Begin("PS Data");
     }
     if (cont) {
-      ImGui::SliderFloat3("Surface Color", (float *)&waterData.SurfaceColor, 0,
-                          1);
+      ImGui::ColorEdit3("Surface Color", (float *)&waterData.SurfaceColor);
       ImGui::SliderFloat("Roughness", &waterData.Roughness, 0, 1);
       ImGui::SliderFloat("Subsurface Scattering",
                          &waterData.SubsurfaceScattering, 0, 1);
@@ -431,10 +474,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       ImGui::SliderFloat3("Light Pos", (float *)&sunData.lights[0].lightPos, -1,
                           1);
 
-      ImGui::SliderFloat3("Light Color", (float *)&sunData.lights[0].lightColor,
-                          0, 1);
-      ImGui::SliderFloat("Light Intensity",
-                         (float *)&sunData.lights[0].lightColor.w, 0, 10);
+      ImGui::ColorEdit3("Light Color", (float *)&sunData.lights[0].lightColor);
+      ImGui::SliderFloat("Light Intensity", &sunData.lights[0].lightColor.w, 0,
+                         10);
     }
     if (exclusiveWindow)
       ImGui::End();
@@ -513,8 +555,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             .CreatePipelineStateAsync(skyboxPipelineStateDefinition)
             .get();
 
-    WaterGraphicRootDescription::PixelShaderPBRData waterData =
-        WaterGraphicRootDescription::PixelShaderPBRData::WaterData();
+    WaterGraphicRootDescription::NewPixelShaderData waterData;
+    // WaterGraphicRootDescription::PixelShaderPBRData waterData =
+    //     WaterGraphicRootDescription::PixelShaderPBRData::WaterData();
     WaterGraphicRootDescription::PixelLighting sunData =
         WaterGraphicRootDescription::PixelLighting::SunData();
 
@@ -1215,6 +1258,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
               skyboxRootSignature.Set(allocator, RootSignatureUsage::Graphics);
 
           mask.skybox = skyboxTexture;
+          mask.lightingBuffer = sunDataBuffer;
 
           mask.cameraBuffer = cameraConstantBuffer;
 
@@ -1232,14 +1276,14 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           if (ImGui::Begin("Application")) {
             ImGui::Text("Press ESC to quit");
             ImGui::Text("Press Space to stop time");
-            ImGui::Text("frameID = %d", frameCounter);
+            ImGui::Text("frame %d", frameCounter);
             ImGui::Text(
-                "Since start %.3f s",
+                " %.3f s",
                 GetDurationInFloatWithPrecision<std::chrono::seconds,
                                                 std::chrono::milliseconds>(
                     getTimeSinceStart()));
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
-                        1000.0f / io.Framerate, io.Framerate);
+            ImGui::Text(" %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate,
+                        io.Framerate);
             settings.DrawImGui(beforeNextFrame);
 
             runtimeResults.DrawImGui(false);

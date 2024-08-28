@@ -7,6 +7,7 @@ using namespace Axodox::Storage;
 using namespace DirectX::PackedVector;
 struct SkyboxRootDescription : public RootSignatureMask {
   RootDescriptor<RootDescriptorType::ConstantBuffer> cameraBuffer;
+  RootDescriptor<RootDescriptorType::ConstantBuffer> lightingBuffer;
   RootDescriptorTable<1> skybox;
 
   StaticSampler _textureSampler;
@@ -14,6 +15,7 @@ struct SkyboxRootDescription : public RootSignatureMask {
   explicit SkyboxRootDescription(const RootSignatureContext &context)
       : RootSignatureMask(context),
         cameraBuffer(this, {0}, ShaderVisibility::Vertex),
+        lightingBuffer(this, {0}, ShaderVisibility::Pixel),
 
         skybox(this, {DescriptorRangeType::ShaderResource, {0}},
                ShaderVisibility::Pixel),

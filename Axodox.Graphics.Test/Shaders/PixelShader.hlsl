@@ -1,4 +1,3 @@
-
 #include "common.hlsli"
 Texture2D<float4> _texture : register(t0);
 TextureCube<float4> _skybox : register(t1);
@@ -42,28 +41,45 @@ struct input_t
 
 
 
-cbuffer MaterialProperties : register(b2)
+cbuffer PSProperties : register(b2)
 {
-    float3 SurfaceColor;
-    float Roughness;
-    float SubsurfaceScattering;
-    float Sheen;
-    float SheenTint;
-    float Anisotropic;
-    float SpecularStrength;
-    float Metallic;
-    float SpecularTint;
-    float Clearcoat;
-    float ClearcoatGloss;
+    float3 SurfaceColor = float3(0.109, 0.340, 0.589);
+    float Roughness = 0.285;
+    float3 _TipColor = float3(0.8f, 0.9f, 1.0f);
+    float foamDepthFalloff = 1.0f;
+    float3 _ScatterColor = float3(1, 1, 1);
+    float foamRoughnessModifier = 1.0f;
+    float3 _AmbientColor = float3(1, 1, 1);
+    float _AmbientMult = 1.0f;
+    float NormalDepthAttenuation = 1.f;
+    float _HeightModifier = 1;
+    float _WavePeakScatterStrength = 1;
+    float _ScatterStrength = 1;
+    float _ScatterShadowStrength = 1;
+    float _EnvMapMult = 1;
 };
-
-
-
-// Utility Functions
-float3 SchlickFresnel(float3 f0, float3 f90, float VdotH)
+float SchlickFresnel(float f0, float NdotV)
 {
-    return f0 + (f90 - f0) * pow(1.0 - VdotH, 5.0);
+    return f0 + (1 - f0) * pow(1.0 - NdotV, 5.0);
 }
+
+
+float SmithMaskingBeckmann(float3 H, float3 S, float roughness)
+{
+    float hdots = max(0.001f, max(dot(H, S), 0));
+    float a = hdots / (roughness * sqrt(1 - hdots * hdots));
+    float a2 = a * a;
+
+    return a < 1.6f ? (1.0f - 1.259f * a + 0.396f * a2) / (3.535f * a + 2.181 * a2) : 0.0f;
+}
+
+float Beckmann(float ndoth, float roughness)
+{
+    float exp_arg = (ndoth * ndoth - 1) / (roughness * roughness * ndoth * ndoth);
+
+    return exp(exp_arg) / (PI * roughness * roughness * ndoth * ndoth * ndoth * ndoth);
+}
+
 
 float D_GGX(float NdotH, float roughness)
 {
@@ -82,114 +98,20 @@ float G_Smith(float NdotL, float NdotV, float roughness)
     return G_V * G_L;
 }
 
-float3 F_Schlick(float3 f0, float3 f90, float VdotH)
+float4 main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
 {
-    return f0 + (f90 - f0) * pow(1.0 - VdotH, 5.0);
-}
 
-// Disney BRDF Functions
-float3 DisneyDiffuse(float NdotL, float NdotV, float LdotH, float LdotN)
-{
-    float energyBias = 0.5 * Roughness;
-    float energyFactor = lerp(1.0, 1.0 / 1.51, Roughness);
+    
+// Colors
+    const float3 sunIrradiance = lights[0].lightColor.xyz * lights[0].lightColor.w;
+    const float3 sunDir = lights[0].lightPos.xyz;
 
-    float fd90 = energyBias + 2.0 * LdotH * LdotH * Roughness;
-    float lightScatter = 1.0 + (fd90 - 1.0) * pow(1.0 - NdotL, 5.0);
-    float viewScatter = 1.0 + (fd90 - 1.0) * pow(1.0 - NdotV, 5.0);
-
-    return lightScatter * viewScatter * energyFactor;
-}
-
-float3 Subsurface(float NdotL, float NdotV, float LdotH)
-{
-    float FL = 1.0 - pow(1.0 - NdotL, 5.0);
-    float FV = 1.0 - pow(1.0 - NdotV, 5.0);
-    return FL * FV * (1.0 / PI);
-}
-
-float3 SheenBRDF(float3 normal, float3 viewDir, float3 lightDir, float3 H)
-{
-    float NdotL = saturate(dot(normal, lightDir));
-    float NdotV = saturate(dot(normal, viewDir));
-    float HdotV = saturate(dot(H, viewDir));
-
-    float3 sheenColor = lerp(float3(1.0, 1.0, 1.0), SurfaceColor, SheenTint);
-
-    return Sheen * sheenColor * SchlickFresnel(float3(0.0, 0.0, 0.0), sheenColor, HdotV);
-}
-
-// Pixel Shader
-float3 PBRShader(float3 localPos, float3 normal, float3 LightDirection, float3 LightColor, float LightIntensity)
-{
     
     
-    normal = normalize(normal);
-    float3 viewDir = normalize(camConstants.cameraPos - localPos);
-    float3 lightDir = normalize(LightDirection);
-
-    // Sample base color
-    float3 baseColor = SurfaceColor;
-
-    float3 H = normalize(lightDir + viewDir);
-
-    float NdotL = saturate(dot(normal, lightDir));
-    float NdotV = saturate(dot(normal, viewDir));
-    float NdotH = saturate(dot(normal, H));
-    float LdotH = saturate(dot(lightDir, H));
-
-    // Diffuse
-    float3 diffuseColor = baseColor;
-    float3 diffuse = (1.0 - Metallic) * DisneyDiffuse(NdotL, NdotV, LdotH, NdotL) * diffuseColor;
-
-    // Subsurface Scattering
-    float3 subsurface = SubsurfaceScattering * Subsurface(NdotL, NdotV, LdotH) * diffuseColor;
-
-    // Specular
-    float3 F0 = lerp(float3(0.04, 0.04, 0.04), diffuseColor, Metallic);
-    float3 F = F_Schlick(F0, float3(1.0, 1.0, 1.0), NdotH);
-    float D = D_GGX(NdotH, Roughness);
-    float G = G_Smith(NdotL, NdotV, Roughness);
-
-    float3 specular = F * G * D / (4.0 * NdotL * NdotV);
-
-    // Sheen
-    float3 sheen = SheenBRDF(normal, viewDir, lightDir, H);
-
-    // Clearcoat
-    float3 clearcoat = Clearcoat * D_GGX(NdotH, ClearcoatGloss) * lerp(0.04, 1.0, NdotH);
-
-    // Reflection
-    float3 reflectionVector = reflect(-viewDir, normal);
-    float3 reflectionColor = _skybox.Sample(_sampler, reflectionVector).xyz;
-
-    float3 reflecitivity = F * (1 - Roughness);
-    reflectionColor *= reflecitivity;
     
     
-    // Combine all contributions
-    float3 lighting = LightColor * LightIntensity * (diffuse + subsurface + sheen + specular + clearcoat * NdotL) + reflectionColor;
-
-
-    // Final color output
-    return lighting;
-}
-float3 PBRShader(float3 localPos, float3 normal, int lightIndex)
-{
-    float3 LightDirection = lights[lightIndex].lightPos.xyz;
-    float3 LightColor = lights[lightIndex].lightColor.xyz;
-    float LightIntensity = lights[lightIndex].lightColor.w;
-    return PBRShader(localPos, normal, LightDirection, LightColor, LightIntensity);
-}
-
-
-
-
-
-
-
-float4 main(input_t input, bool isFrontFacing : SV_IsFrontFace) : SV_TARGET
-{
-
+     
+	
     if (has_flag(debugValues.flags, 6))
     {
         float2 texCoord = GetTextureCoordFromPlaneCoordAndPatch(input.planeCoord, debugValues.patchSizes.r);
@@ -199,24 +121,20 @@ float4 main(input_t input, bool isFrontFacing : SV_IsFrontFace) : SV_TARGET
         return text;
         return Swizzle(text, debugValues.swizzleOrder);
     }
-    
-    
-
-    
-
-    
-    
+        
     float3 normal = normalize(input.grad.xyz);
     
 
     const float3 viewVec = camConstants.cameraPos - input.localPos;
     float3 viewDir = normalize(viewVec);
+
     if (has_flag(debugValues.flags, 24))
     {
         if (dot(normal, viewDir) < 0)
             return float4(1, 0, 0, 1);
         return float4(0, 1, 0, 1);
     }
+
     if (dot(normal, viewDir) < 0)
     {
         normal *= -1;
@@ -232,28 +150,118 @@ float4 main(input_t input, bool isFrontFacing : SV_IsFrontFace) : SV_TARGET
     {
         return float4(Jacobian, Jacobian, Jacobian, 1);
     }
-
-
     
-    const float depthsqr = dot(viewVec, viewVec);
-    const float3 foamColor = debugValues.FoamInfo.xyz;
-    const float foamDepthAttenuation = debugValues.FoamInfo.w;
+    float3 lightDir = normalize(sunDir);
+    float3 halfwayDir = normalize(lightDir + viewDir);
+    float depth = input.Screen.z / input.Screen.w;
+    float LdotH = DotClamped(lightDir, halfwayDir);
+    float VdotH = DotClamped(viewDir, halfwayDir);
+    float NdotV = DotClamped(viewDir, normal);
+				
+    float NdotL = DotClamped(normal, lightDir);
+    float NdotH = max(0.0001f, dot(normal, halfwayDir));
+				
+
+				
+
+				
     float foam = 0;
     if (has_flag(debugValues.flags, 2))
     {
-        foam = lerp(0.0f, saturate(Jacobian), saturate(pow(depthsqr, foamDepthAttenuation / 2)));
+        foam =
+    lerp(0.0f, saturate(Jacobian), pow(depth, foamDepthFalloff));
     }
 
+    normal = lerp(normal, float3(0, 1, 0), pow(depth, NormalDepthAttenuation));
 
-     
-    float3 ret = float3(0, 0, 0);
 
-    float3 samp = _skybox.Sample(_sampler, normal).xyz;
-    ret += PBRShader(input.localPos, normal, 0);
-    ret += PBRShader(input.localPos, normal, normal, samp, 1);
-    ret /= 2;
 
-    ret = lerp(ret, foamColor, saturate(foam));
+				
+    // Make foam appear rougher
+    float a = Roughness + foam * foamRoughnessModifier;
+
+    float viewMask = SmithMaskingBeckmann(halfwayDir, viewDir, a);
+    float lightMask = SmithMaskingBeckmann(halfwayDir, lightDir, a);
+				
+    float G = rcp(1 + viewMask + lightMask);
+    //float D = Beckmann(NdotH, a);
+
+    //float eta = 1.33f;
+    //float R = ((eta - 1) * (eta - 1)) / ((eta + 1) * (eta + 1));
+    //float thetaV = acos(viewDir.y);
+
+    //float numerator = pow(1 - dot(normal, viewDir), 5 * exp(-2.69 * a));
+    //float F = R + (1 - R) * numerator / (1.0f + 22.7f * pow(a, 1.5f));
+    //F = saturate(F);
+
+    float D = D_GGX(NdotH, Roughness);
+    float F = SchlickFresnel(0.02, NdotV);
+				
+
+
+    float denom = 4.0 * NdotL * NdotV;
+    float3 specular = F * G * D / max(0.001f, denom);
+
+    float3 reflectDir = reflect(-viewDir, normal);
+//    float3x3 rotate90degrees = float3x3(
+//        float3(0, 0, 1),
+//        float3(0, 1, 0),
+//        float3(-1, 0, 0)
+//);
+//    reflectDir = mul(rotate90degrees, reflectDir);
+    float3 envReflection = _skybox.Sample(_sampler, reflectDir).rgb * _EnvMapMult;
+
+    //envReflection = SampleSkyboxCommon(reflectDir) * _EnvMapMult;
+
+
+
+    float H = max(0.0f, input.localPos.y) * _HeightModifier;
+    float3 scatterColor = _ScatterColor;
+    float3 ambientColor = _AmbientColor * _AmbientMult;
+
+			
+
+    float k1 = _WavePeakScatterStrength * H * pow(DotClamped(lightDir, -viewDir), 4.0f) * pow(0.5f - 0.5f * NdotL, 3.0f);
+    float k2 = _ScatterStrength * pow(DotClamped(viewDir, normal), 2.0f);
+    float k3 = _ScatterShadowStrength * max(0, NdotL);
+
     
-    return float4(ret, 1);
+
+    float3 scatter = (k1 + k2) * scatterColor * rcp(1 + lightMask);
+    scatter += k3 * scatterColor + ambientColor * rcp(1 + lightMask);
+
+    float3 K1 = k1 * scatterColor * rcp(1 + lightMask);
+    float3 K2 = k2 * scatterColor * rcp(1 + lightMask);
+    float3 K3 = k3 * scatterColor * rcp(1 + lightMask);
+    if (has_flag(debugValues.flags, 26))
+    {
+        return float4(K1 * sunIrradiance, 1);
+    }
+    if (has_flag(debugValues.flags, 27))
+    {
+        return float4(K2 * sunIrradiance, 1);
+    }
+    if (has_flag(debugValues.flags, 28))
+    {
+        return float4(K3 * sunIrradiance, 1);
+    }
+    if (has_flag(debugValues.flags, 29))
+    {
+        return float4(K3 * sunIrradiance / rcp(1 + lightMask), 1);
+    }
+    if (has_flag(debugValues.flags, 30))
+    {
+        return float4(specular, 1);
+    }
+    if (has_flag(debugValues.flags, 31))
+    {
+        float x = 6 * viewMask;
+        return float4(x, x, x, 1);
+    }
+				
+    float3 output = (1 - F) * scatter * sunIrradiance + sunIrradiance * specular + F * envReflection;
+    output = max(0.0f, output);
+    output = lerp(output, _TipColor, saturate(foam));
+
+    return float4(output, 1);
 }
