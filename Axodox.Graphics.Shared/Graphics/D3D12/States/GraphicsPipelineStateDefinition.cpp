@@ -42,13 +42,8 @@ GraphicsPipelineStateDefinition::operator D3D12_GRAPHICS_PIPELINE_STATE_DESC()
 
   zero_memory(result.RTVFormats);
 
-  size_t i = 0;
-  for (const auto &format : RenderTargetFormats) {
-    if (i < size(result.RTVFormats)) {
-      result.RTVFormats[i] = static_cast<DXGI_FORMAT>(format);
-      ++i;
-    }
-  }
+  std::memcpy(result.RTVFormats, RenderTargetFormats.begin(),
+              sizeof(DXGI_FORMAT) * RenderTargetFormats.size());
   return result;
 }
 } // namespace Axodox::Graphics::D3D12
