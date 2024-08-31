@@ -39,6 +39,14 @@ struct input_t
     float4 grad : GRADIENTS;
 };
 
+struct output_t
+{
+    float4 albedo;
+    float4 normal;
+    float4 position;
+    float4 materialValues;
+};
+
 
 
 cbuffer PSProperties : register(b2)
@@ -98,9 +106,13 @@ float G_Smith(float NdotL, float NdotV, float roughness)
     return G_V * G_L;
 }
 
-float4 main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
+
+
+
+output_t main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
 {
 
+    output_t output;
     
 // Colors
     const float3 sunIrradiance = lights[0].lightColor.xyz * lights[0].lightColor.w;
@@ -118,8 +130,8 @@ float4 main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
         float4 text = _texture.Sample(_sampler, texCoord) * float4(debugValues.pixelMult.
         xyz, 1);
       
-        return text;
-        return Swizzle(text, debugValues.swizzleOrder);
+        output.albedo = text;
+        return output;
     }
         
     float3 normal = normalize(input.grad.xyz);
@@ -130,9 +142,12 @@ float4 main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
 
     if (has_flag(debugValues.flags, 24))
     {
+        output.albedo =
+         float4(0, 1, 0, 1);
         if (dot(normal, viewDir) < 0)
-            return float4(1, 0, 0, 1);
-        return float4(0, 1, 0, 1);
+            output.albedo = float4(1, 0, 0, 1);
+        
+        return output;
     }
 
     if (dot(normal, viewDir) < 0)
@@ -142,13 +157,17 @@ float4 main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
 
     if (has_flag(debugValues.flags, 7))
     {
-        return float4(normal, 1);
+        output.albedo =
+    float4(normal, 1);
+        return output;
     }
 
     float Jacobian = input.grad.w;
     if (has_flag(debugValues.flags, 25))
     {
-        return float4(Jacobian, Jacobian, Jacobian, 1);
+        output.albedo =
+         float4(Jacobian, Jacobian, Jacobian, 1);
+        return output;
     }
     
     float3 lightDir = normalize(sunDir);
@@ -235,33 +254,51 @@ float4 main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
     float3 K3 = k3 * scatterColor * rcp(1 + lightMask);
     if (has_flag(debugValues.flags, 26))
     {
-        return float4(K1 * sunIrradiance, 1);
+        output.albedo =
+         float4(K1 * sunIrradiance, 1);
+        return output;
     }
     if (has_flag(debugValues.flags, 27))
     {
-        return float4(K2 * sunIrradiance, 1);
+        output.albedo =
+         float4(K2 * sunIrradiance, 1);
+        return output;
     }
     if (has_flag(debugValues.flags, 28))
     {
-        return float4(K3 * sunIrradiance, 1);
+        output.albedo =
+         float4(K3 * sunIrradiance, 1);
+        return output;
     }
     if (has_flag(debugValues.flags, 29))
     {
-        return float4(K3 * sunIrradiance / rcp(1 + lightMask), 1);
+        output.albedo =
+         float4(K3 * sunIrradiance / rcp(1 + lightMask), 1);
+        return output;
     }
     if (has_flag(debugValues.flags, 30))
     {
-        return float4(specular, 1);
+        output.albedo =
+         float4(specular, 1);
+        return output;
     }
     if (has_flag(debugValues.flags, 31))
     {
         float x = 6 * viewMask;
-        return float4(x, x, x, 1);
+        output.albedo =
+         float4(x, x, x, 1);
+        return output;
     }
 				
-    float3 output = (1 - F) * scatter * sunIrradiance + sunIrradiance * specular + F * envReflection;
-    output = max(0.0f, output);
-    output = lerp(output, _TipColor, saturate(foam));
+    float3 albedo = (1 - F) * scatter * sunIrradiance + sunIrradiance * specular + F * envReflection;
+    albedo = max(0.0f, albedo);
+    albedo = lerp(albedo, _TipColor, saturate(foam));
 
-    return float4(output, 1);
+    output.albedo = float4(albedo, 1);
+
+    output.position = float4(input.localPos, 1);
+    output.normal = float4(normal, 1);
+    output.materialValues = float4(0, 0, 0, 0);
+    return output;
+    
 }

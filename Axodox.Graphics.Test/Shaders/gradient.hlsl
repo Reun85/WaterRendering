@@ -33,7 +33,6 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     float2 dDx = (dv.xz) * INV_TILE_SIZE / constants.displacementLambda.xz;
     float2 dDy = (du.xz) * INV_TILE_SIZE / constants.displacementLambda.xz;
 
-    //float J = (1.0 + dDx.x) * (1.0 + dDy.y) - dDx.y * dDy.x;
     float J = dDx.x * dDy.y - dDx.y * dDy.x;
 
 

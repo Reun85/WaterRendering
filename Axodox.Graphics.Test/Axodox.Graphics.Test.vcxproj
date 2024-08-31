@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\packages\Microsoft.Windows.CppWinRT.2.0.220531.1\build\native\Microsoft.Windows.CppWinRT.props" Condition="Exists('..\packages\Microsoft.Windows.CppWinRT.2.0.220531.1\build\native\Microsoft.Windows.CppWinRT.props')" />
   <PropertyGroup Label="Globals">
@@ -131,6 +131,21 @@
     <ClCompile Include="Simulation.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <Image Include="Assets\skybox\nx.png" />
+    <Image Include="Assets\skybox\ny.png" />
+    <Image Include="Assets\skybox\nz.png" />
+    <Image Include="Assets\skybox\px.png" />
+    <Image Include="Assets\skybox\py.png" />
+    <Image Include="Assets\skybox\pz.png" />
+    <Image Include="Assets\skybox\skybox.hdr">
+      <FileType>Document</FileType>
+    </Image>
+    <Image Include="Assets\skybox\skybox2.hdr">
+      <FileType>Document</FileType>
+    </Image>
+    <Image Include="Assets\skybox\skybox3.hdr">
+      <FileType>Document</FileType>
+    </Image>
     <None Include="packages.config" />
     <None Include="PropertySheet.props" />
     <None Include="Shaders\common.hlsli" />
@@ -143,6 +158,14 @@
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
     </FxCompile>
     <FxCompile Include="Shaders\AtmosphereVS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
+    </FxCompile>
+    <FxCompile Include="Shaders\DeferredShadingPS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="Shaders\DeferredShadingVS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
     </FxCompile>
@@ -202,6 +225,7 @@
     <Image Include="Assets\skybox\front.jpg" />
     <Image Include="Assets\skybox\left.jpg" />
     <Image Include="Assets\skybox\right.jpg" />
+    <Image Include="Assets\skybox\test.jpg" />
     <Image Include="Assets\skybox\top.jpg" />
     <Image Include="Assets\SplashScreen.scale-200.png" />
     <Image Include="Assets\Square150x150Logo.scale-200.png" />
@@ -215,6 +239,7 @@
     <Import Project="..\packages\Microsoft.Windows.CppWinRT.2.0.220531.1\build\native\Microsoft.Windows.CppWinRT.targets" Condition="Exists('..\packages\Microsoft.Windows.CppWinRT.2.0.220531.1\build\native\Microsoft.Windows.CppWinRT.targets')" />
     <Import Project="..\packages\Axodox.Common.1.0.40\build\native\Axodox.Common.targets" Condition="Exists('..\packages\Axodox.Common.1.0.40\build\native\Axodox.Common.targets')" />
     <Import Project="..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets" Condition="Exists('..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets')" />
+    <Import Project="..\packages\directxtex_uwp.2024.6.5.1\build\native\directxtex_uwp.targets" Condition="Exists('..\packages\directxtex_uwp.2024.6.5.1\build\native\directxtex_uwp.targets')" />
   </ImportGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
@@ -224,5 +249,6 @@
     <Error Condition="!Exists('..\packages\Microsoft.Windows.CppWinRT.2.0.220531.1\build\native\Microsoft.Windows.CppWinRT.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Windows.CppWinRT.2.0.220531.1\build\native\Microsoft.Windows.CppWinRT.targets'))" />
     <Error Condition="!Exists('..\packages\Axodox.Common.1.0.40\build\native\Axodox.Common.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Axodox.Common.1.0.40\build\native\Axodox.Common.targets'))" />
     <Error Condition="!Exists('..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets'))" />
+    <Error Condition="!Exists('..\packages\directxtex_uwp.2024.6.5.1\build\native\directxtex_uwp.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\directxtex_uwp.2024.6.5.1\build\native\directxtex_uwp.targets'))" />
   </Target>
 </Project>

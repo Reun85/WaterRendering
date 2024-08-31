@@ -19,9 +19,17 @@ cbuffer PixelLighting : register(b0)
 
 TextureCube skyboxTexture : register(t0);
 SamplerState sampleState : register(s0);
-
-float4 main(VS_OUTPUT input) : SV_TARGET
+struct output_t
 {
+    float4 albedo;
+    float4 normal;
+    float4 position;
+    float4 materialValues;
+};
+
+output_t main(VS_OUTPUT input) : SV_TARGET
+{
+    output_t output;
 //    float3x3 rotate90degrees = float3x3(
 //        float3(0, 0, 1),
 //        float3(0, 1, 0),
@@ -30,15 +38,18 @@ float4 main(VS_OUTPUT input) : SV_TARGET
     //float3 dir = mul(rotate90degrees, input.TexCoord);
     float3 dir = input.TexCoord;
    //float3 samp = SampleSkyboxCommon(dir);
-    float3 samp = skyboxTexture.Sample(sampleState, dir).xyz;
+    float4 samp = skyboxTexture.Sample(sampleState, dir);
     float3 sunPos = lights[0].lightPos.xyz;
     float sunRadius = 0.01;
 
     if (length(
         sunPos - dir) < sunRadius)
     {
-        return float4(1, 0, 0, 1);
+        samp = float4(1, 0, 0, 1);
     }
 
-    return float4(samp, 1);
+    output.albedo =
+samp;
+    return
+output;
 }

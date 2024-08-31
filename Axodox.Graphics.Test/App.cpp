@@ -482,6 +482,15 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       ImGui::End();
   }
 
+  struct RuntimeCPUBuffers {
+    struct OceanData {
+      WaterGraphicRootDescription::VertexConstants vertexConstants;
+      WaterGraphicRootDescription::HullConstants hullConstants;
+      u16 N = 0;
+    };
+    std::vector<OceanData> oceanData;
+  };
+
   void Run() const {
     CoreWindow window = CoreWindow::GetForCurrentThread();
     window.Activate();
@@ -504,8 +513,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     GraphicsDevice device{};
     CommandQueue directQueue{device};
-    // CoreSwapChain swapChain{directQueue, window,
-    //                         SwapChainFlags::IsShaderResource};
     CoreSwapChain swapChain{directQueue, window,
                             SwapChainFlags::IsTearingAllowed};
 
@@ -529,8 +536,12 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         .DepthStencilState = DepthStencilMode::WriteDepth,
         .InputLayout = VertexPosition::Layout,
         .TopologyType = PrimitiveTopologyType::Patch,
-        .RenderTargetFormats = {Format::B8G8R8A8_UNorm},
+        .RenderTargetFormats = {Format::B8G8R8A8_UNorm,
+                                Format::R16G16B16A16_Float,
+                                Format::R16G16B16A16_Float,
+                                Format::B8G8R8A8_UNorm},
         .DepthStencilFormat = Format::D32_Float};
+
     Axodox::Graphics::D3D12::PipelineState waterPipelineState =
         pipelineStateProvider
             .CreatePipelineStateAsync(waterPipelineStateDefinition)
@@ -548,16 +559,36 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         .RasterizerState = RasterizerFlags::CullNone,
         .DepthStencilState = skyboxDepthStencilState,
         .InputLayout = VertexPositionNormalTexture::Layout,
-        .RenderTargetFormats = {Format::B8G8R8A8_UNorm},
+        .RenderTargetFormats = {Format::B8G8R8A8_UNorm,
+                                Format::R16G16B16A16_Float,
+                                Format::R16G16B16A16_Float,
+                                Format::B8G8R8A8_UNorm},
         .DepthStencilFormat = Format::D32_Float};
     Axodox::Graphics::D3D12::PipelineState skyboxPipelineState =
         pipelineStateProvider
             .CreatePipelineStateAsync(skyboxPipelineStateDefinition)
             .get();
 
+    VertexShader deferredShadingVS{app_folder() / L"DeferredShadingVS.cso"};
+    PixelShader deferredShadingPS{app_folder() / L"DeferredShadingPS.cso"};
+    RootSignature<DeferredShading> deferredShadingRootSignature{device};
+
+    GraphicsPipelineStateDefinition deferredShadingPipelineStateDefinition{
+        .RootSignature = &deferredShadingRootSignature,
+        .VertexShader = &deferredShadingVS,
+        .PixelShader = &deferredShadingPS,
+        .RasterizerState = RasterizerFlags::CullNone,
+        .DepthStencilState = DepthStencilMode::WriteDepth,
+        .InputLayout = VertexPositionNormalTexture::Layout,
+        .TopologyType = PrimitiveTopologyType::Triangle,
+        .RenderTargetFormats = {Format::B8G8R8A8_UNorm},
+        .DepthStencilFormat = Format::D32_Float};
+    Axodox::Graphics::D3D12::PipelineState deferredShadingPipelineState =
+        pipelineStateProvider
+            .CreatePipelineStateAsync(deferredShadingPipelineStateDefinition)
+            .get();
+
     WaterGraphicRootDescription::NewPixelShaderData waterData;
-    // WaterGraphicRootDescription::PixelShaderPBRData waterData =
-    //     WaterGraphicRootDescription::PixelShaderPBRData::WaterData();
     WaterGraphicRootDescription::PixelLighting sunData =
         WaterGraphicRootDescription::PixelLighting::SunData();
 
@@ -571,24 +602,34 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     ResourceUploader resourceUploader{device};
     CommonDescriptorHeap commonDescriptorHeap{device, 2};
     DepthStencilDescriptorHeap depthStencilDescriptorHeap{device};
+    RenderTargetDescriptorHeap renderTargetDescriptorHeap{device};
     ResourceAllocationContext immutableAllocationContext{
         .Device = &device,
         .ResourceAllocator = &groupedResourceAllocator,
         .ResourceUploader = &resourceUploader,
         .CommonDescriptorHeap = &commonDescriptorHeap,
+        .RenderTargetDescriptorHeap = &renderTargetDescriptorHeap,
         .DepthStencilDescriptorHeap = &depthStencilDescriptorHeap};
 
     SimulationData simData = SimulationData::Default();
 
     ImmutableMesh planeMesh{immutableAllocationContext, CreateQuadPatch()};
 
+    ImmutableMesh deferredShadingPlane{immutableAllocationContext,
+                                       CreatePlane(2, XMUINT2(2, 2))};
     ImmutableMesh skyboxMesh{immutableAllocationContext, CreateCube(2)};
 
-    const std::array<const std::filesystem::path, 6> paths = {
-        "Assets/skybox/right.jpg", "Assets/skybox/left.jpg",
-        "Assets/skybox/top.jpg",   "Assets/skybox/bottom.jpg",
-        "Assets/skybox/front.jpg", "Assets/skybox/back.jpg"};
-    CubeMapTexture skyboxTexture{immutableAllocationContext, paths};
+    const CubeMapPaths paths = {
+        .sides = {.PosX = app_folder() / "Assets/skybox/px.png",
+                  .NegX = app_folder() / "Assets/skybox/nx.png",
+                  .PosY = app_folder() / "Assets/skybox/py.png",
+                  .NegY = app_folder() / "Assets/skybox/ny.png",
+                  .PosZ = app_folder() / "Assets/skybox/pz.png",
+                  .NegZ = app_folder() / "Assets/skybox/nz.png"}};
+    CubeMapTexture skyboxTexture{immutableAllocationContext,
+                                 paths}; /*CubeMapTexture
+   skyboxTexture{immutableAllocationContext, app_folder() /
+   "Assets/skybox/skybox3.hdr", 2024};*/
 
     //  Acquire memory
     groupedResourceAllocator.Build();
@@ -654,6 +695,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     beforeNextFrame.PatchHighestChanged = true;
     CommandFence beforeNextFence(device);
     std::vector<CommandFenceMarker> AdditionalMarkers;
+
+    RuntimeCPUBuffers cpuBuffers;
 
     loopStartTime = std::chrono::high_resolution_clock::now();
 
@@ -733,6 +776,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           !TextureDefinition::AreSizeCompatible(
               *frameResource.DepthBuffer.Definition(),
               renderTargetView->Definition())) {
+
         auto depthDefinition =
             renderTargetView->Definition().MakeSizeCompatible(
                 Format::D32_Float, TextureFlags::DepthStencil);
@@ -748,14 +792,19 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             commonDescriptorHeap.CreateShaderResourceView(&screenTexture);
       }
 
-      // Update constants
+      // Ensure GBuffer compatibility
+      frameResource.DeferredShadingBuffers.EnsureCompatibility(
+          *renderTargetView, commonDescriptorHeap);
+
       auto resolution = swapChain.Resolution();
       cam.SetAspect(float(resolution.x) / float(resolution.y));
       cam.Update(deltaTime);
+
       // Frame Begin
       {
         committedResourceAllocator.Build();
         depthStencilDescriptorHeap.Build();
+        renderTargetDescriptorHeap.Build();
         commonDescriptorHeap.Build();
       }
 
@@ -766,6 +815,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         computeAllocator.Reset();
         computeAllocator.BeginList();
         commonDescriptorHeap.Set(computeAllocator);
+
+        // If a change has been issued change constant buffers
         if (newHighestData || newMediumData || newLowestData) {
           auto copyRes = [&computeAllocator](const MutableTexture &src,
                                              const MutableTexture &dst) {
@@ -804,193 +855,12 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         GpuVirtualAddress timeDataBuffer =
             simResource.DynamicBuffer.AddBuffer(timeConstants);
 
-        struct LODData {
-          SimulationStage::SimulationResources::LODDataBuffers &buffers;
-          SimulationStage::ConstantGpuSources<>::LODDataSource &sources;
-          MutableTexture &Foam;
-          GpuVirtualAddress constantBuffer;
-        };
-
-        std::array<LODData, 3> lodData = {
-            LODData{simResource.HighestBuffer,
-                    simulationConstantSources.Highest,
-                    simulationMutableSources.Highest.Foam,
-                    simResource.DynamicBuffer.AddBuffer(
-                        SimulationStage::LODComputeBuffer(simData.Highest))},
-            LODData{simResource.MediumBuffer, simulationConstantSources.Medium,
-                    simulationMutableSources.Medium.Foam,
-                    simResource.DynamicBuffer.AddBuffer(
-                        SimulationStage::LODComputeBuffer(simData.Medium))},
-            LODData{simResource.LowestBuffer, simulationConstantSources.Lowest,
-                    simulationMutableSources.Lowest.Foam,
-                    simResource.DynamicBuffer.AddBuffer(
-                        SimulationStage::LODComputeBuffer(simData.Lowest))}};
-        // Spektrums
-        fullSimPipeline.spektrumPipeline.Apply(computeAllocator);
-        for (const LODData &dat : lodData) {
-          auto mask = fullSimPipeline.spektrumRootDescription.Set(
-              computeAllocator, RootSignatureUsage::Compute);
-          // Inputs
-          mask.timeDataBuffer = timeDataBuffer;
-
-          mask.Tildeh0 = *dat.sources.Tildeh0.ShaderResource();
-          mask.Frequencies = *dat.sources.Frequencies.ShaderResource();
-
-          // Outputs
-          mask.Tildeh = *dat.buffers.tildeh.UnorderedAccess(computeAllocator);
-          mask.TildeD = *dat.buffers.tildeD.UnorderedAccess(computeAllocator);
-
-          const auto xGroupSize = 16;
-          const auto yGroupSize = 16;
-          const auto sizeX = N;
-          const auto sizeY = N;
-          computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
-                                    (sizeY + yGroupSize - 1) / yGroupSize, 1);
-        }
-        //  FFT
-        {
-          const auto doFFT = [&computeAllocator, &N,
-                              &fullSimPipeline](MutableTextureWithState &inp,
-                                                MutableTextureWithState &out) {
-            auto mask = fullSimPipeline.FFTRootDescription.Set(
-                computeAllocator, RootSignatureUsage::Compute);
-
-            mask.Input = *inp.ShaderResource(computeAllocator);
-            mask.Output = *out.UnorderedAccess(computeAllocator);
-
-            const auto xGroupSize = 1;
-            const auto yGroupSize = 1;
-            const auto sizeX = N;
-            const auto sizeY = 1;
-            computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
-                                      (sizeY + yGroupSize - 1) / yGroupSize, 1);
-          };
-
-          fullSimPipeline.FFTPipeline.Apply(computeAllocator);
-          // UAV+Transition
-          for (const LODData &dat : lodData) {
-            MutableTextureWithState &text = dat.buffers.tildeh;
-            computeAllocator.AddUAVBarrier(
-                *text.UnorderedAccess(computeAllocator));
-            text.ShaderResource(computeAllocator);
-
-            MutableTextureWithState &text2 = dat.buffers.tildeD;
-            computeAllocator.AddUAVBarrier(
-                *text2.UnorderedAccess(computeAllocator));
-            text2.ShaderResource(computeAllocator);
-          }
-          // Stage1
-          for (const LODData &dat : lodData) {
-            doFFT(dat.buffers.tildeh, dat.buffers.tildehBuffer);
-            doFFT(dat.buffers.tildeD, dat.buffers.tildeDBuffer);
-          }
-          // UAV+Transition
-          for (const LODData &dat : lodData) {
-            MutableTextureWithState &text = dat.buffers.tildehBuffer;
-            computeAllocator.AddUAVBarrier(
-                *text.UnorderedAccess(computeAllocator));
-            text.ShaderResource(computeAllocator);
-
-            MutableTextureWithState &text2 = dat.buffers.tildeDBuffer;
-            computeAllocator.AddUAVBarrier(
-                *text2.UnorderedAccess(computeAllocator));
-            text2.ShaderResource(computeAllocator);
-          }
-          // Stage2
-          for (const LODData &dat : lodData) {
-            doFFT(dat.buffers.tildehBuffer, dat.buffers.FFTTildeh);
-            doFFT(dat.buffers.tildeDBuffer, dat.buffers.FFTTildeD);
-          }
-        }
-
-        // Calculate final displacements
-        {
-          fullSimPipeline.displacementPipeline.Apply(computeAllocator);
-          // UAV
-          for (const LODData &dat : lodData) {
-            computeAllocator.AddUAVBarrier(
-                *dat.buffers.FFTTildeh.UnorderedAccess(computeAllocator));
-            computeAllocator.AddUAVBarrier(
-                *dat.buffers.FFTTildeD.UnorderedAccess(computeAllocator));
-          }
-          for (const LODData &dat : lodData) {
-            auto mask = fullSimPipeline.displacementRootDescription.Set(
-                computeAllocator, RootSignatureUsage::Compute);
-
-            mask.constantBuffer = dat.constantBuffer;
-            mask.Height =
-                *dat.buffers.FFTTildeh.ShaderResource(computeAllocator);
-            mask.Choppy =
-                *dat.buffers.FFTTildeD.ShaderResource(computeAllocator);
-            mask.Output =
-                *dat.buffers.displacementMap.UnorderedAccess(computeAllocator);
-
-            const auto xGroupSize = 16;
-            const auto yGroupSize = 16;
-            const auto sizeX = N;
-            const auto sizeY = N;
-            computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
-                                      (sizeY + yGroupSize - 1) / yGroupSize, 1);
-          }
-        }
-
-        // Calculate gradients
-        {
-          fullSimPipeline.gradientPipeline.Apply(computeAllocator);
-          // UAV
-          for (const LODData &dat : lodData) {
-            computeAllocator.AddUAVBarrier(
-                *dat.buffers.displacementMap.UnorderedAccess(computeAllocator));
-          }
-          for (const LODData &dat : lodData) {
-            auto mask = fullSimPipeline.gradientRootDescription.Set(
-                computeAllocator, RootSignatureUsage::Compute);
-
-            mask.constantBuffer = dat.constantBuffer;
-            mask.Displacement =
-                *dat.buffers.displacementMap.ShaderResource(computeAllocator);
-            mask.Output =
-                *dat.buffers.gradients.UnorderedAccess(computeAllocator);
-
-            const auto xGroupSize = 16;
-            const auto yGroupSize = 16;
-            const auto sizeX = N;
-            const auto sizeY = N;
-            computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
-                                      (sizeY + yGroupSize - 1) / yGroupSize, 1);
-          }
-        }
-        // Foam Calculations
-
-        {
-          fullSimPipeline.foamDecayPipeline.Apply(computeAllocator);
-          for (const LODData &dat : lodData) {
-            computeAllocator.AddUAVBarrier(
-                *dat.buffers.gradients.UnorderedAccess(computeAllocator));
-          }
-          for (const LODData &dat : lodData) {
-            auto mask = fullSimPipeline.foamDecayRootDescription.Set(
-                computeAllocator, RootSignatureUsage::Compute);
-
-            mask.constantBuffer = dat.constantBuffer;
-            mask.Gradients =
-                *dat.buffers.gradients.UnorderedAccess(computeAllocator);
-
-            mask.Foam = *dat.Foam.UnorderedAccess();
-            mask.timeBuffer = timeDataBuffer;
-
-            const auto xGroupSize = 16;
-            const auto yGroupSize = 16;
-            const auto sizeX = N;
-            const auto sizeY = N;
-            computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
-                                      (sizeY + yGroupSize - 1) / yGroupSize, 1);
-          }
-        }
+        WaterSimulationComputeShader(
+            simResource, simulationConstantSources, simulationMutableSources,
+            simData, fullSimPipeline, computeAllocator, timeDataBuffer, N);
 
         // Upload queue
         {
-          PIXScopedEvent(directQueue.get(), 0, "asdadwadsdawddawdsdzxc");
           auto commandList = computeAllocator.EndList();
           computeAllocator.BeginList();
           simResource.DynamicBuffer.UploadResources(computeAllocator);
@@ -1007,6 +877,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
       // Graphics Stage
       {
+
+        RuntimeResults runtimeResults;
         auto &allocator = frameResource.Allocator;
         {
           allocator.Reset();
@@ -1014,34 +886,20 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           allocator.TransitionResource(*renderTargetView,
                                        ResourceStates::Present,
                                        ResourceStates::RenderTarget);
-          // static bool firstTime = true;
 
-          // if (firstTime) {
-          //   allocator.TransitionResource(*skyboxTexture.ShaderResource(),
-          //                                ResourceStates::Common,
-          //                                ResourceStates::PixelShaderResource);
-          //   firstTime = false;
-          // }
-
-          committedResourceAllocator.Build();
-          depthStencilDescriptorHeap.Build();
-
-          commonDescriptorHeap.Build();
           commonDescriptorHeap.Set(allocator);
           // Clears frame with background color
           renderTargetView->Clear(allocator, settings.clearColor);
           frameResource.DepthBuffer.DepthStencil()->Clear(allocator);
         }
-        // Draw Ocean
-        RuntimeResults runtimeResults;
 
+        // Global data
         GpuVirtualAddress cameraConstantBuffer;
         GpuVirtualAddress debugConstantBuffer;
         GpuVirtualAddress sunDataBuffer;
         {
           WaterGraphicRootDescription::cameraConstants cameraConstants{};
-          DebugGPUBufferStuff debugBufferContent =
-              /*DebugGPUBufferStuff::*/ From(debugValues, simData);
+          DebugGPUBufferStuff debugBufferContent = From(debugValues, simData);
 
           XMStoreFloat3(&cameraConstants.cameraPos, cam.GetEye());
           XMStoreFloat4x4(&cameraConstants.vMatrix,
@@ -1057,111 +915,183 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           sunDataBuffer = frameResource.DynamicBuffer.AddBuffer(sunData);
         }
 
+        // Draw Ocean
         {
-          WaterGraphicRootDescription::VertexConstants vertexConstants{};
-          WaterGraphicRootDescription::HullConstants hullConstants{};
-          WaterGraphicRootDescription::ModelConstants modelConstants{};
 
+          // Will be accessed in multiple parts
           auto modelMatrix = XMMatrixIdentity();
 
-          XMStoreFloat4x4(&modelConstants.mMatrix,
-                          XMMatrixTranspose(modelMatrix));
-
+          // Need to reset after drawing
           std::optional<GpuVirtualAddress> usedTextureAddress;
           std::optional<MutableTextureWithState *> usedTexture;
-          // Debug stuff
+          // Collect Quad Info
           {
-            switch (debugValues.mode) {
-            case DebugValues::Mode::DisplacementHighest:
-              usedTexture = &drawingSimResource.HighestBuffer.displacementMap;
-              break;
-            case DebugValues::Mode::GradientsHighest:
-              usedTexture = &drawingSimResource.HighestBuffer.gradients;
-              break;
-            case DebugValues::Mode::DisplacementMedium:
-              usedTexture = &drawingSimResource.MediumBuffer.displacementMap;
-              break;
-            case DebugValues::Mode::GradientsMedium:
-              usedTexture = &drawingSimResource.MediumBuffer.gradients;
-              break;
-            case DebugValues::Mode::DisplacementLowest:
-              usedTexture = &drawingSimResource.LowestBuffer.displacementMap;
-              break;
-            case DebugValues::Mode::GradientsLowest:
-              usedTexture = &drawingSimResource.LowestBuffer.gradients;
-              break;
-            default:
-              break;
-            }
 
-            if (usedTexture) {
-              usedTextureAddress = *(*usedTexture)->ShaderResource(allocator);
+            float2 fullSizeXZ = {Defaults::App::oceanSize,
+                                 Defaults::App::oceanSize};
+
+            float3 center = {0, 0, 0};
+            QuadTree qt;
+            XMFLOAT3 camUsedPos;
+            XMVECTOR camEye = cam.GetEye();
+            XMStoreFloat3(&camUsedPos, camEye);
+
+            auto start = std::chrono::high_resolution_clock::now();
+
+            qt.Build(center, fullSizeXZ,
+                     float3(camUsedPos.x, camUsedPos.y, camUsedPos.z),
+                     cam.GetFrustum(), modelMatrix,
+                     simData.quadTreeDistanceThreshold);
+
+            runtimeResults.QuadTreeBuildTime += std::chrono::duration_cast<
+                decltype(runtimeResults.QuadTreeBuildTime)>(
+                std::chrono::high_resolution_clock::now() - start);
+
+            runtimeResults.qtNodes += qt.GetSize();
+
+            // The best choice is to upload planeBottomLeft and
+            // planeTopRight and kinda of UV coordinate that can go
+            // outside [0,1] and the fract is the actual UV value.
+
+            // Fill buffer with Quad Info
+            {
+              cpuBuffers.oceanData.clear();
+              start = std::chrono::high_resolution_clock::now();
+              RuntimeCPUBuffers::OceanData *curr =
+                  &cpuBuffers.oceanData.emplace_back();
+
+              for (auto it = qt.begin(); it != qt.end(); ++it) {
+                runtimeResults.NavigatingTheQuadTree +=
+                    std::chrono::duration_cast<
+                        decltype(runtimeResults.NavigatingTheQuadTree)>(
+                        (std::chrono::high_resolution_clock::now() - start));
+                runtimeResults.drawnNodes++;
+
+                {
+                  curr->vertexConstants.instanceData[curr->N].scaling = {
+                      it->size.x, it->size.y};
+                  curr->vertexConstants.instanceData[curr->N].offset = {
+                      it->center.x, it->center.y};
+                }
+                {
+                  start = std::chrono::high_resolution_clock::now();
+
+                  auto res = it.GetSmallerNeighbor();
+
+                  runtimeResults.NavigatingTheQuadTree +=
+                      std::chrono::duration_cast<
+                          decltype(runtimeResults.NavigatingTheQuadTree)>(
+                          (std::chrono::high_resolution_clock::now() - start));
+                  static const constexpr auto l = [](const float x) -> float {
+                    if (x == 0)
+                      return 1;
+                    else
+                      return x;
+                  };
+                  curr->hullConstants.instanceData[curr->N].TesselationFactor =
+                      {l(res.zneg), l(res.xneg), l(res.zpos), l(res.xpos)};
+                }
+
+                curr->N = curr->N + 1;
+                if (curr->N == Defaults::App::maxInstances) {
+                  curr = &cpuBuffers.oceanData.emplace_back();
+                }
+
+                start = std::chrono::high_resolution_clock::now();
+              }
+
+              // If a quarter of the capacity is unused shrink the vector in a
+              // way that the unused capacity is halfed
+              // how though?
             }
           }
 
-          // Upload absolute contants
-
-          GpuVirtualAddress modelBuffer =
-              frameResource.DynamicBuffer.AddBuffer(modelConstants);
-
-          GpuVirtualAddress waterDataBuffer =
-              frameResource.DynamicBuffer.AddBuffer(waterData);
-
-          // Pre translate resources
-          GpuVirtualAddress displacementMapAddress1 =
-              *drawingSimResource.HighestBuffer.displacementMap.ShaderResource(
-                  allocator);
-          GpuVirtualAddress gradientsAddress1 =
-              *drawingSimResource.HighestBuffer.gradients.ShaderResource(
-                  allocator);
-          GpuVirtualAddress displacementMapAddress2 =
-              *drawingSimResource.MediumBuffer.displacementMap.ShaderResource(
-                  allocator);
-          GpuVirtualAddress gradientsAddress2 =
-              *drawingSimResource.MediumBuffer.gradients.ShaderResource(
-                  allocator);
-          GpuVirtualAddress displacementMapAddress3 =
-              *drawingSimResource.LowestBuffer.displacementMap.ShaderResource(
-                  allocator);
-          GpuVirtualAddress gradientsAddress3 =
-              *drawingSimResource.LowestBuffer.gradients.ShaderResource(
-                  allocator);
-
-          float2 fullSizeXZ = {Defaults::App::oceanSize,
-                               Defaults::App::oceanSize};
-
-          float3 center = {0, 0, 0};
-          QuadTree qt;
-          XMFLOAT3 camUsedPos;
-          XMVECTOR camEye = cam.GetEye();
-          XMStoreFloat3(&camUsedPos, camEye);
-
-          auto start = std::chrono::high_resolution_clock::now();
-
-          qt.Build(center, fullSizeXZ,
-                   float3(camUsedPos.x, camUsedPos.y, camUsedPos.z),
-                   cam.GetFrustum(), modelMatrix,
-                   simData.quadTreeDistanceThreshold);
-
-          runtimeResults.QuadTreeBuildTime += std::chrono::duration_cast<
-              decltype(runtimeResults.QuadTreeBuildTime)>(
-              std::chrono::high_resolution_clock::now() - start);
-
-          runtimeResults.qtNodes += qt.GetSize();
-
-          // The best choice is to upload planeBottomLeft and
-          // planeTopRight and kinda of UV coordinate that can go
-          // outside [0,1] and the fract is the actual UV value.
-
-          u16 instanceCount = 0;
-
-          allocator.SetRenderTargets({renderTargetView},
-                                     frameResource.DepthBuffer.DepthStencil());
-          waterPipelineState.Apply(allocator);
-          start = std::chrono::high_resolution_clock::now();
-          // Draw calls
+          // Shadow Map pass
           {
-            auto drawCollected = [&]() {
+            // ...
+          }
+
+          // GBuffer Pass
+
+          frameResource.DeferredShadingBuffers.Clear(allocator);
+          allocator.SetRenderTargets(
+              {
+                  frameResource.DeferredShadingBuffers.Albedo.RenderTarget(),
+                  frameResource.DeferredShadingBuffers.Normal.RenderTarget(),
+                  frameResource.DeferredShadingBuffers.Position.RenderTarget(),
+                  frameResource.DeferredShadingBuffers.MaterialValues
+                      .RenderTarget(),
+              },
+              frameResource.DepthBuffer.DepthStencil());
+          {
+            WaterGraphicRootDescription::ModelConstants modelConstants{};
+
+            XMStoreFloat4x4(&modelConstants.mMatrix,
+                            XMMatrixTranspose(modelMatrix));
+
+            // Debug stuff
+            {
+              switch (debugValues.mode) {
+              case DebugValues::Mode::DisplacementHighest:
+                usedTexture = &drawingSimResource.HighestBuffer.displacementMap;
+                break;
+              case DebugValues::Mode::GradientsHighest:
+                usedTexture = &drawingSimResource.HighestBuffer.gradients;
+                break;
+              case DebugValues::Mode::DisplacementMedium:
+                usedTexture = &drawingSimResource.MediumBuffer.displacementMap;
+                break;
+              case DebugValues::Mode::GradientsMedium:
+                usedTexture = &drawingSimResource.MediumBuffer.gradients;
+                break;
+              case DebugValues::Mode::DisplacementLowest:
+                usedTexture = &drawingSimResource.LowestBuffer.displacementMap;
+                break;
+              case DebugValues::Mode::GradientsLowest:
+                usedTexture = &drawingSimResource.LowestBuffer.gradients;
+                break;
+              default:
+                break;
+              }
+
+              if (usedTexture) {
+                usedTextureAddress = *(*usedTexture)->ShaderResource(allocator);
+              }
+            }
+
+            // Upload absolute contants
+
+            GpuVirtualAddress modelBuffer =
+                frameResource.DynamicBuffer.AddBuffer(modelConstants);
+
+            GpuVirtualAddress waterDataBuffer =
+                frameResource.DynamicBuffer.AddBuffer(waterData);
+
+            // Pre translate resources
+            GpuVirtualAddress displacementMapAddressHighest =
+                *drawingSimResource.HighestBuffer.displacementMap
+                     .ShaderResource(allocator);
+            GpuVirtualAddress gradientsAddressHighest =
+                *drawingSimResource.HighestBuffer.gradients.ShaderResource(
+                    allocator);
+            GpuVirtualAddress displacementMapAddressMedium =
+                *drawingSimResource.MediumBuffer.displacementMap.ShaderResource(
+                    allocator);
+            GpuVirtualAddress gradientsAddressMedium =
+                *drawingSimResource.MediumBuffer.gradients.ShaderResource(
+                    allocator);
+            GpuVirtualAddress displacementMapAddressLowest =
+                *drawingSimResource.LowestBuffer.displacementMap.ShaderResource(
+                    allocator);
+            GpuVirtualAddress gradientsAddressLowest =
+                *drawingSimResource.LowestBuffer.gradients.ShaderResource(
+                    allocator);
+
+            waterPipelineState.Apply(allocator);
+
+            for (auto &curr : cpuBuffers.oceanData) {
+              if (curr.N == 0)
+                continue;
               auto mask = waterRootSignature.Set(allocator,
                                                  RootSignatureUsage::Graphics);
 
@@ -1170,73 +1100,66 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
               mask.skybox = skyboxTexture;
 
-              mask.heightMap1 = displacementMapAddress1;
-              mask.gradients1 = gradientsAddress1;
-              mask.heightMap2 = displacementMapAddress2;
-              mask.gradients2 = gradientsAddress2;
-              mask.heightMap3 = displacementMapAddress3;
-              mask.gradients3 = gradientsAddress3;
+              mask.heightMapHighest = displacementMapAddressHighest;
+              mask.gradientsHighest = gradientsAddressHighest;
+              mask.heightMapMedium = displacementMapAddressMedium;
+              mask.gradientsMedium = gradientsAddressMedium;
+              mask.heightMapLowest = displacementMapAddressLowest;
+              mask.gradientsLowest = gradientsAddressLowest;
 
               mask.waterPBRBuffer = waterDataBuffer;
               mask.lightingBuffer = sunDataBuffer;
 
               mask.hullBuffer =
-                  frameResource.DynamicBuffer.AddBuffer(hullConstants);
+                  frameResource.DynamicBuffer.AddBuffer(curr.hullConstants);
               mask.vertexBuffer =
-                  frameResource.DynamicBuffer.AddBuffer(vertexConstants);
+                  frameResource.DynamicBuffer.AddBuffer(curr.vertexConstants);
               mask.debugBuffer = debugConstantBuffer;
               mask.cameraBuffer = cameraConstantBuffer;
               mask.modelBuffer = modelBuffer;
 
-              planeMesh.Draw(allocator, instanceCount);
-              instanceCount = 0;
-            };
+              planeMesh.Draw(allocator, curr.N);
+            }
+            // skybox
+            {
+              skyboxPipelineState.Apply(allocator);
+              auto mask = skyboxRootSignature.Set(allocator,
+                                                  RootSignatureUsage::Graphics);
 
-            for (auto it = qt.begin(); it != qt.end(); ++it) {
-              runtimeResults.NavigatingTheQuadTree +=
-                  std::chrono::duration_cast<
-                      decltype(runtimeResults.NavigatingTheQuadTree)>(
-                      (std::chrono::high_resolution_clock::now() - start));
-              runtimeResults.drawnNodes++;
+              mask.skybox = skyboxTexture;
+              mask.lightingBuffer = sunDataBuffer;
 
-              {
-                vertexConstants.instanceData[instanceCount].scaling = {
-                    it->size.x, it->size.y};
-                vertexConstants.instanceData[instanceCount].offset = {
-                    it->center.x, it->center.y};
-              }
-              {
-                start = std::chrono::high_resolution_clock::now();
+              mask.cameraBuffer = cameraConstantBuffer;
 
-                auto res = it.GetSmallerNeighbor();
-
-                runtimeResults.NavigatingTheQuadTree +=
-                    std::chrono::duration_cast<
-                        decltype(runtimeResults.NavigatingTheQuadTree)>(
-                        (std::chrono::high_resolution_clock::now() - start));
-                static const constexpr auto l = [](const float x) -> float {
-                  if (x == 0)
-                    return 1;
-                  else
-                    return x;
-                };
-                hullConstants.instanceData[instanceCount].TesselationFactor = {
-                    l(res.zneg), l(res.xneg), l(res.zpos), l(res.xpos)};
-              }
-
-              instanceCount++;
-              if (instanceCount == Defaults::App::maxInstances) {
-                drawCollected();
-              }
-
-              start = std::chrono::high_resolution_clock::now();
-            } // loop end
-            if (instanceCount != 0) {
-              drawCollected();
+              skyboxMesh.Draw(allocator);
             }
           }
 
-          // Retransition simulation resources
+          // Deferred Shading Pass
+          allocator.SetRenderTargets(
+              {renderTargetView},
+              frameResource.DeferredShadingBuffers.DepthStencil.DepthStencil());
+          {
+            frameResource.DeferredShadingBuffers.TranslateToView(allocator);
+            deferredShadingPipelineState.Apply(allocator);
+            auto mask = deferredShadingRootSignature.Set(
+                allocator, RootSignatureUsage::Graphics);
+
+            mask.albedo =
+                *frameResource.DeferredShadingBuffers.Albedo.ShaderResource();
+            mask.normal =
+                *frameResource.DeferredShadingBuffers.Normal.ShaderResource();
+            mask.position =
+                *frameResource.DeferredShadingBuffers.Position.ShaderResource();
+            mask.materialValues = *frameResource.DeferredShadingBuffers
+                                       .MaterialValues.ShaderResource();
+
+            deferredShadingPlane.Draw(allocator);
+
+            frameResource.DeferredShadingBuffers.TranslateToTarget(allocator);
+          }
+
+          // Retransition simulation resources for compute shaders
 
           drawingSimResource.HighestBuffer.gradients.UnorderedAccess(allocator);
           drawingSimResource.HighestBuffer.displacementMap.UnorderedAccess(
@@ -1249,20 +1172,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
               allocator);
           if (usedTexture)
             (*usedTexture)->UnorderedAccess(allocator);
-        }
-
-        // skybox
-        {
-          skyboxPipelineState.Apply(allocator);
-          auto mask =
-              skyboxRootSignature.Set(allocator, RootSignatureUsage::Graphics);
-
-          mask.skybox = skyboxTexture;
-          mask.lightingBuffer = sunDataBuffer;
-
-          mask.cameraBuffer = cameraConstantBuffer;
-
-          skyboxMesh.Draw(allocator);
         }
 
         auto CPURenderEnd = std::chrono::high_resolution_clock::now();
@@ -1301,7 +1210,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(),
                                         allocator.operator->());
         }
-
         // End frame command list
         {
           allocator.TransitionResource(*renderTargetView,
@@ -1323,7 +1231,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       // Present frame
       swapChain.Present();
     }
-    // Wait until everything is done
+    // Wait until everything is done before deleting context
 
     for (auto &frameResource : frameResources) {
       if (frameResource.Marker) {
