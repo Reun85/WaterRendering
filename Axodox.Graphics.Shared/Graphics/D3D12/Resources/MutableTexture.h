@@ -25,7 +25,7 @@ public:
   operator ResourceArgument() const;
   explicit operator bool() const;
 
-private:
+protected:
   ResourceAllocationContext _context;
 
   TextureRef _texture;
