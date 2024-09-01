@@ -112,11 +112,16 @@ void CommandAllocator::SetRenderTargets(
     renderTargetHandles.push_back(renderTarget->CpuHandle());
   }
 
-  auto depthStencilHandle = depthStencilView ? depthStencilView->CpuHandle()
-                                             : D3D12_CPU_DESCRIPTOR_HANDLE(0);
+  D3D12_CPU_DESCRIPTOR_HANDLE depthStencilHandle = {};
+  const D3D12_CPU_DESCRIPTOR_HANDLE *pDepthStencilHandle = nullptr;
+
+  if (depthStencilView) {
+    depthStencilHandle = depthStencilView->CpuHandle();
+    pDepthStencilHandle = &depthStencilHandle;
+  }
   (*this)->OMSetRenderTargets(uint32_t(renderTargetHandles.size()),
                               renderTargetHandles.data(), false,
-                              &depthStencilHandle);
+                              pDepthStencilHandle);
 
   D3D12_RECT scissorRect{0, 0, int32_t(definition.Width),
                          int32_t(definition.Height)};
