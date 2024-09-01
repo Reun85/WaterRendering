@@ -141,3 +141,63 @@ struct NeedToDo {
   bool PatchMediumChanged = false;
   bool PatchLowestChanged = false;
 };
+
+/// <summary>
+/// For deferred shading the culling should be set to CullCounterClockwise
+/// therefore shown mesh should be facing backwards
+/// </summary>
+/// <param name="size"></param>
+/// <param name="subdivisions"></param>
+/// <returns></returns>
+inline MeshDescription CreateBackwardsPlane(float size,
+                                            DirectX::XMUINT2 subdivisions) {
+  if (subdivisions.x < 2 || subdivisions.y < 2)
+    throw logic_error("Plane size must be at least 2!");
+  if (subdivisions.x * subdivisions.y >
+      (uint64_t)numeric_limits<uint32_t>::max() + 1)
+    throw logic_error("Run out of indices!");
+
+  MeshDescription result;
+
+  // Vertices
+  float xstep = size / (subdivisions.x - 1),
+        xtexstep = 1.f / (subdivisions.x - 1), xstart = -size / 2.f;
+  float ystep = size / (subdivisions.y - 1),
+        ytexstep = 1.f / (subdivisions.y - 1), ystart = -size / 2.f;
+  uint32_t vertexCount = subdivisions.x * subdivisions.y;
+
+  VertexPositionNormalTexture *pVertex;
+  result.Vertices = BufferData(vertexCount, pVertex);
+
+  for (uint32_t j = 0; j < subdivisions.y; j++) {
+    for (uint32_t i = 0; i < subdivisions.x; i++) {
+      *pVertex++ = {XMFLOAT3{xstart + i * xstep, ystart + j * ystep, 0.f},
+                    XMBYTEN4{0.f, 0.f, 1.f, 1.f},
+                    XMUSHORTN2{i * xtexstep, 1 - j * ytexstep}};
+    }
+  }
+
+  // Indices
+  uint32_t triangleWidth = subdivisions.x - 1,
+           triangleHeight = subdivisions.y - 1;
+  uint32_t indexCount = triangleWidth * triangleHeight * 6;
+
+  uint32_t *pIndex;
+  result.Indices = BufferData(indexCount, pIndex);
+
+  for (uint32_t j = 0; j < triangleHeight; j++) {
+    for (uint32_t i = 0; i < triangleWidth; i++) {
+      *pIndex++ = j * subdivisions.x + i;
+      *pIndex++ = (j + 1) * subdivisions.x + i;
+      *pIndex++ = j * subdivisions.x + i + 1;
+      *pIndex++ = j * subdivisions.x + i + 1;
+      *pIndex++ = (j + 1) * subdivisions.x + i;
+      *pIndex++ = (j + 1) * subdivisions.x + i + 1;
+    }
+  }
+
+  // Topology
+  result.Topology = PrimitiveTopology::TriangleList;
+
+  return result;
+}

@@ -577,7 +577,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         .RootSignature = &deferredShadingRootSignature,
         .VertexShader = &deferredShadingVS,
         .PixelShader = &deferredShadingPS,
-        .RasterizerState = RasterizerFlags::CullNone,
+        .RasterizerState = RasterizerFlags::CullCounterClockwise,
         .DepthStencilState = DepthStencilMode::WriteDepth,
         .InputLayout = VertexPositionNormalTexture::Layout,
         .TopologyType = PrimitiveTopologyType::Triangle,
@@ -616,7 +616,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     ImmutableMesh planeMesh{immutableAllocationContext, CreateQuadPatch()};
 
     ImmutableMesh deferredShadingPlane{immutableAllocationContext,
-                                       CreatePlane(2, XMUINT2(2, 2))};
+                                       CreateBackwardsPlane(2, XMUINT2(2, 2))};
     ImmutableMesh skyboxMesh{immutableAllocationContext, CreateCube(2)};
 
     const CubeMapPaths paths = {
