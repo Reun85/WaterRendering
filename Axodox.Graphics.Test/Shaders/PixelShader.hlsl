@@ -136,7 +136,6 @@ output_t main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
         
     float3 normal = normalize(input.grad.xyz);
     
-
     const float3 viewVec = camConstants.cameraPos - input.localPos;
     float3 viewDir = normalize(viewVec);
 
@@ -298,7 +297,7 @@ output_t main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
 
     output.position = float4(input.localPos, 1);
     output.normal = float4(normal, 1);
-    output.materialValues = float4(0, 0, 0, 0);
+    output.materialValues = float4(a, 0, 0, 0);
     return output;
     
 }

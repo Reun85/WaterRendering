@@ -66,8 +66,8 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
 
     static constexpr PixelShaderPBRData WaterData() {
       PixelShaderPBRData data;
-      data.SurfaceColor = float3(0.109, 0.340, 0.589);
-      data.Roughness = 0.285;
+      data.SurfaceColor = float3(0.109f, 0.340f, 0.589f);
+      data.Roughness = 0.285f;
       data.SubsurfaceScattering = 0.571f;
       data.Sheen = 0.163f;
       data.SheenTint = 0.366f;
@@ -242,6 +242,7 @@ struct DeferredShading : public RootSignatureMask {
   RootDescriptorTable<1> normal;
   RootDescriptorTable<1> position;
   RootDescriptorTable<1> materialValues;
+  RootDescriptorTable<1> geometryDepth;
   StaticSampler Sampler;
 
   explicit DeferredShading(const RootSignatureContext &context)
@@ -250,6 +251,7 @@ struct DeferredShading : public RootSignatureMask {
         normal(this, {DescriptorRangeType::ShaderResource, 1}),
         position(this, {DescriptorRangeType::ShaderResource, 2}),
         materialValues(this, {DescriptorRangeType::ShaderResource, 3}),
+        geometryDepth(this, {DescriptorRangeType::ShaderResource, 4}),
         Sampler(this, {0}, Filter::Linear, TextureAddressMode::Clamp) {
 
     Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
@@ -262,7 +264,7 @@ struct FrameResources {
   CommandFenceMarker Marker;
   DynamicBufferManager DynamicBuffer;
 
-  MutableTexture DepthBuffer;
+  MutableTextureWithViews DepthBuffer;
   descriptor_ptr<ShaderResourceView> ScreenResourceView;
   DeferredShading::Buffers DeferredShadingBuffers;
 

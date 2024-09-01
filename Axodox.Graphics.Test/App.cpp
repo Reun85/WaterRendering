@@ -540,7 +540,10 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                                 Format::R16G16B16A16_Float,
                                 Format::R16G16B16A16_Float,
                                 Format::B8G8R8A8_UNorm},
-        .DepthStencilFormat = Format::D32_Float};
+        .DepthStencilFormat =
+            Format::R32_Typeless // Typeless so we can transition it to shader
+                                 // resource.
+    };
 
     Axodox::Graphics::D3D12::PipelineState waterPipelineState =
         pipelineStateProvider
@@ -577,12 +580,13 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         .RootSignature = &deferredShadingRootSignature,
         .VertexShader = &deferredShadingVS,
         .PixelShader = &deferredShadingPS,
+        .BlendState = {BlendType::Additive, BlendType::AlphaBlend},
         .RasterizerState = RasterizerFlags::CullCounterClockwise,
-        .DepthStencilState = DepthStencilMode::WriteDepth,
+        .DepthStencilState = DepthStencilMode::IgnoreDepth,
         .InputLayout = VertexPositionNormalTexture::Layout,
         .TopologyType = PrimitiveTopologyType::Triangle,
         .RenderTargetFormats = {Format::B8G8R8A8_UNorm},
-        .DepthStencilFormat = Format::D32_Float};
+        .DepthStencilFormat = {}};
     Axodox::Graphics::D3D12::PipelineState deferredShadingPipelineState =
         pipelineStateProvider
             .CreatePipelineStateAsync(deferredShadingPipelineStateDefinition)
@@ -779,8 +783,25 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
         auto depthDefinition =
             renderTargetView->Definition().MakeSizeCompatible(
-                Format::D32_Float, TextureFlags::DepthStencil);
-        frameResource.DepthBuffer.Allocate(depthDefinition);
+                Format::R32_Typeless,
+                (TextureFlags)(D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL));
+        TextureViewDefinitions depthViews{
+            .ShaderResource = D3D12_SHADER_RESOURCE_VIEW_DESC{},
+            .RenderTarget = std::nullopt,
+            .DepthStencil = D3D12_DEPTH_STENCIL_VIEW_DESC{},
+            .UnorderedAccess = std::nullopt};
+        depthViews.DepthStencil->Format = DXGI_FORMAT_D32_FLOAT;
+        depthViews.DepthStencil->ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+        depthViews.DepthStencil->Flags = D3D12_DSV_FLAG_NONE;
+
+        depthViews.ShaderResource->Format = DXGI_FORMAT_R32_FLOAT;
+        depthViews.ShaderResource->ViewDimension =
+            D3D12_SRV_DIMENSION_TEXTURE2D;
+        depthViews.ShaderResource->Shader4ComponentMapping =
+            D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        depthViews.ShaderResource->Texture2D.MipLevels = 1;
+
+        frameResource.DepthBuffer.Allocate(depthDefinition, depthViews);
       }
 
       // Ensure screen shader resource view
@@ -1141,6 +1162,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
               frameResource.DeferredShadingBuffers.DepthStencil.DepthStencil());
           {
             frameResource.DeferredShadingBuffers.TranslateToView(allocator);
+            allocator.TransitionResource(frameResource.DepthBuffer,
+                                         ResourceStates::DepthWrite,
+                                         ResourceStates::PixelShaderResource);
             deferredShadingPipelineState.Apply(allocator);
             auto mask = deferredShadingRootSignature.Set(
                 allocator, RootSignatureUsage::Graphics);
@@ -1153,9 +1177,13 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                 *frameResource.DeferredShadingBuffers.Position.ShaderResource();
             mask.materialValues = *frameResource.DeferredShadingBuffers
                                        .MaterialValues.ShaderResource();
+            mask.geometryDepth = *frameResource.DepthBuffer.ShaderResource();
 
             deferredShadingPlane.Draw(allocator);
 
+            allocator.TransitionResource(frameResource.DepthBuffer,
+                                         ResourceStates::PixelShaderResource,
+                                         ResourceStates::DepthWrite);
             frameResource.DeferredShadingBuffers.TranslateToTarget(allocator);
           }
 

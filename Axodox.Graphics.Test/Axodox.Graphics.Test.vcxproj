@@ -100,9 +100,7 @@
   <ItemGroup>
     <ClInclude Include="Camera.h" />
     <ClInclude Include="ComputePipeline.h" />
-    <ClInclude Include="ConstantGPUBuffer.h" />
     <ClInclude Include="constants.h" />
-    <ClInclude Include="CubeMap.h" />
     <ClInclude Include="Defaults.h" />
     <ClInclude Include="Frustum.hpp" />
     <ClInclude Include="GraphicsPipeline.h" />
@@ -113,6 +111,10 @@
     <ClInclude Include="SkyboxPipeline.hpp" />
     <ClInclude Include="Typedefs.h" />
     <ClInclude Include="Simulation.h" />
+    <ClInclude Include="WrapperAddons\ConstantGPUBuffer.h" />
+    <ClInclude Include="WrapperAddons\CubeMap.h" />
+    <ClInclude Include="WrapperAddons\includes.h" />
+    <ClInclude Include="WrapperAddons\MutableTextureWithViews.h" />
   </ItemGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest">
@@ -122,13 +124,14 @@
   <ItemGroup>
     <ClCompile Include="App.cpp" />
     <ClCompile Include="Camera.cpp" />
-    <ClCompile Include="ConstantGPUBuffer.cpp" />
-    <ClCompile Include="CubeMap.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="QuadTree.cpp" />
     <ClCompile Include="Simulation.cpp" />
+    <ClCompile Include="WrapperAddons\ConstantGPUBuffer.cpp" />
+    <ClCompile Include="WrapperAddons\CubeMap.cpp" />
+    <ClCompile Include="WrapperAddons\MutableTextureWithViews.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="Assets\skybox\nx.png" />
