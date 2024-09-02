@@ -77,7 +77,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     XMUINT4 swizzleorder = XMUINT4(0, 1, 2, 3);
     XMFLOAT4 blendDistances = XMFLOAT4(40.f, 150, 1000, 5000);
     XMFLOAT3 foamColor = XMFLOAT3(1, 1, 1);
-    f32 foamDepthAttenuation = 2.f;
 
     bool useFoam = true;
     bool useChannel1 = true;
@@ -91,6 +90,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                                       DebugBitsEnd - DebugBitsStart + 1>
         DebugBitsNames{"Normal overflow", "Display Foam", std::nullopt};
 
+    float EnvMapMult = 2.696f;
     Mode mode = Mode::Full;
 
     RasterizerFlags rasterizerFlags = RasterizerFlags::CullNone;
@@ -109,8 +109,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         ImGui::Checkbox("Use channel Medium", &useChannel2);
         ImGui::Checkbox("Use channel Lowest", &useChannel3);
         ImGui::InputFloat4("Blend Distances", (float *)&blendDistances);
-        ImGui::InputFloat3("Foam Color", (float *)&foamColor);
-        ImGui::InputFloat("Foam Depth Attenuation", &foamDepthAttenuation);
+        ImGui::SliderFloat("Env Map Mult", &EnvMapMult, 0, 5);
         for (u32 i = DebugBitsStart; i <= DebugBitsEnd; i++) {
           if (DebugBitsNames[i - DebugBitsStart])
             ImGui::Checkbox(*DebugBitsNames[i - DebugBitsStart],
@@ -205,7 +204,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
               for (size_t j = 0; j < swizzleitems.size(); j++) {
                 bool isSelected = (*(vals[i]) == j);
                 if (ImGui::Selectable(swizzleitems[j].c_str(), isSelected)) {
-                  *vals[i] = j;
+                  *vals[i] = (u32)j;
                 }
                 if (isSelected) {
                   ImGui::SetItemDefaultFocus();
@@ -234,6 +233,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     // 7: transform texture values from [-1,1] to [0,1]
     uint flags = 0; // Its here because padding
     XMFLOAT4 foamInfo;
+    float EnvMapMult;
   };
   static void set_flag(uint &flag, uint flagIndex, bool flagValue = true) {
     if (flagValue) {
@@ -253,8 +253,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         XMFLOAT3(simData.Highest.patchSize, simData.Medium.patchSize,
                  simData.Lowest.patchSize);
 
-    res.foamInfo = XMFLOAT4(deb.foamColor.x, deb.foamColor.y, deb.foamColor.z,
-                            deb.foamDepthAttenuation);
+    res.EnvMapMult = deb.EnvMapMult;
+
     set_flag(res.flags, 6, true);
     set_flag(res.flags, 0, false);
     set_flag(res.flags, 2, deb.useFoam);
@@ -432,7 +432,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                          10.0f);
       ImGui::SliderFloat("Scatter Shadow Strength",
                          &waterData._ScatterShadowStrength, 0.0f, 10.0f);
-      ImGui::SliderFloat("Env Map Mult", &waterData._EnvMapMult, 0.0f, 10.0f);
 
       ImGui::Separator();
       ImGui::Text("Sun Data");
@@ -515,6 +514,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     CommandQueue directQueue{device};
     CoreSwapChain swapChain{directQueue, window,
                             SwapChainFlags::IsTearingAllowed};
+    // CoreSwapChain swapChain{directQueue, window, SwapChainFlags::Default};
 
     PipelineStateProvider pipelineStateProvider{device};
 
@@ -526,6 +526,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     HullShader hullShader{app_folder() / L"hullShader.cso"};
     DomainShader domainShader{app_folder() / L"domainShader.cso"};
 
+    auto gBufferFormats = DeferredShading::GBuffer::GetGBufferFormats();
+
     GraphicsPipelineStateDefinition waterPipelineStateDefinition{
         .RootSignature = &waterRootSignature,
         .VertexShader = &simpleVertexShader,
@@ -536,14 +538,10 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         .DepthStencilState = DepthStencilMode::WriteDepth,
         .InputLayout = VertexPosition::Layout,
         .TopologyType = PrimitiveTopologyType::Patch,
-        .RenderTargetFormats = {Format::B8G8R8A8_UNorm,
-                                Format::R16G16B16A16_Float,
-                                Format::R16G16B16A16_Float,
-                                Format::B8G8R8A8_UNorm},
-        .DepthStencilFormat =
-            Format::R32_Typeless // Typeless so we can transition it to shader
-                                 // resource.
-    };
+        .RenderTargetFormats =
+            std::initializer_list(std::to_address(gBufferFormats.begin()),
+                                  std::to_address(gBufferFormats.end())),
+        .DepthStencilFormat = Format::D32_Float};
 
     Axodox::Graphics::D3D12::PipelineState waterPipelineState =
         pipelineStateProvider
@@ -555,6 +553,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     RootSignature<SkyboxRootDescription> skyboxRootSignature{device};
     DepthStencilState skyboxDepthStencilState{DepthStencilMode::ReadDepth};
     skyboxDepthStencilState.Comparison = ComparisonFunction::LessOrEqual;
+
     GraphicsPipelineStateDefinition skyboxPipelineStateDefinition{
         .RootSignature = &skyboxRootSignature,
         .VertexShader = &atmosphereVS,
@@ -562,10 +561,10 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         .RasterizerState = RasterizerFlags::CullNone,
         .DepthStencilState = skyboxDepthStencilState,
         .InputLayout = VertexPositionNormalTexture::Layout,
-        .RenderTargetFormats = {Format::B8G8R8A8_UNorm,
-                                Format::R16G16B16A16_Float,
-                                Format::R16G16B16A16_Float,
-                                Format::B8G8R8A8_UNorm},
+        .RenderTargetFormats =
+            std::initializer_list(std::to_address(gBufferFormats.begin()),
+                                  std::to_address(gBufferFormats.end())),
+
         .DepthStencilFormat = Format::D32_Float};
     Axodox::Graphics::D3D12::PipelineState skyboxPipelineState =
         pipelineStateProvider
@@ -582,11 +581,10 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         .PixelShader = &deferredShadingPS,
         .BlendState = {BlendType::Additive, BlendType::AlphaBlend},
         .RasterizerState = RasterizerFlags::CullCounterClockwise,
-        .DepthStencilState = DepthStencilMode::IgnoreDepth,
         .InputLayout = VertexPositionNormalTexture::Layout,
         .TopologyType = PrimitiveTopologyType::Triangle,
         .RenderTargetFormats = {Format::B8G8R8A8_UNorm},
-        .DepthStencilFormat = {}};
+    };
     Axodox::Graphics::D3D12::PipelineState deferredShadingPipelineState =
         pipelineStateProvider
             .CreatePipelineStateAsync(deferredShadingPipelineStateDefinition)
@@ -679,7 +677,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     }
 
     ID3D12DescriptorHeap *ImGuiDescriptorHeap =
-        InitImGui(device, frameResources.size(), ImGuiIniPath);
+        InitImGui(device, (u8)frameResources.size(), ImGuiIniPath);
     ImGuiIO const &io = ImGui::GetIO();
 
     // Time counter
@@ -775,47 +773,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       TimeData timeConstants{.deltaTime = settings.timeRunning ? deltaTime : 0,
                              .timeSinceLaunch = gameTime};
 
-      // Ensure depth buffer matches frame size
-      if (!frameResource.DepthBuffer ||
-          !TextureDefinition::AreSizeCompatible(
-              *frameResource.DepthBuffer.Definition(),
-              renderTargetView->Definition())) {
-
-        auto depthDefinition =
-            renderTargetView->Definition().MakeSizeCompatible(
-                Format::R32_Typeless,
-                (TextureFlags)(D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL));
-        TextureViewDefinitions depthViews{
-            .ShaderResource = D3D12_SHADER_RESOURCE_VIEW_DESC{},
-            .RenderTarget = std::nullopt,
-            .DepthStencil = D3D12_DEPTH_STENCIL_VIEW_DESC{},
-            .UnorderedAccess = std::nullopt};
-        depthViews.DepthStencil->Format = DXGI_FORMAT_D32_FLOAT;
-        depthViews.DepthStencil->ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-        depthViews.DepthStencil->Flags = D3D12_DSV_FLAG_NONE;
-
-        depthViews.ShaderResource->Format = DXGI_FORMAT_R32_FLOAT;
-        depthViews.ShaderResource->ViewDimension =
-            D3D12_SRV_DIMENSION_TEXTURE2D;
-        depthViews.ShaderResource->Shader4ComponentMapping =
-            D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        depthViews.ShaderResource->Texture2D.MipLevels = 1;
-
-        frameResource.DepthBuffer.Allocate(depthDefinition, depthViews);
-      }
-
-      // Ensure screen shader resource view
-      if (!frameResource.ScreenResourceView ||
-          frameResource.ScreenResourceView->Resource() !=
-              renderTargetView->Resource()) {
-        Texture screenTexture{renderTargetView->Resource()};
-        frameResource.ScreenResourceView =
-            commonDescriptorHeap.CreateShaderResourceView(&screenTexture);
-      }
-
-      // Ensure GBuffer compatibility
-      frameResource.DeferredShadingBuffers.EnsureCompatibility(
-          *renderTargetView, commonDescriptorHeap);
+      frameResource.MakeCompatible(*renderTargetView, mutableAllocationContext);
 
       auto resolution = swapChain.Resolution();
       cam.SetAspect(float(resolution.x) / float(resolution.y));
@@ -909,9 +867,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                                        ResourceStates::RenderTarget);
 
           commonDescriptorHeap.Set(allocator);
-          // Clears frame with background color
           renderTargetView->Clear(allocator, settings.clearColor);
-          frameResource.DepthBuffer.DepthStencil()->Clear(allocator);
+          frameResource.Clear(allocator);
         }
 
         // Global data
@@ -1034,17 +991,14 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
           // GBuffer Pass
 
-          frameResource.DeferredShadingBuffers.Clear(allocator);
-          allocator.SetRenderTargets(
-              {
-                  frameResource.DeferredShadingBuffers.Albedo.RenderTarget(),
-                  frameResource.DeferredShadingBuffers.Normal.RenderTarget(),
-                  frameResource.DeferredShadingBuffers.Position.RenderTarget(),
-                  frameResource.DeferredShadingBuffers.MaterialValues
-                      .RenderTarget(),
-              },
-              frameResource.DepthBuffer.DepthStencil());
           {
+            waterPipelineState.Apply(allocator);
+
+            auto gBufferViews = frameResource.GBuffer.GetGBufferViews();
+            allocator.SetRenderTargets(
+                std::initializer_list(std::to_address(gBufferViews.begin()),
+                                      std::to_address(gBufferViews.end())),
+                frameResource.DepthBuffer.DepthStencil());
             WaterGraphicRootDescription::ModelConstants modelConstants{};
 
             XMStoreFloat4x4(&modelConstants.mMatrix,
@@ -1108,8 +1062,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                 *drawingSimResource.LowestBuffer.gradients.ShaderResource(
                     allocator);
 
-            waterPipelineState.Apply(allocator);
-
             for (auto &curr : cpuBuffers.oceanData) {
               if (curr.N == 0)
                 continue;
@@ -1118,8 +1070,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
               if (usedTextureAddress)
                 mask.texture = *usedTextureAddress;
-
-              mask.skybox = skyboxTexture;
 
               mask.heightMapHighest = displacementMapAddressHighest;
               mask.gradientsHighest = gradientsAddressHighest;
@@ -1157,34 +1107,31 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           }
 
           // Deferred Shading Pass
-          allocator.SetRenderTargets(
-              {renderTargetView},
-              frameResource.DeferredShadingBuffers.DepthStencil.DepthStencil());
           {
-            frameResource.DeferredShadingBuffers.TranslateToView(allocator);
+            deferredShadingPipelineState.Apply(allocator);
+            allocator.SetRenderTargets({renderTargetView});
+            frameResource.GBuffer.TranslateToView(allocator);
             allocator.TransitionResource(frameResource.DepthBuffer,
                                          ResourceStates::DepthWrite,
                                          ResourceStates::PixelShaderResource);
-            deferredShadingPipelineState.Apply(allocator);
             auto mask = deferredShadingRootSignature.Set(
                 allocator, RootSignatureUsage::Graphics);
 
-            mask.albedo =
-                *frameResource.DeferredShadingBuffers.Albedo.ShaderResource();
-            mask.normal =
-                *frameResource.DeferredShadingBuffers.Normal.ShaderResource();
-            mask.position =
-                *frameResource.DeferredShadingBuffers.Position.ShaderResource();
-            mask.materialValues = *frameResource.DeferredShadingBuffers
-                                       .MaterialValues.ShaderResource();
+            mask.BindGBuffer(frameResource.GBuffer);
+
             mask.geometryDepth = *frameResource.DepthBuffer.ShaderResource();
+            mask.skybox = skyboxTexture;
+
+            mask.lightingBuffer = sunDataBuffer;
+            mask.cameraBuffer = cameraConstantBuffer;
+            mask.debugBuffer = debugConstantBuffer;
 
             deferredShadingPlane.Draw(allocator);
 
             allocator.TransitionResource(frameResource.DepthBuffer,
                                          ResourceStates::PixelShaderResource,
                                          ResourceStates::DepthWrite);
-            frameResource.DeferredShadingBuffers.TranslateToTarget(allocator);
+            frameResource.GBuffer.TranslateToTarget(allocator);
           }
 
           // Retransition simulation resources for compute shaders

@@ -9,6 +9,9 @@ struct TextureViewDefinitions {
   std::optional<D3D12_DEPTH_STENCIL_VIEW_DESC> DepthStencil = std::nullopt;
   std::optional<D3D12_UNORDERED_ACCESS_VIEW_DESC> UnorderedAccess =
       std::nullopt;
+  static TextureViewDefinitions
+  GetDepthStencilWithShaderView(const Format &DSFormat,
+                                const Format &SRVFormat);
 };
 class MutableTextureWithViews : public MutableTexture {
 public:

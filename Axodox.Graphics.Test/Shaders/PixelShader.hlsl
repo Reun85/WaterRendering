@@ -1,6 +1,5 @@
 #include "common.hlsli"
 Texture2D<float4> _texture : register(t0);
-TextureCube<float4> _skybox : register(t1);
 SamplerState _sampler : register(s0);
 
 #define PI 3.14159265359
@@ -22,6 +21,7 @@ struct PixelLightData
 {
     float4 lightPos;
     float4 lightColor;
+    float4 AmbientColor;
 };
 cbuffer PixelLighting : register(b1)
 {
@@ -64,11 +64,13 @@ cbuffer PSProperties : register(b2)
     float _WavePeakScatterStrength = 1;
     float _ScatterStrength = 1;
     float _ScatterShadowStrength = 1;
-    float _EnvMapMult = 1;
 };
 float SchlickFresnel(float f0, float NdotV)
 {
-    return f0 + (1 - f0) * pow(1.0 - NdotV, 5.0);
+    float x = 1.0 - NdotV;
+    float x2 = x * x;
+    float x5 = x2 * x2 * x;
+    return f0 + (1 - f0) * x5;
 }
 
 
@@ -169,16 +171,7 @@ output_t main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
         return output;
     }
     
-    float3 lightDir = normalize(sunDir);
-    float3 halfwayDir = normalize(lightDir + viewDir);
     float depth = input.Screen.z / input.Screen.w;
-    float LdotH = DotClamped(lightDir, halfwayDir);
-    float VdotH = DotClamped(viewDir, halfwayDir);
-    float NdotV = DotClamped(viewDir, normal);
-				
-    float NdotL = DotClamped(normal, lightDir);
-    float NdotH = max(0.0001f, dot(normal, halfwayDir));
-				
 
 				
 
@@ -198,106 +191,27 @@ output_t main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
     // Make foam appear rougher
     float a = Roughness + foam * foamRoughnessModifier;
 
-    float viewMask = SmithMaskingBeckmann(halfwayDir, viewDir, a);
-    float lightMask = SmithMaskingBeckmann(halfwayDir, lightDir, a);
-				
-    float G = rcp(1 + viewMask + lightMask);
-    //float D = Beckmann(NdotH, a);
-
-    //float eta = 1.33f;
-    //float R = ((eta - 1) * (eta - 1)) / ((eta + 1) * (eta + 1));
-    //float thetaV = acos(viewDir.y);
-
-    //float numerator = pow(1 - dot(normal, viewDir), 5 * exp(-2.69 * a));
-    //float F = R + (1 - R) * numerator / (1.0f + 22.7f * pow(a, 1.5f));
-    //F = saturate(F);
-
-    float D = D_GGX(NdotH, Roughness);
-    float F = SchlickFresnel(0.02, NdotV);
 				
 
 
-    float denom = 4.0 * NdotL * NdotV;
-    float3 specular = F * G * D / max(0.001f, denom);
-
-    float3 reflectDir = reflect(-viewDir, normal);
-//    float3x3 rotate90degrees = float3x3(
-//        float3(0, 0, 1),
-//        float3(0, 1, 0),
-//        float3(-1, 0, 0)
-//);
-//    reflectDir = mul(rotate90degrees, reflectDir);
-    float3 envReflection = _skybox.Sample(_sampler, reflectDir).rgb * _EnvMapMult;
-
-    //envReflection = SampleSkyboxCommon(reflectDir) * _EnvMapMult;
 
 
 
-    float H = max(0.0f, input.localPos.y) * _HeightModifier;
     float3 scatterColor = _ScatterColor;
-    float3 ambientColor = _AmbientColor * _AmbientMult;
-
-			
-
-    float k1 = _WavePeakScatterStrength * H * pow(DotClamped(lightDir, -viewDir), 4.0f) * pow(0.5f - 0.5f * NdotL, 3.0f);
-    float k2 = _ScatterStrength * pow(DotClamped(viewDir, normal), 2.0f);
-    float k3 = _ScatterShadowStrength * max(0, NdotL);
-
-    
-
-    float3 scatter = (k1 + k2) * scatterColor * rcp(1 + lightMask);
-    scatter += k3 * scatterColor + ambientColor * rcp(1 + lightMask);
-
-    float3 K1 = k1 * scatterColor * rcp(1 + lightMask);
-    float3 K2 = k2 * scatterColor * rcp(1 + lightMask);
-    float3 K3 = k3 * scatterColor * rcp(1 + lightMask);
-    if (has_flag(debugValues.flags, 26))
-    {
-        output.albedo =
-         float4(K1 * sunIrradiance, 1);
-        return output;
-    }
-    if (has_flag(debugValues.flags, 27))
-    {
-        output.albedo =
-         float4(K2 * sunIrradiance, 1);
-        return output;
-    }
-    if (has_flag(debugValues.flags, 28))
-    {
-        output.albedo =
-         float4(K3 * sunIrradiance, 1);
-        return output;
-    }
-    if (has_flag(debugValues.flags, 29))
-    {
-        output.albedo =
-         float4(K3 * sunIrradiance / rcp(1 + lightMask), 1);
-        return output;
-    }
-    if (has_flag(debugValues.flags, 30))
-    {
-        output.albedo =
-         float4(specular, 1);
-        return output;
-    }
-    if (has_flag(debugValues.flags, 31))
-    {
-        float x = 6 * viewMask;
-        output.albedo =
-         float4(x, x, x, 1);
-        return output;
-    }
-				
-    float3 albedo = (1 - F) * scatter * sunIrradiance + sunIrradiance * specular + F * envReflection;
-    albedo = max(0.0f, albedo);
+   
+    				
+    float3 albedo = scatterColor;
+    foam = 0;
     albedo = lerp(albedo, _TipColor, saturate(foam));
 
+    //low
     output.albedo = float4(albedo, 1);
-
-    output.position = float4(input.localPos, 1);
+    //high
+    output.position = float4(input.localPos, _HeightModifier * _WavePeakScatterStrength);
+    //high
     output.normal = float4(normal, 1);
-    output.materialValues = float4(a, 0, 0, 0);
+    //low
+    output.materialValues = float4(a, _ScatterStrength, _ScatterShadowStrength, 1);
     return output;
     
 }

@@ -76,7 +76,11 @@ static ResourceStates GetResourceStateFromFlags(const TextureFlags &flags) {
     return ResourceStates::RenderTarget;
   } else if (has_flag(flags, TextureFlags::DepthStencil)) {
     return ResourceStates::DepthWrite;
-  } else if (has_flag(flags, TextureFlags::UnorderedAccess)) {
+  } else if (has_flag(flags, TextureFlags::ShaderResourceDepthStencil)) {
+    return ResourceStates::DepthWrite;
+  }
+
+  else if (has_flag(flags, TextureFlags::UnorderedAccess)) {
     return ResourceStates::UnorderedAccess;
   } else {
     return ResourceStates::Common;
@@ -200,4 +204,12 @@ inline MeshDescription CreateBackwardsPlane(float size,
   result.Topology = PrimitiveTopology::TriangleList;
 
   return result;
+}
+
+template <typename T, const size_t N>
+std::initializer_list<typename std::array<T, N>::value_type>
+to_initializer_list(const std::array<T, N> &arr) {
+
+  return std::initializer_list<typename std::array<T, N>::value_type>(
+      arr.data(), arr.data() + arr.size());
 }

@@ -24,6 +24,7 @@ struct DebugValues
     uint flags;
     // .xyz is foamColor, .w is foamDepthAttenuation
     float4 FoamInfo;
+    float EnvMapMult;
 
 };
 

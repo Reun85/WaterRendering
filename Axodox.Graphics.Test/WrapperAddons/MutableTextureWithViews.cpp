@@ -93,4 +93,25 @@ void MutableTextureWithViews::OnAllocated(
   }
 }
 
+TextureViewDefinitions
+TextureViewDefinitions::GetDepthStencilWithShaderView(const Format &DSFormat,
+                                                      const Format &SRVFormat) {
+  TextureViewDefinitions depthViews{
+      .ShaderResource = D3D12_SHADER_RESOURCE_VIEW_DESC{},
+      .RenderTarget = std::nullopt,
+      .DepthStencil = D3D12_DEPTH_STENCIL_VIEW_DESC{},
+      .UnorderedAccess = std::nullopt};
+  depthViews.DepthStencil->Format = static_cast<DXGI_FORMAT>(DSFormat);
+  depthViews.DepthStencil->Flags = D3D12_DSV_FLAG_NONE;
+  depthViews.DepthStencil->ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+  depthViews.DepthStencil->Texture2D.MipSlice = 0;
+
+  depthViews.ShaderResource->Format = static_cast<DXGI_FORMAT>(SRVFormat);
+  depthViews.ShaderResource->ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+  depthViews.ShaderResource->Shader4ComponentMapping =
+      D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+  depthViews.ShaderResource->Texture2D.MipLevels = 1;
+  return depthViews;
+}
+
 } // namespace Axodox::Graphics::D3D12
