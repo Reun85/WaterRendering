@@ -107,8 +107,6 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
     // float3 _ScatterColor = float3(5.f, 18.f, 34.f) / 255.f;
     float3 _ScatterColor = float3(0.f, 11.f, 25.f) / 255.f;
     float foamRoughnessModifier = 5.0f;
-    float3 _AmbientColor = float3(53, 111, 111) / 255.f;
-    float _AmbientMult = 0.639f;
     float NormalDepthAttenuation = 1;
     float _HeightModifier = 60.f;
     float _WavePeakScatterStrength = 4.629f;

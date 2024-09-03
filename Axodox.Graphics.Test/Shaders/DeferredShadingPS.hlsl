@@ -63,7 +63,7 @@ float SmithMaskingBeckmann(float3 H, float3 S, float roughness)
     float a = hdots / (roughness * sqrt(1 - hdots * hdots));
     float a2 = a * a;
 
-    return a < 1.6f ? (1.0f - 1.259f * a + 0.396f * a2) / (3.535f * a + 2.181 * a2) : 0.0f;
+    return a < 1.6f ? (1.0f - 1.259f * a + 0.396f * a2) / (3.535f * a + 2.181 * a2) : 1e-4f;
 }
 
 float Beckmann(float ndoth, float roughness)
@@ -168,7 +168,7 @@ float4 main(input_t input) : SV_TARGET
     float denom = 4.0 * NdotL * NdotV;
     float3 specular = F * G * D / max(0.001f, denom);
 
-
+    
     if (has_flag(debugValues.flags, 30))
     {
         return
@@ -189,7 +189,6 @@ float4 main(input_t input) : SV_TARGET
             // water
             float H = max(0.0f, localPos.y) * HeightModifierAndWavePeakScatterStrength;
             const float3 scatterColor = albedo;
-            const float3 ambientColor = AmbientColor;
 			
 
             const float k1 = H * pow(DotClamped(lightDir, -viewDir), 4.0f) * pow(0.5f - 0.5f * NdotL, 3.0f);
@@ -225,8 +224,8 @@ float4 main(input_t input) : SV_TARGET
 
     
 
-            float3 scatter = (k1 + k2) * scatterColor * rcp(1 + lightMask);
-            scatter += k3 * scatterColor + ambientColor * rcp(1 + lightMask);
+            float3 scatter = (k1 + k2) * scatterColor;
+            scatter += k3 * scatterColor;
             output = (1 - F) * scatter * sunIrradiance;
             output += sunIrradiance * specular;
 
@@ -241,13 +240,14 @@ float4 main(input_t input) : SV_TARGET
     }
     else
     {
-        output = (1 - F) * albedo * sunIrradiance;
+        output = albedo * sunIrradiance;
         output += sunIrradiance * specular;
     }
     
     
     
-    output = max(0, output) + F * envReflection;
+    output = output + F * envReflection + AmbientColor;
+    output = AmbientColor;
 
     
     return float4(output, 1);

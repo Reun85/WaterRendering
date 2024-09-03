@@ -44,8 +44,6 @@ cbuffer PSProperties : register(b2)
     float foamDepthFalloff = 1.0f;
     float3 _ScatterColor = float3(1, 1, 1);
     float foamRoughnessModifier = 1.0f;
-    float3 _AmbientColor = float3(1, 1, 1);
-    float _AmbientMult = 1.0f;
     float NormalDepthAttenuation = 1.f;
     float _HeightModifier = 1;
     float _WavePeakScatterStrength = 1;

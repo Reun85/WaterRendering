@@ -416,8 +416,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
       ImGui::ColorEdit3("Tip Color", &waterData._TipColor.x);
       ImGui::ColorEdit3("Scatter Color", &waterData._ScatterColor.x);
-      ImGui::ColorEdit3("Ambient Color", &waterData._AmbientColor.x);
-      ImGui::SliderFloat("Ambient Mult", &waterData._AmbientMult, 0.0f, 10.0f);
       ImGui::SliderFloat("Normal Depth Attenuation",
                          &waterData.NormalDepthAttenuation, 0, 2);
       ImGui::SliderFloat("Foam Roughness Modifier",
@@ -441,6 +439,10 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       ImGui::ColorEdit3("Light Color", (float *)&sunData.lights[0].lightColor);
       ImGui::SliderFloat("Light Intensity", &sunData.lights[0].lightColor.w, 0,
                          10);
+
+      ImGui::ColorEdit3("Ambient Color", &sunData.lights[0].AmbientColor.x);
+      ImGui::SliderFloat("Ambient Mult", &sunData.lights[0].AmbientColor.w,
+                         0.0f, 10.0f);
     }
     if (exclusiveWindow)
       ImGui::End();
