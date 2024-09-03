@@ -90,7 +90,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                                       DebugBitsEnd - DebugBitsStart + 1>
         DebugBitsNames{"Normal overflow", "Display Foam", std::nullopt};
 
-    float EnvMapMult = 1.f;
     Mode mode = Mode::Full;
 
     RasterizerFlags rasterizerFlags = RasterizerFlags::CullNone;
@@ -109,7 +108,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         ImGui::Checkbox("Use channel Medium", &useChannel2);
         ImGui::Checkbox("Use channel Lowest", &useChannel3);
         ImGui::InputFloat4("Blend Distances", (float *)&blendDistances);
-        ImGui::SliderFloat("Env Map Mult", &EnvMapMult, 0, 5);
         for (u32 i = DebugBitsStart; i <= DebugBitsEnd; i++) {
           if (DebugBitsNames[i - DebugBitsStart])
             ImGui::Checkbox(*DebugBitsNames[i - DebugBitsStart],
@@ -252,8 +250,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     res.patchSizes =
         XMFLOAT3(simData.Highest.patchSize, simData.Medium.patchSize,
                  simData.Lowest.patchSize);
-
-    res.EnvMapMult = deb.EnvMapMult;
 
     set_flag(res.flags, 6, true);
     set_flag(res.flags, 0, false);
@@ -405,6 +401,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   static void DrawImGuiForPSResources(
       WaterGraphicRootDescription::WaterPixelShaderData &waterData,
       WaterGraphicRootDescription::PixelLighting &sunData,
+      DeferredShading::DeferredShaderBuffers &defData,
       bool exclusiveWindow = true) {
     bool cont = true;
     if (exclusiveWindow) {
@@ -440,6 +437,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       ImGui::ColorEdit3("Ambient Color", &sunData.lights[0].AmbientColor.x);
       ImGui::SliderFloat("Ambient Mult", &sunData.lights[0].AmbientColor.w,
                          0.0f, 10.0f);
+      ImGui::Separator();
+      ImGui::Text("DeferredShaderBuffer Data");
+      ImGui::SliderFloat("Env Map", (float *)&defData.EnvMapMult, 0, 2);
     }
     if (exclusiveWindow)
       ImGui::End();
@@ -591,6 +591,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             .get();
 
     WaterGraphicRootDescription::WaterPixelShaderData waterData;
+    DeferredShading::DeferredShaderBuffers defData;
     WaterGraphicRootDescription::PixelLighting sunData =
         WaterGraphicRootDescription::PixelLighting::SunData();
 
@@ -1126,6 +1127,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             mask.cameraBuffer = cameraConstantBuffer;
             mask.debugBuffer = debugConstantBuffer;
 
+            mask.deferredShaderBuffer =
+                frameResource.DynamicBuffer.AddBuffer(defData);
+
             deferredShadingPlane.Draw(allocator);
 
             allocator.TransitionResource(frameResource.DepthBuffer,
@@ -1176,7 +1180,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           ImGui::End();
           debugValues.DrawImGui(beforeNextFrame);
           simData.DrawImGui(beforeNextFrame);
-          DrawImGuiForPSResources(waterData, sunData, true);
+          DrawImGuiForPSResources(waterData, sunData, defData, true);
 
           ImGui::Render();
 

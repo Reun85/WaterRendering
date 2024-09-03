@@ -22,9 +22,6 @@ struct DebugValues
     // 7: show normal
     // Bits [24,31] are reversed for debug reasons
     uint flags;
-    // .xyz is foamColor, .w is foamDepthAttenuation
-    float4 FoamInfo;
-    float EnvMapMult;
 
 };
 

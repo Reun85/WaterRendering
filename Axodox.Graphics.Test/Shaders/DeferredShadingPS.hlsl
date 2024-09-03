@@ -33,12 +33,16 @@ struct PixelLightData
     float4 lightColor;
     float4 AmbientColor;
 };
-cbuffer PixelLighting : register(b1)
+cbuffer Lighting : register(b1)
 {
     PixelLightData lights[MAX_LIGHT_COUNT];
     int lightCount;
 };
 
+cbuffer DSBuffer : register(b2)
+{
+    float EnvMapMult;
+}
 
 
 struct input_t
@@ -139,7 +143,7 @@ float4 main(input_t input) : SV_TARGET
 
     float3 reflectDir = reflect(-viewDir, normal);
     float4 envReflectioninp = _skybox.Sample(_sampler, reflectDir);
-    float3 envReflection = pow(envReflectioninp.rgb * debugValues.EnvMapMult, envReflectioninp.w);
+    float3 envReflection = pow(envReflectioninp.rgb * EnvMapMult, envReflectioninp.w);
 
 
 
@@ -238,10 +242,7 @@ float4 main(input_t input) : SV_TARGET
         output += sunIrradiance * specular;
     }
     
-    
-    
     output = output + F * envReflection + AmbientColor;
-
     
     return float4(output, 1);
 }

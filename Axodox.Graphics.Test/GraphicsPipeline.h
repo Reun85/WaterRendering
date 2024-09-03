@@ -264,6 +264,10 @@ struct DeferredShading : public RootSignatureMask {
     }
   };
 
+  struct DeferredShaderBuffers {
+    float EnvMapMult = 1.f;
+  };
+
   RootDescriptorTable<1> albedo;
   RootDescriptorTable<1> normal;
   RootDescriptorTable<1> position;
@@ -274,6 +278,7 @@ struct DeferredShading : public RootSignatureMask {
   RootDescriptor<RootDescriptorType::ConstantBuffer> lightingBuffer;
   RootDescriptor<RootDescriptorType::ConstantBuffer> cameraBuffer;
   RootDescriptor<RootDescriptorType::ConstantBuffer> debugBuffer;
+  RootDescriptor<RootDescriptorType::ConstantBuffer> deferredShaderBuffer;
   StaticSampler Sampler;
 
   explicit DeferredShading(const RootSignatureContext &context)
@@ -288,6 +293,7 @@ struct DeferredShading : public RootSignatureMask {
         lightingBuffer(this, {1}, ShaderVisibility::Pixel),
         cameraBuffer(this, {0}, ShaderVisibility::Pixel),
         debugBuffer(this, {9}, ShaderVisibility::Pixel),
+        deferredShaderBuffer(this, {2}, ShaderVisibility::Pixel),
         Sampler(this, {0}, Filter::Linear, TextureAddressMode::Clamp) {
 
     Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
