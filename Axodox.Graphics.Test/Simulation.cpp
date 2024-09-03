@@ -54,11 +54,11 @@ bool SimulationData::PatchData::DrawImGui(std::string_view ID) {
 }
 
 SimulationData SimulationData::Default() {
-  const auto &N = Defaults::Simulation::N;
-  const auto &M = Defaults::Simulation::N;
-  const auto &wind = Defaults::Simulation::WindDirection;
-  const auto &gravity = Defaults::Simulation::gravity;
-  const auto &Depth = Defaults::Simulation::Depth;
+  const auto &N = DefaultsValues::Simulation::N;
+  const auto &M = DefaultsValues::Simulation::N;
+  const auto &wind = DefaultsValues::Simulation::WindDirection;
+  const auto &gravity = DefaultsValues::Simulation::gravity;
+  const auto &Depth = DefaultsValues::Simulation::Depth;
   SimulationData res{.N = N,
                      .M = M,
                      .windDirection = wind,

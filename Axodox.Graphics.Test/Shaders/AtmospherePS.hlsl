@@ -48,8 +48,7 @@ output_t main(VS_OUTPUT input) : SV_TARGET
         samp = float4(1, 0, 0, 1);
     }
 
-    output.albedo =
-samp;
-    return
-output;
+    output.albedo = samp;
+    output.materialValues = float4(0, 0, 0, 2);
+    return output;
 }

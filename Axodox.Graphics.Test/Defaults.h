@@ -32,7 +32,8 @@ constexpr bool divides_within_eps(float a, float b, float epsilon) noexcept {
   float diff = back > 0 ? back : -back;
   return diff < epsilon;
 }
-struct Defaults {
+
+struct DefaultsValues {
 public:
   struct Cam {
     QUALIFIER float3 camStartPos = float3(-23, 10, 11);
@@ -51,12 +52,6 @@ public:
     CONST_QUALIFIER u32 heightMapDimensions = ShaderConstantCompat::dispMapSize;
     CONST_QUALIFIER u32 computeShaderGroupsDim1 = 16;
     CONST_QUALIFIER u32 computeShaderGroupsDim2 = 16;
-  };
-  struct QuadTree {
-    QUALIFIER f32 quadTreeDistanceThreshold = 2e+2f;
-    QUALIFIER u32 allocation = 20000;
-    QUALIFIER u32 maxDepth = 40;
-    QUALIFIER u32 minDepth = 0;
   };
   struct Simulation {
     /// Have to change in common.hlsli as well

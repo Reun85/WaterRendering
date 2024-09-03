@@ -31,14 +31,14 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
       XMFLOAT2 scaling;
       XMFLOAT2 offset;
     };
-    InstanceData instanceData[Defaults::App::maxInstances];
+    InstanceData instanceData[DefaultsValues::App::maxInstances];
   };
   struct HullConstants {
     struct InstanceData {
       XMFLOAT4 TesselationFactor;
     };
     // zneg,xneg, zpos, xpos
-    InstanceData instanceData[Defaults::App::maxInstances];
+    InstanceData instanceData[DefaultsValues::App::maxInstances];
   };
 
   struct PixelLighting {
@@ -121,7 +121,6 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
   RootDescriptor<RootDescriptorType::ConstantBuffer> cameraBuffer;
   RootDescriptor<RootDescriptorType::ConstantBuffer> modelBuffer;
   RootDescriptor<RootDescriptorType::ConstantBuffer> debugBuffer;
-  RootDescriptor<RootDescriptorType::ConstantBuffer> lightingBuffer;
   RootDescriptor<RootDescriptorType::ConstantBuffer> waterPBRBuffer;
 
   // Optional
@@ -143,7 +142,6 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
         cameraBuffer(this, {0}, ShaderVisibility::All),
         modelBuffer(this, {1}, ShaderVisibility::Vertex),
         debugBuffer(this, {9}, ShaderVisibility::All),
-        lightingBuffer(this, {1}, ShaderVisibility::Pixel),
         waterPBRBuffer(this, {2}, ShaderVisibility::Pixel),
 
         texture(this, {DescriptorRangeType::ShaderResource, {0}},
@@ -174,16 +172,35 @@ struct DeferredShading : public RootSignatureMask {
     MutableTexture Normal;
     MutableTexture MaterialValues;
 
-    std::array<const RenderTargetView *, 4> GetGBufferViews() const {
+    const static constexpr u8 NumberOfBuffers = 4;
+
+    std::array<const RenderTargetView *, NumberOfBuffers>
+    GetGBufferViews() const {
       return {Albedo.RenderTarget(), Normal.RenderTarget(),
               Position.RenderTarget(), MaterialValues.RenderTarget()};
     }
 
     //
-    constexpr static std::array<Format, 4> GetGBufferFormats() {
+    constexpr static std::array<Format, NumberOfBuffers> GetGBufferFormats() {
       return {Format::B8G8R8A8_UNorm, Format::R16G16B16A16_Float,
-              Format::R16G16B16A16_Float, Format::B8G8R8A8_UNorm};
+              Format::R16G16B16A16_Float, Format::R16G16B16A16_Float};
     };
+
+    std::array<MutableTexture *, NumberOfBuffers> GetBuffers() {
+      return {&Albedo, &Normal, &Position, &MaterialValues};
+    }
+    std::array<std::pair<MutableTexture *, Format>, NumberOfBuffers>
+    GetBuffersAndFormats() {
+      std::array<Format, NumberOfBuffers> formats = GetGBufferFormats();
+      std::array<MutableTexture *, NumberOfBuffers> buffers = GetBuffers();
+      std::array<std::pair<MutableTexture *, Format>, NumberOfBuffers>
+          zippedArray;
+
+      std::transform(
+          formats.begin(), formats.end(), buffers.begin(), zippedArray.begin(),
+          [](Format f, MutableTexture *b) { return std::make_pair(b, f); });
+      return zippedArray;
+    }
 
     explicit GBuffer(const ResourceAllocationContext &context)
         : Albedo(context), Position(context), Normal(context),
@@ -202,13 +219,9 @@ struct DeferredShading : public RootSignatureMask {
           texture.Allocate(definition);
         }
       };
-      UpdateTexture(Albedo, Format::B8G8R8A8_UNorm, TextureFlags::RenderTarget);
-      UpdateTexture(Position, Format::R16G16B16A16_Float,
-                    TextureFlags::RenderTarget);
-      UpdateTexture(Normal, Format::R16G16B16A16_Float,
-                    TextureFlags::RenderTarget);
-      UpdateTexture(MaterialValues, Format::B8G8R8A8_UNorm,
-                    TextureFlags::RenderTarget);
+      for (auto &it : GetBuffersAndFormats()) {
+        UpdateTexture(*it.first, it.second, TextureFlags::RenderTarget);
+      }
     }
 
     void Clear(CommandAllocator &allocator) override {

@@ -3,6 +3,7 @@
 #include <complex>
 #include <numbers>
 #include "Defaults.h"
+#include "QuadTree.h"
 #include <random>
 
 struct NeedToDo;
@@ -33,8 +34,7 @@ struct SimulationData {
   PatchData Highest;
   PatchData Medium;
   PatchData Lowest;
-  float quadTreeDistanceThreshold =
-      Defaults::QuadTree::quadTreeDistanceThreshold;
+  float quadTreeDistanceThreshold = QuadTree::Defaults::DistanceThreshold;
 
 public:
   void DrawImGui(NeedToDo &out, bool exclusiveWindow = true);

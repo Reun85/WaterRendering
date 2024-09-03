@@ -7,6 +7,7 @@ Texture2D<float4> _materialValues : register(t3);
 Texture2D<float> _depthTex : register(t4);
 TextureCube<float4> _skybox : register(t5);
 
+
 SamplerState _sampler : register(s0);
 
 #define PI 3.14159265359
@@ -137,15 +138,9 @@ float4 main(input_t input) : SV_TARGET
 				
 
     float3 reflectDir = reflect(-viewDir, normal);
-//    float3x3 rotate90degrees = float3x3(
-//        float3(0, 0, 1),
-//        float3(0, 1, 0),
-//        float3(-1, 0, 0)
-//);
-//    reflectDir = mul(rotate90degrees, reflectDir);
-    float3 envReflection = _skybox.Sample(_sampler, reflectDir).rgb * debugValues.EnvMapMult;
+    float4 envReflectioninp = _skybox.Sample(_sampler, reflectDir);
+    float3 envReflection = pow(envReflectioninp.rgb * debugValues.EnvMapMult, envReflectioninp.w);
 
-    //envReflection = SampleSkyboxCommon(reflectDir) * _EnvMapMult;
 
 
     // Old code
@@ -183,7 +178,6 @@ float4 main(input_t input) : SV_TARGET
     
 
     float3 output = float3(0, 0, 0);
-
     
     if (matId > matIdEPS)
     {
@@ -194,13 +188,13 @@ float4 main(input_t input) : SV_TARGET
             const float HeightModifierAndWavePeakScatterStrength = _positioninput.w;
             // water
             float H = max(0.0f, localPos.y) * HeightModifierAndWavePeakScatterStrength;
-            float3 scatterColor = albedo;
-            float3 ambientColor = AmbientColor;
+            const float3 scatterColor = albedo;
+            const float3 ambientColor = AmbientColor;
 			
 
-            float k1 = H * pow(DotClamped(lightDir, -viewDir), 4.0f) * pow(0.5f - 0.5f * NdotL, 3.0f);
-            float k2 = ScatterStrength * pow(DotClamped(viewDir, normal), 2.0f);
-            float k3 = ScatterShadowStrength * max(0, NdotL);
+            const float k1 = H * pow(DotClamped(lightDir, -viewDir), 4.0f) * pow(0.5f - 0.5f * NdotL, 3.0f);
+            const float k2 = ScatterStrength * pow(DotClamped(viewDir, normal), 2.0f);
+            const float k3 = ScatterShadowStrength * max(0, NdotL);
 
 
             if (has_flag(debugValues.flags, 26))
@@ -221,7 +215,7 @@ float4 main(input_t input) : SV_TARGET
             if (has_flag(debugValues.flags, 29))
             {
                 float3 K3 = k3 * scatterColor * rcp(1 + lightMask);
-                return float4(K3 * sunIrradiance / rcp(1 + lightMask), 1);
+                return float4(K3 * sunIrradiance * rcp(1 + lightMask), 1);
             }
             if (has_flag(debugValues.flags, 31))
             {
@@ -237,12 +231,20 @@ float4 main(input_t input) : SV_TARGET
             output += sunIrradiance * specular;
 
         }
+        else if (matId < 255 + matIdEPS)
+        {
+            const float exp = _albedoinput.w;
+            output = pow(albedo, exp);
+            return float4(output, 1);
+        }
+
     }
     else
     {
         output = (1 - F) * albedo * sunIrradiance;
         output += sunIrradiance * specular;
     }
+    
     
     
     output = max(0, output) + F * envReflection;

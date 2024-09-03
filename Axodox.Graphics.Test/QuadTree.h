@@ -87,22 +87,26 @@ private:
 };
 // The plane must be perpendicular to the Y-axis.
 class QuadTree {
+
+public:
+  struct Defaults {
+    static constexpr Depth maxDepth = 40;
+    static constexpr Depth minDepth = 0;
+    static constexpr float DistanceThreshold = 2e+3f;
+  };
+
   using value_type = Node;
   using const_iterator = ConstQuadTreeLeafIteratorDepthFirst;
 
-public:
-  QuadTree(const uint allocation = Defaults::QuadTree::allocation)
-      : nodes(allocation) {}
-  void Build(const float3 center, const float2 fullSizeXZ, const float3 camEye,
-             const Frustum &f, const XMMATRIX &mMatrix,
-             const float quadTreeDistanceThreshold =
-                 Defaults::QuadTree::quadTreeDistanceThreshold);
+  QuadTree(const uint allocation = 20000) : nodes(allocation) {}
+  void
+  Build(const float3 center, const float2 fullSizeXZ, const float3 camEye,
+        const Frustum &f, const XMMATRIX &mMatrix,
+        const float quadTreeDistanceThreshold = Defaults::DistanceThreshold);
   const value_type &GetRoot() const { return nodes[0]; }
-  const_iterator begin() const {
-    return ConstQuadTreeLeafIteratorDepthFirst(0, height, *this);
-  }
+  const_iterator begin() const { return const_iterator(0, height, *this); }
   const value_type &GetAt(NodeID id) const { return nodes[id]; }
-  const NodeID end() const { return GetSize(); }
+  NodeID end() const { return GetSize(); }
   const NodeID &GetSize() const { return count; }
 
 private:
@@ -116,6 +120,6 @@ private:
   std::vector<value_type> nodes;
   NodeID count = 0;
   Depth height = 0;
-  Depth maxDepth = Defaults::QuadTree::maxDepth;
-  Depth minDepth = Defaults::QuadTree::minDepth;
+  Depth maxDepth = Defaults::maxDepth;
+  Depth minDepth = Defaults::minDepth;
 };

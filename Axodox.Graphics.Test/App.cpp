@@ -47,7 +47,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   };
   struct RuntimeSettings {
     bool timeRunning = true;
-    XMFLOAT4 clearColor = Defaults::App::clearColor;
+    XMFLOAT4 clearColor = DefaultsValues::App::clearColor;
     bool quit = false;
     void DrawImGui(NeedToDo &out, bool exclusiveWindow = false) {
       bool cont = true;
@@ -495,12 +495,13 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     window.Activate();
 
     Camera cam;
-    cam.SetView(
-        XMVectorSet(Defaults::Cam::camStartPos.x, Defaults::Cam::camStartPos.y,
-                    Defaults::Cam::camStartPos.z, 0),
-        XMVectorSet(0.0f, 0.0f, 0.0f, 0), XMVectorSet(0.0f, 1.0f, 0.0f, 0));
+    cam.SetView(XMVectorSet(DefaultsValues::Cam::camStartPos.x,
+                            DefaultsValues::Cam::camStartPos.y,
+                            DefaultsValues::Cam::camStartPos.z, 0),
+                XMVectorSet(0.0f, 0.0f, 0.0f, 0),
+                XMVectorSet(0.0f, 1.0f, 0.0f, 0));
 
-    cam.SetFirstPerson(Defaults::Cam::startFirstPerson);
+    cam.SetFirstPerson(DefaultsValues::Cam::startFirstPerson);
     // Events
 
     RuntimeSettings settings;
@@ -905,8 +906,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           // Collect Quad Info
           {
 
-            float2 fullSizeXZ = {Defaults::App::oceanSize,
-                                 Defaults::App::oceanSize};
+            float2 fullSizeXZ = {DefaultsValues::App::oceanSize,
+                                 DefaultsValues::App::oceanSize};
 
             float3 center = {0, 0, 0};
             QuadTree qt;
@@ -971,7 +972,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                 }
 
                 curr->N = curr->N + 1;
-                if (curr->N == Defaults::App::maxInstances) {
+                if (curr->N == DefaultsValues::App::maxInstances) {
                   curr = &cpuBuffers.oceanData.emplace_back();
                 }
 
@@ -1079,7 +1080,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
               mask.gradientsLowest = gradientsAddressLowest;
 
               mask.waterPBRBuffer = waterDataBuffer;
-              mask.lightingBuffer = sunDataBuffer;
 
               mask.hullBuffer =
                   frameResource.DynamicBuffer.AddBuffer(curr.hullConstants);
@@ -1094,6 +1094,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             // skybox
             {
               skyboxPipelineState.Apply(allocator);
+
               auto mask = skyboxRootSignature.Set(allocator,
                                                   RootSignatureUsage::Graphics);
 

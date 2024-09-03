@@ -17,19 +17,6 @@ cbuffer DebugBuffer : register(b9)
 
 
 
-struct PixelLightData
-{
-    float4 lightPos;
-    float4 lightColor;
-    float4 AmbientColor;
-};
-cbuffer PixelLighting : register(b1)
-{
-    PixelLightData lights[MAX_LIGHT_COUNT];
-    int lightCount;
-};
-
-
 
 struct input_t
 {
@@ -65,49 +52,6 @@ cbuffer PSProperties : register(b2)
     float _ScatterStrength = 1;
     float _ScatterShadowStrength = 1;
 };
-float SchlickFresnel(float f0, float NdotV)
-{
-    float x = 1.0 - NdotV;
-    float x2 = x * x;
-    float x5 = x2 * x2 * x;
-    return f0 + (1 - f0) * x5;
-}
-
-
-float SmithMaskingBeckmann(float3 H, float3 S, float roughness)
-{
-    float hdots = max(0.001f, max(dot(H, S), 0));
-    float a = hdots / (roughness * sqrt(1 - hdots * hdots));
-    float a2 = a * a;
-
-    return a < 1.6f ? (1.0f - 1.259f * a + 0.396f * a2) / (3.535f * a + 2.181 * a2) : 0.0f;
-}
-
-float Beckmann(float ndoth, float roughness)
-{
-    float exp_arg = (ndoth * ndoth - 1) / (roughness * roughness * ndoth * ndoth);
-
-    return exp(exp_arg) / (PI * roughness * roughness * ndoth * ndoth * ndoth * ndoth);
-}
-
-
-float D_GGX(float NdotH, float roughness)
-{
-    float alpha = roughness * roughness;
-    float alpha2 = alpha * alpha;
-    float denom = NdotH * NdotH * (alpha2 - 1.0) + 1.0;
-    return alpha2 / (PI * denom * denom);
-}
-
-float G_Smith(float NdotL, float NdotV, float roughness)
-{
-    float alpha = roughness * roughness;
-    float k = alpha * 0.5;
-    float G_V = NdotV / (NdotV * (1.0 - k) + k);
-    float G_L = NdotL / (NdotL * (1.0 - k) + k);
-    return G_V * G_L;
-}
-
 
 
 
@@ -116,15 +60,6 @@ output_t main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
 
     output_t output;
     
-// Colors
-    const float3 sunIrradiance = lights[0].lightColor.xyz * lights[0].lightColor.w;
-    const float3 sunDir = lights[0].lightPos.xyz;
-
-    
-    
-    
-    
-     
 	
     if (has_flag(debugValues.flags, 6))
     {
@@ -190,12 +125,6 @@ output_t main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
 				
     // Make foam appear rougher
     float a = Roughness + foam * foamRoughnessModifier;
-
-				
-
-
-
-
 
     float3 scatterColor = _ScatterColor;
    
