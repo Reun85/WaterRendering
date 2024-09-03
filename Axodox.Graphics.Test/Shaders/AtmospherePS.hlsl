@@ -40,7 +40,7 @@ output_t main(VS_OUTPUT input) : SV_TARGET
    //float3 samp = SampleSkyboxCommon(dir);
     float4 samp = skyboxTexture.Sample(sampleState, dir);
     float3 sunPos = lights[0].lightPos.xyz;
-    float sunRadius = 0.01;
+    float sunRadius = 0.005;
 
     if (length(
         sunPos - dir) < sunRadius)

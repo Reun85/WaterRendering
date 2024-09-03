@@ -105,6 +105,7 @@
     <ClInclude Include="Frustum.hpp" />
     <ClInclude Include="GraphicsPipeline.h" />
     <ClInclude Include="Helpers.h" />
+    <ClInclude Include="oldstuff.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="QuadTree.h" />
     <ClInclude Include="Shaders\DebugValues.h" />

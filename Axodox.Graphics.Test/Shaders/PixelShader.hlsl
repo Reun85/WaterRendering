@@ -38,17 +38,15 @@ struct output_t
 
 cbuffer PSProperties : register(b2)
 {
-    float3 SurfaceColor = float3(0.109, 0.340, 0.589);
-    float Roughness = 0.285;
-    float3 _TipColor = float3(0.8f, 0.9f, 1.0f);
-    float foamDepthFalloff = 1.0f;
-    float3 _ScatterColor = float3(1, 1, 1);
-    float foamRoughnessModifier = 1.0f;
-    float NormalDepthAttenuation = 1.f;
-    float _HeightModifier = 1;
-    float _WavePeakScatterStrength = 1;
-    float _ScatterStrength = 1;
-    float _ScatterShadowStrength = 1;
+    float3 Albedo;
+    float Roughness;
+    float3 _TipColor;
+    float foamDepthFalloff;
+    float foamRoughnessModifier;
+    float NormalDepthAttenuation;
+    float _HeightModifier;
+    float _WavePeakScatterStrength;
+    float _ScatterShadowStrength;
 };
 
 
@@ -124,11 +122,9 @@ output_t main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
     // Make foam appear rougher
     float a = Roughness + foam * foamRoughnessModifier;
 
-    float3 scatterColor = _ScatterColor;
    
     				
-    float3 albedo = scatterColor;
-    foam = 0;
+    float3 albedo = Albedo;
     albedo = lerp(albedo, _TipColor, saturate(foam));
 
     //low
@@ -138,7 +134,7 @@ output_t main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
     //high
     output.normal = float4(normal, 1);
     //low
-    output.materialValues = float4(a, _ScatterStrength, _ScatterShadowStrength, 1);
+    output.materialValues = float4(a, 0, _ScatterShadowStrength, 1);
     return output;
     
 }

@@ -90,7 +90,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                                       DebugBitsEnd - DebugBitsStart + 1>
         DebugBitsNames{"Normal overflow", "Display Foam", std::nullopt};
 
-    float EnvMapMult = 2.696f;
+    float EnvMapMult = 1.f;
     Mode mode = Mode::Full;
 
     RasterizerFlags rasterizerFlags = RasterizerFlags::CullNone;
@@ -403,7 +403,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   }
 
   static void DrawImGuiForPSResources(
-      WaterGraphicRootDescription::NewPixelShaderData &waterData,
+      WaterGraphicRootDescription::WaterPixelShaderData &waterData,
       WaterGraphicRootDescription::PixelLighting &sunData,
       bool exclusiveWindow = true) {
     bool cont = true;
@@ -411,11 +411,10 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       cont = ImGui::Begin("PS Data");
     }
     if (cont) {
-      ImGui::ColorEdit3("Surface Color", &waterData.SurfaceColor.x);
+      ImGui::ColorEdit3("Surface Color", &waterData.AlbedoColor.x);
       ImGui::SliderFloat("Roughness", &waterData.Roughness, 0.0f, 1.0f);
 
       ImGui::ColorEdit3("Tip Color", &waterData._TipColor.x);
-      ImGui::ColorEdit3("Scatter Color", &waterData._ScatterColor.x);
       ImGui::SliderFloat("Normal Depth Attenuation",
                          &waterData.NormalDepthAttenuation, 0, 2);
       ImGui::SliderFloat("Foam Roughness Modifier",
@@ -426,8 +425,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                          10.0f);
       ImGui::SliderFloat("Wave Peak Scatter Strength",
                          &waterData._WavePeakScatterStrength, 0.0f, 10.0f);
-      ImGui::SliderFloat("Scatter Strength", &waterData._ScatterStrength, 0.0f,
-                         10.0f);
       ImGui::SliderFloat("Scatter Shadow Strength",
                          &waterData._ScatterShadowStrength, 0.0f, 10.0f);
 
@@ -593,7 +590,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             .CreatePipelineStateAsync(deferredShadingPipelineStateDefinition)
             .get();
 
-    WaterGraphicRootDescription::NewPixelShaderData waterData;
+    WaterGraphicRootDescription::WaterPixelShaderData waterData;
     WaterGraphicRootDescription::PixelLighting sunData =
         WaterGraphicRootDescription::PixelLighting::SunData();
 

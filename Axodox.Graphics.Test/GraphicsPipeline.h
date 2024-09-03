@@ -56,10 +56,24 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
       data.lightCount = 1;
       data.lights[0].lightPos = XMFLOAT4(1, 0.109, 0.964, 0);
       data.lights[0].lightColor =
-          XMFLOAT4(230.f / 255.f, 214.f / 255.f, 167.f / 255.f, 0.446);
+          XMFLOAT4(234.f / 255.f, 204.f / 255.f, 118.f / 255.f, 0.446);
 
       data.lights[0].AmbientColor =
-          XMFLOAT4(53.f / 255.f, 111.f / 255.f, 111.f / 255.f, .639f);
+          XMFLOAT4(15.f / 255.f, 14.f / 255.f, 5.f / 255.f, .185);
+
+      return data;
+    }
+    // old
+  private:
+    static constexpr PixelLighting old() {
+      PixelLighting data;
+      data.lightCount = 1;
+      data.lights[0].lightPos = XMFLOAT4(1, 0.109, 0.964, 0);
+      data.lights[0].lightColor =
+          XMFLOAT4(243.f / 255.f, 206.f / 255.f, 97.f / 255.f, 0.446);
+
+      data.lights[0].AmbientColor =
+          XMFLOAT4(15.f / 255.f, 14.f / 255.f, 5.f / 255.f, .639f);
 
       return data;
     }
@@ -96,22 +110,17 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
     }
   };
 
-  struct NewPixelShaderData {
+  struct WaterPixelShaderData {
 
-    float3 SurfaceColor = float3(0.109, 0.340, 0.589);
+    float3 AlbedoColor = float3(11.f, 53.f, 108.f) / 255.f;
     float Roughness = 0.192;
     float3 _TipColor = float3(231.f, 231.f, 231.f) / 255.f;
     float foamDepthFalloff = 0.245;
-    // float3 _ScatterColor = float3(4.f / 255.f, 22.f / 255.f, 33.f / 255.f);
-    // float3 _ScatterColor = float3(10.f, 18.f, 29.f) / 255.f;
-    // float3 _ScatterColor = float3(5.f, 18.f, 34.f) / 255.f;
-    float3 _ScatterColor = float3(0.f, 11.f, 25.f) / 255.f;
     float foamRoughnessModifier = 5.0f;
     float NormalDepthAttenuation = 1;
-    float _HeightModifier = 60.f;
+    float _HeightModifier = 1.871f;
     float _WavePeakScatterStrength = 4.629f;
-    float _ScatterStrength = 0.78f;
-    float _ScatterShadowStrength = 4.460f;
+    float _ScatterShadowStrength = 4.067f;
   };
 
   RootDescriptor<RootDescriptorType::ConstantBuffer> vertexBuffer;

@@ -192,7 +192,6 @@ float4 main(input_t input) : SV_TARGET
 			
 
             const float k1 = H * pow(DotClamped(lightDir, -viewDir), 4.0f) * pow(0.5f - 0.5f * NdotL, 3.0f);
-            const float k2 = ScatterStrength * pow(DotClamped(viewDir, normal), 2.0f);
             const float k3 = ScatterShadowStrength * max(0, NdotL);
 
 
@@ -200,11 +199,6 @@ float4 main(input_t input) : SV_TARGET
             {
                 float3 K1 = k1 * scatterColor * rcp(1 + lightMask);
                 return float4(K1 * sunIrradiance, 1);
-            }
-            if (has_flag(debugValues.flags, 27))
-            {
-                float3 K2 = k2 * scatterColor * rcp(1 + lightMask);
-                return float4(K2 * sunIrradiance, 1);
             }
             if (has_flag(debugValues.flags, 28))
             {
@@ -224,7 +218,7 @@ float4 main(input_t input) : SV_TARGET
 
     
 
-            float3 scatter = (k1 + k2) * scatterColor;
+            float3 scatter = k1 * scatterColor;
             scatter += k3 * scatterColor;
             output = (1 - F) * scatter * sunIrradiance;
             output += sunIrradiance * specular;
@@ -247,7 +241,6 @@ float4 main(input_t input) : SV_TARGET
     
     
     output = output + F * envReflection + AmbientColor;
-    output = AmbientColor;
 
     
     return float4(output, 1);
