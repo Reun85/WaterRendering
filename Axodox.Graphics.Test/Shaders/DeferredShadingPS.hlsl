@@ -8,9 +8,14 @@ Texture2D<float> _depthTex : register(t4);
 TextureCube<float4> _skybox : register(t5);
 
 
+// Water
+Texture2D<float4> gradients1 : register(t20);
+Texture2D<float4> gradients2 : register(t21);
+Texture2D<float4> gradients3 : register(t22);
+
+
 SamplerState _sampler : register(s0);
 
-#define PI 3.14159265359
 
 
 
@@ -52,52 +57,10 @@ struct input_t
 };
 
 
-float SchlickFresnel(float f0, float NdotV)
-{
-    float x = 1.0 - NdotV;
-    float x2 = x * x;
-    float x5 = x2 * x2 * x;
-    return f0 + (1 - f0) * x5;
-}
-
-
-float SmithMaskingBeckmann(float3 H, float3 S, float roughness)
-{
-    float hdots = max(0.001f, max(dot(H, S), 0));
-    float a = hdots / (roughness * sqrt(1 - hdots * hdots));
-    float a2 = a * a;
-
-    return a < 1.6f ? (1.0f - 1.259f * a + 0.396f * a2) / (3.535f * a + 2.181 * a2) : 1e-4f;
-}
-
-float Beckmann(float ndoth, float roughness)
-{
-    float exp_arg = (ndoth * ndoth - 1) / (roughness * roughness * ndoth * ndoth);
-
-    return exp(exp_arg) / (PI * roughness * roughness * ndoth * ndoth * ndoth * ndoth);
-}
-
-
-float D_GGX(float NdotH, float roughness)
-{
-    float alpha = roughness * roughness;
-    float alpha2 = alpha * alpha;
-    float denom = NdotH * NdotH * (alpha2 - 1.0) + 1.0;
-    return alpha2 / (PI * denom * denom);
-}
-
-float G_Smith(float NdotL, float NdotV, float roughness)
-{
-    float alpha = roughness * roughness;
-    float k = alpha * 0.5;
-    float G_V = NdotV / (NdotV * (1.0 - k) + k);
-    float G_L = NdotL / (NdotL * (1.0 - k) + k);
-    return G_V * G_L;
-}
 
 
 
-#define RETURNALBEDO_BITMASK (1 << 6 | 1 << 7 | 1<<24  | 1<<25)
+#define RETURNALBEDO_BITMASK (1 << 6 | 1<<24  | 1<<25)
 float4 main(input_t input) : SV_TARGET
 {
     float4 _albedoinput = _albedo.Sample(_sampler, input.texCoord);
@@ -128,8 +91,99 @@ float4 main(input_t input) : SV_TARGET
     const float3 AmbientColor = lights[0].AmbientColor.xyz * lights[0].AmbientColor.w;
 
     const float3 viewVec = camConstants.cameraPos - localPos;
+    const float viewDistanceSqr = dot(viewVec, viewVec);
     float3 viewDir = normalize(viewVec);
+
     
+    if (has_flag(debugValues.flags, 8))
+    {
+        return _albedoinput;
+    }
+    if (has_flag(debugValues.flags, 9))
+    {
+        return _normalinput;
+    }
+    if (has_flag(debugValues.flags, 10))
+    {
+        return -_normalinput;
+    }
+    if (has_flag(debugValues.flags, 11))
+    {
+        return _positioninput;
+    }
+    if (has_flag(debugValues.flags, 12))
+    {
+        return _materialValuesinput;
+    }
+
+    //if (matId > matIdEPS)
+    //{
+    //    if (matId < 1 + matIdEPS)
+    //    {
+    //        const float HighestMax = sqr(debugValues.blendDistances.r);
+    //        const float MediumMax = sqr(debugValues.blendDistances.g);
+    //        const float LowestMax = sqr(debugValues.blendDistances.b);
+
+    //        float HighestMult = GetMultiplier(0, HighestMax, viewDistanceSqr);
+    //        float MediumMult = GetMultiplier(HighestMax, MediumMax, viewDistanceSqr);
+    //        float LowestMult = GetMultiplier(MediumMax, LowestMax, viewDistanceSqr);
+
+    //        float highestaccountedfor = 0;
+    //        float2 planeCoord = _normalinput.rg;
+
+    
+    //        float4 grad = float4(0, 0, 0, 0);
+
+    //// Use displacement
+    //        if (has_flag(debugValues.flags, 0))
+    //        {
+    //            if (has_flag(debugValues.flags, 3) && HighestMult > 0)
+    //            {
+    //                highestaccountedfor = HighestMax;
+    //                float2 texCoord = GetTextureCoordFromPlaneCoordAndPatch(planeCoord, debugValues.patchSizes.r);
+    //                return float4(texCoord, 0, 1);
+    //                grad += gradients1.SampleLevel(_sampler, texCoord, 0) * HighestMult;
+    //            }
+    //            if (has_flag(debugValues.flags, 4) && MediumMult > 0)
+    //            {
+    //                highestaccountedfor = MediumMax;
+    //                float2 texCoord = GetTextureCoordFromPlaneCoordAndPatch(planeCoord, debugValues.patchSizes.g);
+    //                grad += gradients2.SampleLevel(_sampler, texCoord, 0) * MediumMult;
+    //            }
+    //            if (has_flag(debugValues.flags, 5) && LowestMult > 0)
+    //            {
+        
+    //                highestaccountedfor = LowestMax;
+    //                float2 texCoord = GetTextureCoordFromPlaneCoordAndPatch(planeCoord, debugValues.patchSizes.b);
+    //                grad += gradients3.SampleLevel(_sampler, texCoord, 0) * LowestMult;
+    //            }
+    //        }
+    //        else
+    //        {
+    //            grad = float4(0, 1, 0, 0);
+    //        }
+    //        if (viewDistanceSqr > highestaccountedfor)
+    //        {
+    //            grad = float4(0, 1, 0, 0);
+    //        }
+    //        normal.xyz = grad.xyz;
+    //        if (dot(normal, viewDir) < 0)
+    //        {
+    //            normal *= -1;
+    //        }
+        
+    //    }
+    //}
+
+    
+    
+    normal = normalize(normal);
+    
+    if (has_flag(debugValues.flags, 7))
+    {
+        return float4(normal, 1);
+    }
+   
     
     float3 lightDir = normalize(sunDir);
     float3 halfwayDir = normalize(lightDir + viewDir);
@@ -146,6 +200,12 @@ float4 main(input_t input) : SV_TARGET
     float3 envReflection = pow(envReflectioninp.rgb * EnvMapMult, envReflectioninp.w);
 
 
+
+    
+    
+    
+    
+    
 
     // Old code
     //float D = Beckmann(NdotH, a);

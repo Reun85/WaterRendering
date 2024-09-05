@@ -80,25 +80,6 @@ Frustum Camera::GetFrustum() const {
       m_eye, XMVector3Cross(frontMultFar + m_up * halfVSide, m_right)};
 
   return frustum;
-  // Frustum frustum{};
-  // const float halfVSide = m_zFar * tanf(m_angle * .5f);
-  // const float halfHSide = halfVSide * m_aspect;
-  // const XMVECTOR frontMultFar = m_zFar * m_forward;
-
-  // frustum.nearFace = {m_eye + m_zNear * m_forward, m_forward};
-  // frustum.farFace = {m_eye + frontMultFar, -m_forward};
-  // frustum.rightFace = {
-  //     m_eye, XMVector3Cross(frontMultFar - m_right * halfHSide, m_up)};
-  // frustum.leftFace = {m_eye,
-  //                     XMVector3Cross(m_up, frontMultFar + m_right *
-  //                     halfHSide)};
-  // frustum.topFace = {m_eye,
-  //                    XMVector3Cross(m_right, frontMultFar - m_up *
-  //                    halfVSide)};
-  // frustum.bottomFace = {
-  //     m_eye, XMVector3Cross(frontMultFar + m_up * halfVSide, m_right)};
-
-  // return frustum;
 }
 
 bool Camera::Update(float _deltaTime) {
@@ -113,14 +94,20 @@ bool Camera::Update(float _deltaTime) {
 
   if (m_viewDirty) {
     m_viewMatrix = XMMatrixLookAtRH(m_eye, m_at, m_worldUp);
+
+    m_INVview = XMMatrixInverse(nullptr, m_viewMatrix);
   }
 
   if (m_projectionDirty) {
     m_matProj = XMMatrixPerspectiveFovRH(m_angle, m_aspect, m_zNear, m_zFar);
+
+    m_INVproj = XMMatrixInverse(nullptr, m_matProj);
   }
   if (m_viewDirty || m_projectionDirty) {
-    // m_matViewProj = m_matProj * m_viewMatrix;
     m_matViewProj = m_viewMatrix * m_matProj;
+
+    m_INVviewProj = m_INVproj * m_INVview;
+
     m_viewDirty = false;
     m_projectionDirty = false;
     return true;

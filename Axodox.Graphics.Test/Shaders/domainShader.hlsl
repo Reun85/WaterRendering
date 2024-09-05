@@ -38,15 +38,6 @@ struct HS_CONSTANT_DATA_OUTPUT
     float inside[2] : SV_InsideTessFactor;
 };
 
-// Return 1 if the distance is lower than prevMax
-// Return 0 if the distance is higher than currMax
-// Return a number in [0,1] as a linear interpolation if between the two values
-float GetMultiplier(float prevMax, float currMax, float distance)
-{
-
-    return clamp(1 - (distance - prevMax) / (currMax - prevMax), 0, 1);
-}
-
 // Ran once per output vertex
 [domain("quad")]
 DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
@@ -60,7 +51,7 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
     float3 localPos = (patch[0].localPos * (1.0f - UV.x) + patch[1].localPos * UV.x) * (1.0f - UV.y) +
                       (patch[2].localPos * (1.0f - UV.x) + patch[3].localPos * UV.x) * UV.y;
 
-    float2 planeCoord = (patch[0].TexCoord * (1.0f - UV.x) + patch[1].TexCoord * UV.x) * (1.0f - UV.y) +
+    const float2 planeCoord = (patch[0].TexCoord * (1.0f - UV.x) + patch[1].TexCoord * UV.x) * (1.0f - UV.y) +
                       (patch[2].TexCoord * (1.0f - UV.x) + patch[3].TexCoord * UV.x) * UV.y;
 
 

@@ -1,6 +1,18 @@
 
 #pragma once
 #include "pch.h"
+#include "Defaults.h"
+
+using namespace Axodox::Infrastructure;
+using namespace Axodox::Storage;
+using namespace DirectX::PackedVector;
+class Camera;
+
+struct LightData {
+  XMFLOAT4 lightPos;   // .a 0 for directional, 1 for positional
+  XMFLOAT4 lightColor; // .a is lightIntensity
+  XMFLOAT4 AmbientColor;
+};
 
 struct TextureBuffers {
   // Allocates necessary buffers if they are not yet allocated. May use the
@@ -10,16 +22,18 @@ struct TextureBuffers {
 
   // Get ready for next frame
   virtual void Clear(CommandAllocator &allocator) = 0;
-};
 
-using namespace Axodox::Infrastructure;
-using namespace Axodox::Storage;
-using namespace DirectX::PackedVector;
+  ~TextureBuffers() {}
+};
 struct WaterGraphicRootDescription : public RootSignatureMask {
+
   struct cameraConstants {
     XMFLOAT4X4 vMatrix;
     XMFLOAT4X4 pMatrix;
     XMFLOAT4X4 vpMatrix;
+    XMFLOAT4X4 INVvMatrix;
+    XMFLOAT4X4 INVpMatrix;
+    XMFLOAT4X4 INVvpMatrix;
     XMFLOAT3 cameraPos;
   };
   struct ModelConstants {
@@ -43,12 +57,7 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
 
   struct PixelLighting {
 
-    struct PixelLightData {
-      XMFLOAT4 lightPos;   // .a 0 for directional, 1 for positional
-      XMFLOAT4 lightColor; // .a is lightIntensity
-      XMFLOAT4 AmbientColor;
-    };
-    std::array<PixelLightData, ShaderConstantCompat::maxLightCount> lights;
+    std::array<LightData, ShaderConstantCompat::maxLightCount> lights;
     int lightCount;
 
     static constexpr PixelLighting SunData() {
@@ -197,71 +206,18 @@ struct DeferredShading : public RootSignatureMask {
       return {&Albedo, &Normal, &Position, &MaterialValues};
     }
     std::array<std::pair<MutableTexture *, Format>, NumberOfBuffers>
-    GetBuffersAndFormats() {
-      std::array<Format, NumberOfBuffers> formats = GetGBufferFormats();
-      std::array<MutableTexture *, NumberOfBuffers> buffers = GetBuffers();
-      std::array<std::pair<MutableTexture *, Format>, NumberOfBuffers>
-          zippedArray;
-
-      std::transform(
-          formats.begin(), formats.end(), buffers.begin(), zippedArray.begin(),
-          [](Format f, MutableTexture *b) { return std::make_pair(b, f); });
-      return zippedArray;
-    }
+    GetBuffersAndFormats();
 
     explicit GBuffer(const ResourceAllocationContext &context)
         : Albedo(context), Position(context), Normal(context),
           MaterialValues(context) {}
 
     void MakeCompatible(const RenderTargetView &finalTarget,
-                        ResourceAllocationContext &allocationContext) override {
-      auto UpdateTexture = [&finalTarget](MutableTexture &texture,
-                                          const Format &format,
-                                          const TextureFlags &flags) {
-        if (!texture || !TextureDefinition::AreSizeCompatible(
-                            *texture.Definition(), finalTarget.Definition())) {
-          texture.Reset();
-          auto definition =
-              finalTarget.Definition().MakeSizeCompatible(format, flags);
-          texture.Allocate(definition);
-        }
-      };
-      for (auto &it : GetBuffersAndFormats()) {
-        UpdateTexture(*it.first, it.second, TextureFlags::RenderTarget);
-      }
-    }
+                        ResourceAllocationContext &allocationContext) override;
 
-    void Clear(CommandAllocator &allocator) override {
-      Albedo.RenderTarget()->Clear(allocator);
-      Normal.RenderTarget()->Clear(allocator);
-      Position.RenderTarget()->Clear(allocator);
-      MaterialValues.RenderTarget()->Clear(allocator);
-    }
-    void TranslateToTarget(CommandAllocator &allocator) {
-      allocator.TransitionResources({
-
-          {Albedo.operator Axodox::Graphics::D3D12::ResourceArgument(),
-           ResourceStates::PixelShaderResource, ResourceStates::RenderTarget},
-          {Normal.operator Axodox::Graphics::D3D12::ResourceArgument(),
-           ResourceStates::PixelShaderResource, ResourceStates::RenderTarget},
-          {Position.operator Axodox::Graphics::D3D12::ResourceArgument(),
-           ResourceStates::PixelShaderResource, ResourceStates::RenderTarget},
-          {MaterialValues.operator Axodox::Graphics::D3D12::ResourceArgument(),
-           ResourceStates::PixelShaderResource, ResourceStates::RenderTarget},
-      });
-    }
-    void TranslateToView(CommandAllocator &allocator) {
-      allocator.TransitionResources({
-          {Albedo.operator Axodox::Graphics::D3D12::ResourceArgument(),
-           ResourceStates::RenderTarget, ResourceStates::PixelShaderResource},
-          {Normal.operator Axodox::Graphics::D3D12::ResourceArgument(),
-           ResourceStates::RenderTarget, ResourceStates::PixelShaderResource},
-          {Position.operator Axodox::Graphics::D3D12::ResourceArgument(),
-           ResourceStates::RenderTarget, ResourceStates::PixelShaderResource},
-          {MaterialValues.operator Axodox::Graphics::D3D12::ResourceArgument(),
-           ResourceStates::RenderTarget, ResourceStates::PixelShaderResource},
-      });
-    }
+    void Clear(CommandAllocator &allocator) override;
+    void TranslateToTarget(CommandAllocator &allocator);
+    void TranslateToView(CommandAllocator &allocator);
   };
 
   struct DeferredShaderBuffers {
@@ -274,6 +230,11 @@ struct DeferredShading : public RootSignatureMask {
   RootDescriptorTable<1> materialValues;
   RootDescriptorTable<1> geometryDepth;
   RootDescriptorTable<1> skybox;
+
+  // Water
+  RootDescriptorTable<1> gradientsHighest;
+  RootDescriptorTable<1> gradientsMedium;
+  RootDescriptorTable<1> gradientsLowest;
 
   RootDescriptor<RootDescriptorType::ConstantBuffer> lightingBuffer;
   RootDescriptor<RootDescriptorType::ConstantBuffer> cameraBuffer;
@@ -290,6 +251,12 @@ struct DeferredShading : public RootSignatureMask {
         geometryDepth(this, {DescriptorRangeType::ShaderResource, 4}),
         skybox(this, {DescriptorRangeType::ShaderResource, {5}},
                ShaderVisibility::Pixel),
+        gradientsHighest(this, {DescriptorRangeType::ShaderResource, 20},
+                         ShaderVisibility::Pixel),
+        gradientsMedium(this, {DescriptorRangeType::ShaderResource, 21},
+                        ShaderVisibility::Pixel),
+        gradientsLowest(this, {DescriptorRangeType::ShaderResource, 22},
+                        ShaderVisibility::Pixel),
         lightingBuffer(this, {1}, ShaderVisibility::Pixel),
         cameraBuffer(this, {0}, ShaderVisibility::Pixel),
         debugBuffer(this, {9}, ShaderVisibility::Pixel),
@@ -299,59 +266,74 @@ struct DeferredShading : public RootSignatureMask {
     Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
   }
 
-  void BindGBuffer(const GBuffer &buffers) {
-    albedo = *buffers.Albedo.ShaderResource();
-    normal = *buffers.Normal.ShaderResource();
-    position = *buffers.Position.ShaderResource();
-    materialValues = *buffers.MaterialValues.ShaderResource();
-  }
+  void BindGBuffer(const GBuffer &buffers);
 };
 
 struct ShadowMapping : public RootSignatureMask {
+  constexpr static size_t LODCOUNT = 3;
 
-  struct Buffers : TextureBuffers {
+  struct Textures : TextureBuffers {
     MutableTextureWithViews DepthBuffer;
 
-    explicit Buffers(const ResourceAllocationContext &context,
-                     const u32 N = 1024)
-
-        : DepthBuffer(
-              context,
-              TextureDefinition(Format::D32_Float, N, N, 0,
-                                TextureFlags::ShaderResourceDepthStencil),
-              TextureViewDefinitions::GetDepthStencilWithShaderView(
-                  Format::D32_Float, Format::R32_Float)) {}
+    explicit Textures(const ResourceAllocationContext &context,
+                      const u32 N = 1024);
 
     void MakeCompatible(const RenderTargetView &finalTarget,
                         ResourceAllocationContext &allocationContext) override {
       // No need to allocate
     }
-    void Clear(CommandAllocator &allocator) override {
-      DepthBuffer.DepthStencil()->Clear(allocator);
-    }
-    void TranslateToTarget(CommandAllocator &allocator) {
-      allocator.TransitionResources({
-
-          {DepthBuffer.operator Axodox::Graphics::D3D12::ResourceArgument(),
-           ResourceStates::PixelShaderResource, ResourceStates::DepthWrite},
-      });
-    }
+    void Clear(CommandAllocator &allocator) override;
+    void TranslateToTarget(CommandAllocator &allocator);
     void TranslateToView(
         CommandAllocator &allocator,
-        const ResourceStates &newState = ResourceStates::AllShaderResource) {
-      allocator.TransitionResources({
-          {DepthBuffer.operator Axodox::Graphics::D3D12::ResourceArgument(),
-           ResourceStates::DepthWrite, newState},
-      });
-    }
+        const ResourceStates &newState = ResourceStates::AllShaderResource);
   };
 
-  RootDescriptorTable<1> lightBuffer;
+  struct Buffer {
+    struct LOD {
+      XMMATRIX viewProj;
+      f32 farPlane;
+    };
+
+    std::array<LOD, LODCOUNT> lods;
+
+    constexpr static f32 zMult = 10.f;
+
+    void Update(const Camera &cam, const LightData &light);
+    explicit Buffer(const Camera &cam, f32 closestFrustumEnd = 200.f,
+                    f32 midFrustumEnd = 600.f);
+  };
+
+  RootDescriptorTable<LODCOUNT> lightBuffer;
 
   explicit ShadowMapping(const RootSignatureContext &context)
       : RootSignatureMask(context),
-        lightBuffer(this, {DescriptorRangeType::ShaderResource, 0}) {
+        lightBuffer(this, {{{DescriptorRangeType::ShaderResource, 0},
+                            {DescriptorRangeType::ShaderResource, 1},
+                            {DescriptorRangeType::ShaderResource, 2}}}) {
 
+    Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
+  }
+};
+struct SSRPostProcessing : public RootSignatureMask {
+  RootDescriptor<RootDescriptorType::ConstantBuffer> CameraBuffer;
+  // RootDescriptor<RootDescriptorType::ConstantBuffer> CameraBuffer;
+  RootDescriptorTable<1> InpColor;
+  RootDescriptorTable<1> NormalBuffer;
+  RootDescriptorTable<1> DepthBuffer;
+  // RootDescriptorTable<1> DepthBuffer;
+  RootDescriptorTable<1> OutputTexture;
+  StaticSampler Sampler;
+
+  SSRPostProcessing(const RootSignatureContext &context)
+      : RootSignatureMask(context), CameraBuffer(this, {0}),
+        // CameraBuffer(this, {1}),
+        InpColor(this, {DescriptorRangeType::ShaderResource, {0}}),
+        NormalBuffer(this, {DescriptorRangeType::ShaderResource, {1}}),
+        DepthBuffer(this, {DescriptorRangeType::ShaderResource, {9}}),
+        // DepthBuffer(this, {DescriptorRangeType::ShaderResource, {1}}),
+        OutputTexture(this, {DescriptorRangeType::UnorderedAccess, {0}}),
+        Sampler(this, {0}, Filter::Linear, TextureAddressMode::Clamp) {
     Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
   }
 };
@@ -363,47 +345,16 @@ struct FrameResources : TextureBuffers {
   DynamicBufferManager DynamicBuffer;
 
   MutableTextureWithViews DepthBuffer;
+
   descriptor_ptr<ShaderResourceView> ScreenResourceView;
+  ShadowMapping::Textures ShadowMapTextures;
   DeferredShading::GBuffer GBuffer;
+  MutableTexture PostProcessingBuffer;
 
   void MakeCompatible(const RenderTargetView &finalTarget,
-                      ResourceAllocationContext &allocationContext) override {
-    // Ensure depth buffer matches frame size
-    if (!DepthBuffer ||
-        !TextureDefinition::AreSizeCompatible(*DepthBuffer.Definition(),
-                                              finalTarget.Definition())) {
+                      ResourceAllocationContext &allocationContext) override;
 
-      auto depthDefinition = finalTarget.Definition().MakeSizeCompatible(
-          Format::D32_Float, TextureFlags::ShaderResourceDepthStencil);
+  void Clear(CommandAllocator &allocator) override;
 
-      auto depthViews = TextureViewDefinitions::GetDepthStencilWithShaderView(
-          Format::D32_Float, Format::R32_Float);
-
-      DepthBuffer.Allocate(depthDefinition, depthViews);
-    }
-
-    // Ensure screen shader resource view
-    if (!ScreenResourceView ||
-        ScreenResourceView->Resource() != finalTarget.Resource()) {
-      Texture screenTexture{finalTarget.Resource()};
-      ScreenResourceView =
-          allocationContext.CommonDescriptorHeap->CreateShaderResourceView(
-              &screenTexture);
-    }
-
-    // Ensure GBuffer compatibility
-    GBuffer.MakeCompatible(finalTarget, allocationContext);
-  }
-
-  void Clear(CommandAllocator &allocator) override {
-
-    // Clears frame with background color
-    DepthBuffer.DepthStencil()->Clear(allocator);
-    GBuffer.Clear(allocator);
-  }
-
-  explicit FrameResources(const ResourceAllocationContext &context)
-      : Allocator(*context.Device), Fence(*context.Device),
-        DynamicBuffer(*context.Device), DepthBuffer(context), GBuffer(context) {
-  }
+  explicit FrameResources(const ResourceAllocationContext &context);
 };

@@ -1,7 +1,6 @@
 #include "pch.h"
 #include "Camera.h"
 #include "QuadTree.h"
-#include <fstream>
 #include <string.h>
 #include "Defaults.h"
 #include "Simulation.h"
@@ -78,17 +77,29 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     XMFLOAT4 blendDistances = XMFLOAT4(40.f, 150, 1000, 5000);
     XMFLOAT3 foamColor = XMFLOAT3(1, 1, 1);
 
-    bool useFoam = true;
-    bool useChannel1 = true;
-    bool useChannel2 = true;
-    bool useChannel3 = false;
-    bool onlyShowNormals = false;
-    const static u32 DebugBitsStart = 24;
-    const static u32 DebugBitsEnd = 31;
-    std::array<bool, DebugBitsEnd - DebugBitsStart + 1> DebugBits{false};
-    const static constexpr std::array<std::optional<const char *>,
-                                      DebugBitsEnd - DebugBitsStart + 1>
-        DebugBitsNames{"Normal overflow", "Display Foam", std::nullopt};
+    std::array<bool, 31 - 0 + 1> DebugBits{false, false, true,
+                                           true,  true,  false};
+
+    bool enableSSR = true;
+    const static constexpr std::initializer_list<
+        std::pair<u8, std::optional<const char *>>>
+        DebugBitsDesc = {{2, "Use Foam"},
+                         {3, "Use channel Highest"},
+                         {4, "Use channel Medium"},
+                         {5, "Use channel Lowest"},
+                         {8, "Show albedo"},
+                         {9, "Show normal"},
+                         {10, "Show neg normal"},
+                         {11, "Show worldPos"},
+                         {12, "Show materialValues"},
+                         {24, "Normal overflow"},
+                         {25, "Display Foam"},
+                         {26, std::nullopt},
+                         {27, std::nullopt},
+                         {28, std::nullopt},
+                         {29, std::nullopt},
+                         {30, std::nullopt},
+                         {31, std::nullopt}};
 
     Mode mode = Mode::Full;
 
@@ -103,18 +114,15 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         // Culling
         CullingImGuiDraw(out);
 
-        ImGui::Checkbox("Use foam", &useFoam);
-        ImGui::Checkbox("Use channel Highest", &useChannel1);
-        ImGui::Checkbox("Use channel Medium", &useChannel2);
-        ImGui::Checkbox("Use channel Lowest", &useChannel3);
         ImGui::InputFloat4("Blend Distances", (float *)&blendDistances);
-        for (u32 i = DebugBitsStart; i <= DebugBitsEnd; i++) {
-          if (DebugBitsNames[i - DebugBitsStart])
-            ImGui::Checkbox(*DebugBitsNames[i - DebugBitsStart],
-                            &DebugBits[i - DebugBitsStart]);
+        ImGui::Checkbox("Enable SSR", &enableSSR);
+        for (auto &[id, name] : DebugBitsDesc) {
+
+          if (name)
+            ImGui::Checkbox(*name, &DebugBits[id]);
           else
-            ImGui::Checkbox(std::format("Debug Bit {}", i).c_str(),
-                            &DebugBits[i - DebugBitsStart]);
+            ImGui::Checkbox(std::format("Debug Bit {}", id).c_str(),
+                            &DebugBits[id]);
         }
       }
       if (exclusiveWindow)
@@ -251,16 +259,12 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         XMFLOAT3(simData.Highest.patchSize, simData.Medium.patchSize,
                  simData.Lowest.patchSize);
 
+    for (int i = 0; i < deb.DebugBits.size(); i++) {
+      set_flag(res.flags, i, deb.DebugBits[i]);
+    }
+
     set_flag(res.flags, 6, true);
     set_flag(res.flags, 0, false);
-    set_flag(res.flags, 2, deb.useFoam);
-    set_flag(res.flags, 3, deb.useChannel1);
-    set_flag(res.flags, 4, deb.useChannel2);
-    set_flag(res.flags, 5, deb.useChannel3);
-
-    for (int i = 0; i < deb.DebugBits.size(); i++) {
-      set_flag(res.flags, i + DebugValues::DebugBitsStart, deb.DebugBits[i]);
-    }
 
     switch (deb.mode) {
     case DebugValues::Mode::Full:
@@ -590,10 +594,23 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             .CreatePipelineStateAsync(deferredShadingPipelineStateDefinition)
             .get();
 
+    RootSignature<SSRPostProcessing> postProcessingRootSignature{device};
+    ComputeShader postProcessingComputeShader{app_folder() /
+                                              L"SSRPostProcessingShader.cso"};
+    ComputePipelineStateDefinition postProcessingStateDefinition{
+        .RootSignature = &postProcessingRootSignature,
+        .ComputeShader = &postProcessingComputeShader};
+    auto postProcessingPipelineState =
+        pipelineStateProvider
+            .CreatePipelineStateAsync(postProcessingStateDefinition)
+            .get();
+
     WaterGraphicRootDescription::WaterPixelShaderData waterData;
     DeferredShading::DeferredShaderBuffers defData;
     WaterGraphicRootDescription::PixelLighting sunData =
         WaterGraphicRootDescription::PixelLighting::SunData();
+
+    ShadowMapping::Buffer shadowMapData(cam);
 
     // Compute pipeline
 
@@ -779,6 +796,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       auto resolution = swapChain.Resolution();
       cam.SetAspect(float(resolution.x) / float(resolution.y));
       cam.Update(deltaTime);
+      shadowMapData.Update(cam, sunData.lights[0]);
 
       // Frame Begin
       {
@@ -876,6 +894,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         GpuVirtualAddress cameraConstantBuffer;
         GpuVirtualAddress debugConstantBuffer;
         GpuVirtualAddress sunDataBuffer;
+        GpuVirtualAddress timeDataBuffer;
+
         {
           WaterGraphicRootDescription::cameraConstants cameraConstants{};
           DebugGPUBufferStuff debugBufferContent = From(debugValues, simData);
@@ -887,11 +907,18 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                           XMMatrixTranspose(cam.GetProj()));
           XMStoreFloat4x4(&cameraConstants.vpMatrix,
                           XMMatrixTranspose(cam.GetViewProj()));
+          XMStoreFloat4x4(&cameraConstants.INVvMatrix,
+                          XMMatrixTranspose(cam.GetINVView()));
+          XMStoreFloat4x4(&cameraConstants.INVpMatrix,
+                          XMMatrixTranspose(cam.GetINVProj()));
+          XMStoreFloat4x4(&cameraConstants.INVvpMatrix,
+                          XMMatrixTranspose(cam.GetINVViewProj()));
           cameraConstantBuffer =
               frameResource.DynamicBuffer.AddBuffer(cameraConstants);
           debugConstantBuffer =
               frameResource.DynamicBuffer.AddBuffer(debugBufferContent);
           sunDataBuffer = frameResource.DynamicBuffer.AddBuffer(sunData);
+          timeDataBuffer = frameResource.DynamicBuffer.AddBuffer(timeConstants);
         }
 
         // Draw Ocean
@@ -1120,9 +1147,20 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
             mask.BindGBuffer(frameResource.GBuffer);
 
+            // Textures
             mask.geometryDepth = *frameResource.DepthBuffer.ShaderResource();
             mask.skybox = skyboxTexture;
+            mask.gradientsHighest =
+                *drawingSimResource.HighestBuffer.gradients.ShaderResource(
+                    allocator);
+            mask.gradientsMedium =
+                *drawingSimResource.MediumBuffer.gradients.ShaderResource(
+                    allocator);
+            mask.gradientsLowest =
+                *drawingSimResource.LowestBuffer.gradients.ShaderResource(
+                    allocator);
 
+            // Buffers
             mask.lightingBuffer = sunDataBuffer;
             mask.cameraBuffer = cameraConstantBuffer;
             mask.debugBuffer = debugConstantBuffer;
@@ -1131,12 +1169,48 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                 frameResource.DynamicBuffer.AddBuffer(defData);
 
             deferredShadingPlane.Draw(allocator);
-
-            allocator.TransitionResource(frameResource.DepthBuffer,
-                                         ResourceStates::PixelShaderResource,
-                                         ResourceStates::DepthWrite);
-            frameResource.GBuffer.TranslateToTarget(allocator);
           }
+
+          // SSR post process
+          if (debugValues.enableSSR) {
+            allocator.TransitionResource(
+                *renderTargetView, ResourceStates::RenderTarget,
+                ResourceStates::NonPixelShaderResource);
+
+            auto mask = postProcessingRootSignature.Set(
+                allocator, RootSignatureUsage::Compute);
+            mask.InpColor = *frameResource.ScreenResourceView;
+            mask.DepthBuffer = *frameResource.DepthBuffer.ShaderResource();
+            mask.NormalBuffer = *frameResource.GBuffer.Normal.ShaderResource();
+            mask.OutputTexture =
+                *frameResource.PostProcessingBuffer.UnorderedAccess();
+            mask.CameraBuffer = cameraConstantBuffer;
+
+            postProcessingPipelineState.Apply(allocator);
+
+            auto definition = frameResource.PostProcessingBuffer.Definition();
+            allocator.Dispatch(definition->Width / 16 + 1,
+                               definition->Height / 16 + 1);
+
+            allocator.TransitionResources(
+                {{frameResource.PostProcessingBuffer,
+                  ResourceStates::UnorderedAccess, ResourceStates::CopySource},
+                 {*renderTargetView, ResourceStates::NonPixelShaderResource,
+                  ResourceStates::CopyDest}});
+
+            allocator.CopyResource(frameResource.PostProcessingBuffer,
+                                   *renderTargetView);
+
+            allocator.TransitionResources(
+                {{frameResource.PostProcessingBuffer,
+                  ResourceStates::CopySource, ResourceStates::UnorderedAccess},
+                 {*renderTargetView, ResourceStates::CopyDest,
+                  ResourceStates::RenderTarget}});
+          }
+          allocator.TransitionResource(frameResource.DepthBuffer,
+                                       ResourceStates::PixelShaderResource,
+                                       ResourceStates::DepthWrite);
+          frameResource.GBuffer.TranslateToTarget(allocator);
 
           // Retransition simulation resources for compute shaders
 

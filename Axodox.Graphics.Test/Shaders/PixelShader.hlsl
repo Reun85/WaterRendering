@@ -20,7 +20,7 @@ cbuffer DebugBuffer : register(b9)
 
 struct input_t
 {
-    float4 Screen : SV_Position;
+    float4 Screen : SV_POSITION;
     float3 localPos : POSITION;
     float2 planeCoord : PLANECOORD;
     float4 grad : GRADIENTS;
@@ -85,13 +85,6 @@ output_t main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
     if (dot(normal, viewDir) < 0)
     {
         normal *= -1;
-    }
-
-    if (has_flag(debugValues.flags, 7))
-    {
-        output.albedo =
-    float4(normal, 1);
-        return output;
     }
 
     float Jacobian = input.grad.w;

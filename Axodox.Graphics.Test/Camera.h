@@ -6,6 +6,12 @@ using namespace DirectX;
 
 struct Frustum;
 
+struct ViewFrustumCoordinates {
+  constexpr static std::pair<f32, f32> xRange = {-1.f, 1.f};
+  constexpr static std::pair<f32, f32> yRange = {-1.f, 1.f};
+  constexpr static std::pair<f32, f32> zRange = {0.f, 1.f};
+};
+
 class Camera {
 public:
   Camera();
@@ -21,6 +27,12 @@ public:
   inline XMMATRIX GetViewMatrix() const { return m_viewMatrix; }
   inline XMMATRIX GetProj() const { return m_matProj; }
   inline XMMATRIX GetViewProj() const { return m_matViewProj; }
+
+  inline XMMATRIX GetINVView() const { return m_INVview; }
+  inline XMMATRIX GetINVProj() const { return m_INVproj; }
+  inline XMMATRIX GetINVViewProj() const { return m_INVviewProj; }
+
+  std::array<XMVECTOR, 8> GetFrustumCorners() const;
 
   Frustum GetFrustum() const;
   // Returns true if the view has changed.
@@ -80,6 +92,10 @@ private:
   XMMATRIX m_matViewProj;
   // The view matrix of the camera
   XMMATRIX m_viewMatrix;
+
+  XMMATRIX m_INVview;
+  XMMATRIX m_INVproj;
+  XMMATRIX m_INVviewProj;
 
   // The camera position.
   XMVECTOR m_eye;
