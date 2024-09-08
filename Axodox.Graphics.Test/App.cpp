@@ -796,7 +796,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
       auto oceanModelMatrix =
           XMMatrixTranslationFromVector(XMVECTOR{0, -5, 0, 1});
-      auto oceanDataFut = threadpool_execute<
+      auto oceanDataFuture = threadpool_execute<
           std::vector<WaterGraphicRootDescription::OceanData>
               &>([&cpuBuffers, cam, simData, &runtimeResults, camChanged,
                   oceanModelMatrix]()
@@ -811,7 +811,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       });
 
       // Compute shader stage
-      std::future computeStage = threadpool_execute<bool>([&]() -> bool {
+      // It has to return some value or the basic code doesn't work?????
+      std::future computeStage = threadpool_execute<bool>([&]() {
         auto &simResource = calculatingSimResource;
         auto &computeAllocator = simResource.Allocator;
         computeAllocator.Reset();
@@ -1017,7 +1018,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                                       std::to_address(gBufferViews.end())),
                 frameResource.DepthBuffer.DepthStencil());
 
-            auto oceanQuadData = oceanDataFut.get();
+            auto oceanQuadData = oceanDataFuture.get();
             for (auto &curr : oceanQuadData) {
               if (curr.N == 0)
                 continue;
