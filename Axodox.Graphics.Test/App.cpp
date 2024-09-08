@@ -23,6 +23,7 @@ using namespace Windows::UI::Composition;
 using namespace Axodox::Graphics::D3D12;
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
+using namespace Axodox::Threading;
 using namespace DirectX;
 using namespace DirectX::PackedVector;
 struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
@@ -299,39 +300,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     return res;
   }
 
-  struct RuntimeResults {
-    uint qtNodes = 0;
-    uint drawnNodes = 0;
-    std::chrono::nanoseconds QuadTreeBuildTime{0};
-
-    std::chrono::nanoseconds NavigatingTheQuadTree{0};
-    std::chrono::nanoseconds CPUTime{0};
-    void DrawImGui(bool exclusiveWindow = false) {
-      bool cont = true;
-      if (exclusiveWindow)
-        cont = ImGui::Begin("Results");
-      if (cont) {
-        ImGui::Text("QuadTree Nodes = %d", qtNodes);
-
-        ImGui::Text("QuadTree buildtime %.3f ms/frame",
-                    GetDurationInFloatWithPrecision<std::chrono::milliseconds,
-                                                    std::chrono::nanoseconds>(
-                        QuadTreeBuildTime));
-        ImGui::Text("Navigating QuadTree %.3f ms/frame",
-                    GetDurationInFloatWithPrecision<std::chrono::milliseconds,
-                                                    std::chrono::nanoseconds>(
-                        NavigatingTheQuadTree));
-        ImGui::Text("Drawn Nodes: %d", drawnNodes);
-        ImGui::Text("CPU time %.3f ms/frame",
-                    GetDurationInFloatWithPrecision<std::chrono::milliseconds,
-                                                    std::chrono::nanoseconds>(
-                        (CPUTime)));
-      }
-      if (exclusiveWindow)
-        ImGui::End();
-    }
-  };
-
   static void SetUpWindowInput(const CoreWindow &window,
                                RuntimeSettings &settings, Camera &cam) {
     bool &timerunning = settings.timeRunning;
@@ -404,8 +372,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
   static void DrawImGuiForPSResources(
       WaterGraphicRootDescription::WaterPixelShaderData &waterData,
-      WaterGraphicRootDescription::PixelLighting &sunData,
-      DeferredShading::DeferredShaderBuffers &defData,
+      PixelLighting &sunData, DeferredShading::DeferredShaderBuffers &defData,
       bool exclusiveWindow = true) {
     bool cont = true;
     if (exclusiveWindow) {
@@ -450,8 +417,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   }
   static void DrawImGuiForPSResources(
       WaterGraphicRootDescription::PixelShaderPBRData &waterData,
-      WaterGraphicRootDescription::PixelLighting &sunData,
-      bool exclusiveWindow = true) {
+      PixelLighting &sunData, bool exclusiveWindow = true) {
     bool cont = true;
     if (exclusiveWindow) {
       cont = ImGui::Begin("PS Data");
@@ -485,12 +451,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   }
 
   struct RuntimeCPUBuffers {
-    struct OceanData {
-      WaterGraphicRootDescription::VertexConstants vertexConstants;
-      WaterGraphicRootDescription::HullConstants hullConstants;
-      u16 N = 0;
-    };
-    std::vector<OceanData> oceanData;
+    std::vector<WaterGraphicRootDescription::OceanData> oceanData;
   };
 
   void Run() const {
@@ -628,8 +589,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     WaterGraphicRootDescription::WaterPixelShaderData waterData;
     DeferredShading::DeferredShaderBuffers defData;
-    WaterGraphicRootDescription::PixelLighting sunData =
-        WaterGraphicRootDescription::PixelLighting::SunData();
+    PixelLighting sunData = PixelLighting::SunData();
 
     ShadowMapping::Data shadowMapData(cam);
 
@@ -792,7 +752,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         drawingSimResource.Fence.Await(drawingSimResource.FrameDoneMarker);
       // This is necessary for the compute queue
 
-      if (beforeNextFrame.changeFlag || newPipelineState) {
+      if (beforeNextFrame.changeFlag && newPipelineState) {
         waterPipelineState = newPipelineState->get();
         beforeNextFrame.changeFlag = std::nullopt;
       }
@@ -827,8 +787,20 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         commonDescriptorHeap.Build();
       }
 
+      RuntimeResults runtimeResults;
+
+      auto oceanDataFut = threadpool_execute<
+          std::vector<WaterGraphicRootDescription::OceanData>
+              &>([&cpuBuffers, cam, simData, &runtimeResults]()
+                     -> std::vector<WaterGraphicRootDescription::OceanData> & {
+        cpuBuffers.oceanData.clear();
+        return WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
+            cpuBuffers.oceanData, cam, XMMatrixIdentity(),
+            simData.quadTreeDistanceThreshold, &runtimeResults);
+      });
+
       // Compute shader stage
-      {
+      std::future computeStage = threadpool_execute<bool>([&]() -> bool {
         auto &simResource = calculatingSimResource;
         auto &computeAllocator = simResource.Allocator;
         computeAllocator.Reset();
@@ -892,12 +864,12 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           simResource.FrameDoneMarker =
               simResource.Fence.EnqueueSignal(directQueue);
         }
-      }
+        return true;
+      });
 
       // Graphics Stage
       {
 
-        RuntimeResults runtimeResults;
         auto &allocator = frameResource.Allocator;
         {
           allocator.Reset();
@@ -918,7 +890,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         GpuVirtualAddress timeDataBuffer;
 
         {
-          WaterGraphicRootDescription::cameraConstants cameraConstants{};
+          CameraConstants cameraConstants{};
           DebugGPUBufferStuff debugBufferContent = From(debugValues, simData);
 
           XMStoreFloat3(&cameraConstants.cameraPos, cam.GetEye());
@@ -951,87 +923,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           // Need to reset after drawing
           std::optional<GpuVirtualAddress> usedTextureAddress;
           std::optional<MutableTextureWithState *> usedTexture;
-          // Collect Quad Info
-          {
-
-            float2 fullSizeXZ = {DefaultsValues::App::oceanSize,
-                                 DefaultsValues::App::oceanSize};
-
-            float3 center = {0, 0, 0};
-            QuadTree qt;
-            XMFLOAT3 camUsedPos;
-            XMVECTOR camEye = cam.GetEye();
-            XMStoreFloat3(&camUsedPos, camEye);
-
-            auto start = std::chrono::high_resolution_clock::now();
-
-            qt.Build(center, fullSizeXZ,
-                     float3(camUsedPos.x, camUsedPos.y, camUsedPos.z),
-                     cam.GetFrustum(), modelMatrix,
-                     simData.quadTreeDistanceThreshold);
-
-            runtimeResults.QuadTreeBuildTime += std::chrono::duration_cast<
-                decltype(runtimeResults.QuadTreeBuildTime)>(
-                std::chrono::high_resolution_clock::now() - start);
-
-            runtimeResults.qtNodes += qt.GetSize();
-
-            // The best choice is to upload planeBottomLeft and
-            // planeTopRight and kinda of UV coordinate that can go
-            // outside [0,1] and the fract is the actual UV value.
-
-            // Fill buffer with Quad Info
-            {
-              cpuBuffers.oceanData.clear();
-              start = std::chrono::high_resolution_clock::now();
-              RuntimeCPUBuffers::OceanData *curr =
-                  &cpuBuffers.oceanData.emplace_back();
-
-              for (auto it = qt.begin(); it != qt.end(); ++it) {
-                runtimeResults.NavigatingTheQuadTree +=
-                    std::chrono::duration_cast<
-                        decltype(runtimeResults.NavigatingTheQuadTree)>(
-                        (std::chrono::high_resolution_clock::now() - start));
-                runtimeResults.drawnNodes++;
-
-                {
-                  curr->vertexConstants.instanceData[curr->N].scaling = {
-                      it->size.x, it->size.y};
-                  curr->vertexConstants.instanceData[curr->N].offset = {
-                      it->center.x, it->center.y};
-                }
-                {
-                  start = std::chrono::high_resolution_clock::now();
-
-                  auto res = it.GetSmallerNeighbor();
-
-                  runtimeResults.NavigatingTheQuadTree +=
-                      std::chrono::duration_cast<
-                          decltype(runtimeResults.NavigatingTheQuadTree)>(
-                          (std::chrono::high_resolution_clock::now() - start));
-                  static const constexpr auto l = [](const float x) -> float {
-                    if (x == 0)
-                      return 1;
-                    else
-                      return x;
-                  };
-                  curr->hullConstants.instanceData[curr->N].TesselationFactor =
-                      {l(res.zneg), l(res.xneg), l(res.zpos), l(res.xpos)};
-                }
-
-                curr->N = curr->N + 1;
-                if (curr->N == DefaultsValues::App::maxInstances) {
-                  curr = &cpuBuffers.oceanData.emplace_back();
-                }
-
-                start = std::chrono::high_resolution_clock::now();
-              }
-
-              // If a quarter of the capacity is unused shrink the vector in a
-              // way that the unused capacity is halfed
-              // how though?
-            }
-          }
 
           // Start Draw pass
           // Debug Data
@@ -1114,7 +1005,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                                       std::to_address(gBufferViews.end())),
                 frameResource.DepthBuffer.DepthStencil());
 
-            for (auto &curr : cpuBuffers.oceanData) {
+            auto oceanQuadData = oceanDataFut.get();
+            for (auto &curr : oceanQuadData) {
               if (curr.N == 0)
                 continue;
               auto mask = waterRootSignature.Set(allocator,
@@ -1143,19 +1035,19 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
               planeMesh.Draw(allocator, curr.N);
             }
             // skybox
-            //{
-            //  skyboxPipelineState.Apply(allocator);
+            {
+              skyboxPipelineState.Apply(allocator);
 
-            //  auto mask = skyboxRootSignature.Set(allocator,
-            //                                      RootSignatureUsage::Graphics);
+              auto mask = skyboxRootSignature.Set(allocator,
+                                                  RootSignatureUsage::Graphics);
 
-            //  mask.skybox = skyboxTexture;
-            //  mask.lightingBuffer = sunDataBuffer;
+              mask.skybox = skyboxTexture;
+              mask.lightingBuffer = sunDataBuffer;
 
-            //  mask.cameraBuffer = cameraConstantBuffer;
+              mask.cameraBuffer = cameraConstantBuffer;
 
-            //  skyboxMesh.Draw(allocator);
-            //}
+              skyboxMesh.Draw(allocator);
+            }
           }
 
           // Deferred Shading Pass
@@ -1310,6 +1202,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
       // Present frame
       swapChain.Present();
+      computeStage.wait();
     }
     // Wait until everything is done before deleting context
 

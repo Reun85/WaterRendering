@@ -2,17 +2,15 @@
 #pragma once
 #include "pch.h"
 #include "Defaults.h"
+#include "Helpers.h"
+
+using namespace DirectX;
+using namespace DirectX::PackedVector;
 
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
 using namespace DirectX::PackedVector;
 class Camera;
-
-struct LightData {
-  XMFLOAT4 lightPos;   // .a 0 for directional, 1 for positional
-  XMFLOAT4 lightColor; // .a is lightIntensity
-  XMFLOAT4 AmbientColor;
-};
 
 struct TextureBuffers {
   // Allocates necessary buffers if they are not yet allocated. May use the
@@ -27,16 +25,6 @@ struct TextureBuffers {
 };
 
 struct WaterGraphicRootDescription : public RootSignatureMask {
-
-  struct cameraConstants {
-    XMFLOAT4X4 vMatrix;
-    XMFLOAT4X4 pMatrix;
-    XMFLOAT4X4 vpMatrix;
-    XMFLOAT4X4 INVvMatrix;
-    XMFLOAT4X4 INVpMatrix;
-    XMFLOAT4X4 INVvpMatrix;
-    XMFLOAT3 cameraPos;
-  };
   struct ModelConstants {
     XMFLOAT4X4 mMatrix;
   };
@@ -55,38 +43,10 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
     // zneg,xneg, zpos, xpos
     std::array<InstanceData, DefaultsValues::App::maxInstances> instanceData;
   };
-
-  struct PixelLighting {
-
-    std::array<LightData, ShaderConstantCompat::maxLightCount> lights;
-    int lightCount;
-
-    static constexpr PixelLighting SunData() {
-      PixelLighting data = {};
-      data.lightCount = 1;
-      data.lights[0].lightPos = XMFLOAT4(1.f, 0.109f, 0.964f, 0.f);
-      data.lights[0].lightColor =
-          XMFLOAT4(234.f / 255.f, 204.f / 255.f, 118.f / 255.f, 0.446f);
-
-      data.lights[0].AmbientColor =
-          XMFLOAT4(15.f / 255.f, 14.f / 255.f, 5.f / 255.f, .185f);
-
-      return data;
-    }
-    // old
-  private:
-    static constexpr PixelLighting old() {
-      PixelLighting data = {};
-      data.lightCount = 1;
-      data.lights[0].lightPos = XMFLOAT4(1, 0.109f, 0.964f, 0);
-      data.lights[0].lightColor =
-          XMFLOAT4(243.f / 255.f, 206.f / 255.f, 97.f / 255.f, 0.446f);
-
-      data.lights[0].AmbientColor =
-          XMFLOAT4(15.f / 255.f, 14.f / 255.f, 5.f / 255.f, .639f);
-
-      return data;
-    }
+  struct OceanData {
+    VertexConstants vertexConstants;
+    HullConstants hullConstants;
+    u16 N = 0;
   };
 
   struct PixelShaderPBRData {
@@ -179,6 +139,13 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
                         ShaderVisibility::All) {
     Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
   }
+
+  static std::vector<WaterGraphicRootDescription::OceanData> &
+  CollectOceanQuadInfoWithQuadTree(
+      std::vector<WaterGraphicRootDescription::OceanData> &vec,
+      const Camera &cam, const XMMATRIX &mMatrix,
+      const float &quadTreeDistanceThreshold,
+      const std::optional<RuntimeResults *> &runRes = std::nullopt);
 };
 
 struct DeferredShading : public RootSignatureMask {

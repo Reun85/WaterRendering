@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "GraphicsPipeline.h"
 #include "Camera.h"
+#include "QuadTree.h"
 
 void FrameResources::MakeCompatible(
     const RenderTargetView &finalTarget,
@@ -280,4 +281,88 @@ ShadowMapping::Data::Data(const Camera &cam, f32 closestFrustumEnd,
   lods[0].farPlane = closestFrustumEnd;
   lods[1].farPlane = midFrustumEnd;
   lods[2].farPlane = cam.GetZFar();
+}
+
+std::vector<WaterGraphicRootDescription::OceanData> &
+WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
+    std::vector<WaterGraphicRootDescription::OceanData> &vec, const Camera &cam,
+    const XMMATRIX &mMatrix, const float &quadTreeDistanceThreshold,
+    const std::optional<RuntimeResults *> &runtimeResults) {
+
+  float2 fullSizeXZ = {DefaultsValues::App::oceanSize,
+                       DefaultsValues::App::oceanSize};
+
+  float3 center = {0, 0, 0};
+  QuadTree qt;
+  XMFLOAT3 camUsedPos;
+  XMVECTOR camEye = cam.GetEye();
+  XMStoreFloat3(&camUsedPos, camEye);
+
+  decltype(std::chrono::high_resolution_clock::now()) start;
+  if (runtimeResults)
+    start = std::chrono::high_resolution_clock::now();
+
+  qt.Build(center, fullSizeXZ, float3(camUsedPos.x, camUsedPos.y, camUsedPos.z),
+           cam.GetFrustum(), mMatrix, quadTreeDistanceThreshold);
+
+  if (runtimeResults) {
+
+    (*runtimeResults)->QuadTreeBuildTime += std::chrono::duration_cast<
+        decltype((*runtimeResults)->QuadTreeBuildTime)>(
+        std::chrono::high_resolution_clock::now() - start);
+
+    (*runtimeResults)->qtNodes += qt.GetSize();
+  }
+  // The best choice is to upload planeBottomLeft and
+  // planeTopRight and kinda of UV coordinate that can go
+  // outside [0,1] and the fract is the actual UV value.
+
+  // Fill buffer with Quad Info
+  {
+    start = std::chrono::high_resolution_clock::now();
+    auto *curr = &vec.emplace_back();
+
+    for (auto it = qt.begin(); it != qt.end(); ++it) {
+      (*runtimeResults)->NavigatingTheQuadTree += std::chrono::duration_cast<
+          decltype((*runtimeResults)->NavigatingTheQuadTree)>(
+          (std::chrono::high_resolution_clock::now() - start));
+      (*runtimeResults)->drawnNodes++;
+
+      {
+        curr->vertexConstants.instanceData[curr->N].scaling = {it->size.x,
+                                                               it->size.y};
+        curr->vertexConstants.instanceData[curr->N].offset = {it->center.x,
+                                                              it->center.y};
+      }
+      {
+        start = std::chrono::high_resolution_clock::now();
+
+        auto res = it.GetSmallerNeighbor();
+
+        (*runtimeResults)->NavigatingTheQuadTree += std::chrono::duration_cast<
+            decltype((*runtimeResults)->NavigatingTheQuadTree)>(
+            (std::chrono::high_resolution_clock::now() - start));
+        static const constexpr auto l = [](const float x) -> float {
+          if (x == 0)
+            return 1;
+          else
+            return x;
+        };
+        curr->hullConstants.instanceData[curr->N].TesselationFactor = {
+            l(res.zneg), l(res.xneg), l(res.zpos), l(res.xpos)};
+      }
+
+      curr->N = curr->N + 1;
+      if (curr->N == DefaultsValues::App::maxInstances) {
+        curr = &vec.emplace_back();
+      }
+
+      start = std::chrono::high_resolution_clock::now();
+    }
+
+    // If a quarter of the capacity is unused shrink the vector in a
+    // way that the unused capacity is halfed
+    // how though?
+  }
+  return vec;
 }
