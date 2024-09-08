@@ -707,6 +707,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     RuntimeCPUBuffers cpuBuffers;
 
     loopStartTime = std::chrono::high_resolution_clock::now();
+    auto resolution = swapChain.Resolution();
+    cam.SetAspect(float(resolution.x) / float(resolution.y));
 
     while (!settings.quit) {
       // Process user input
