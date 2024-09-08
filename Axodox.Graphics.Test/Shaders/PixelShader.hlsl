@@ -120,7 +120,7 @@ output_t main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
     //low
     output.albedo = float4(albedo, saturate(foam));
     //high
-    output.normal = float4(normal, 1);
+    output.normal = float4(OctahedronNormalEncode(normal), 0, 1);
     //low
     output.materialValues = float4(a, _HeightModifier * _WavePeakScatterStrength, _ScatterShadowStrength, 1);
     return output;

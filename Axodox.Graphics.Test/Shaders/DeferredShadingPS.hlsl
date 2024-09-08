@@ -90,10 +90,10 @@ float4 main(input_t input) : SV_TARGET
     const float depth = _depthTex.Load(pixelLoadCoords);
 
     float2 ndc = input.uv * 2.0f - 1.0f; // Convert UV [0,1] -> NDC [-1,1]
-    double4 clipSpacePos = double4(ndc, depth, 1.0f);
+    float4 clipSpacePos = float4(ndc, depth, 1.0f);
 
 // Apply inverse view-projection matrix to get world space position
-    double4 worldPos = mul(clipSpacePos, camConstants.INVvpMatrix);
+    float4 worldPos = mul(clipSpacePos, camConstants.INVvpMatrix);
 
 // Perform perspective divide to get the world-space position
     float3 localPos = hetdiv(worldPos);
@@ -105,7 +105,7 @@ float4 main(input_t input) : SV_TARGET
 
 
     float3 albedo = _albedoinput.rgb;
-    float3 normal = _normalinput.rgb;
+    float3 normal = OctahedronNormalDecode(_normalinput.rg);
     // The albedo.w channel is was stored in only 8bits, while the rest are 16bits!
     float Roughness = _materialValuesinput.x;
     float matId = _materialValuesinput.w;
