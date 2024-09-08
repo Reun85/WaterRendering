@@ -23,18 +23,6 @@ output
 */
 
 
-// Reverse bits in a number
-int ReverseBitfield(int x)
-{
-    x = ((x >> 1) & 0x55555555) | ((x & 0x55555555) << 1);
-    x = ((x >> 2) & 0x33333333) | ((x & 0x33333333) << 2);
-    x = ((x >> 4) & 0x0F0F0F0F) | ((x & 0x0F0F0F0F) << 4);
-    x = ((x >> 8) & 0x00FF00FF) | ((x & 0x00FF00FF) << 8);
-    x = (x >> 16) | (x << 16);
-    return x;
-}
-
-
 // LocalGroupSize=N
 [numthreads(N, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3 GTid : SV_GroupID)
@@ -51,7 +39,6 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3
 
 
     
-    GroupMemoryBarrierWithGroupSync();
 
     int src = 0;
 
@@ -67,13 +54,13 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3
         float theta = (TWO_PI * float(k)) / float(N);
         float2 W_N_k = float2(cos(theta), sin(theta));
     
+        GroupMemoryBarrierWithGroupSync();
         float2 input1 = pingpong[src][i + j + mh];
         float2 input2 = pingpong[src][i + j];
 
         src = 1 - src;
         pingpong[src][x] = input2 + ComplexMul(W_N_k, input1);
 
-        GroupMemoryBarrierWithGroupSync();
     }
 
     float2 result = pingpong[src][x];
