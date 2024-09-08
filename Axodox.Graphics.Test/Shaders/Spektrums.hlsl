@@ -15,18 +15,51 @@ cbuffer Constants : register(b0)
 
 
 
+#define LOG2_M 4
+#define M (1<<LOG2_M)
+#define MHalf (M>>1)
+#define LOG2_N_DIV_M (DISP_MAP_LOG2-LOG2_M)
+#define N_DIV_M (1 << LOG2_N_DIV_M)
 
 
+
+groupshared float2 cache[M][M];
 // What would the group sizes be?
-[numthreads(16, 16, 1)]
+[numthreads(MHalf, M, 2)]
+//[numthreads(M, M, 1)]
 void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3 LTid : SV_GroupID)
 {
-    int2 loc1 = int2(DTid.xy);
+    int2 groupID = LTid.xy;
+    int2 threadID = GTid.xy;
+    bool mirroredInMiddle = GTid.z == 1;
+
+    if (mirroredInMiddle)
+    {
+        groupID = N_DIV_M - 1 - groupID;
+        threadID = M - 1 - threadID;
+    }
+
+    
+    int2 loc1 = groupID * M + threadID.xy;
     int2 loc2 = int2(N - 1 - loc1.x, N - 1 - loc1.y);
 
+    float2 h0_k = tilde_h0[loc1].rg;
+    cache[threadID.x][threadID.y] = h0_k;
+    GroupMemoryBarrierWithGroupSync();
+    float2 h0_mk = cache[M - 1 - threadID.x][M - 1 - threadID.y];
+
+    // The above solution mimics this implementation using shared memory => +10fps.
+    /*
+     [numthreads(M,M,1)]
+
+    int2 loc1 = DTid.xy;
+    int2 loc2 = int2(N - 1 - loc1.x, N - 1 - loc1.y);
     // Load initial spectrum
     float2 h0_k = tilde_h0[loc1].rg;
     float2 h0_mk = tilde_h0[loc2].rg;
+*/
+    
+    
     float w_k = frequencies[loc1].r;
 
     // Height spectrum
