@@ -811,7 +811,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       });
 
       // Compute shader stage
-      // It has to return some value or the basic code doesn't work?????
+      // It has to return some value or threadpool execute fails?????
       std::future computeStage = threadpool_execute<bool>([&]() {
         auto &simResource = calculatingSimResource;
         auto &computeAllocator = simResource.Allocator;

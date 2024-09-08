@@ -31,8 +31,8 @@ float4 TraceRay(float3 rayPos, float3 dir, int iterationCount)
         sampleDepth = depthMap.SampleLevel(_sampler, rayPos.xy, 0).r;
 
         
-        float depthDif = rayPos.z - sampleDepth;
-        if (depthDif >= 0 && depthDif < 0.00001)
+        double depthDif = rayPos.z - sampleDepth;
+        if (depthDif >= 0 && depthDif < 1e-5)
         { //we have a hit
             hit = true;
             hitColor = float4(colorBuffer.SampleLevel(_sampler, rayPos.xy, 0).rgb, 1);
@@ -44,13 +44,13 @@ float4 TraceRay(float3 rayPos, float3 dir, int iterationCount)
 }
 
 [numthreads(16, 16, 1)]
-void main(uint3 index : SV_DispatchThreadID)
+void main(uint3 DTid : SV_DispatchThreadID)
 {
     uint2 size;
     colorBuffer.GetDimensions(size.x, size.y);
   
-    float2 uv = (index.xy + 0.5) / size;
-    float4 color = colorBuffer.SampleLevel(_sampler, uv, 0);
+    float2 uv = (DTid.xy + 0.5) / size;
+    float4 color = colorBuffer.Load(int3(DTid.xy, 0));
   
 
     float maxRayDistance = 200.0f;
@@ -95,5 +95,5 @@ void main(uint3 index : SV_DispatchThreadID)
 
     reflectionColor.xyz *= SchlickFresnel(0.02, max(0, dot(normalView, float3(0, 0, -1))));
     
-    _output[index.xy] = (color + reflectionColor);
+    _output[DTid.xy] = (color + reflectionColor);
 }

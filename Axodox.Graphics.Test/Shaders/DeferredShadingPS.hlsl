@@ -98,11 +98,7 @@ float4 main(input_t input) : SV_TARGET
 // Perform perspective divide to get the world-space position
     float3 localPos = hetdiv(worldPos);
 
-    //float3 ps = hetdiv(mul(float4(localPos, 1), camConstants.vpMatrix));
-    //float2 uv = (ps.xy + 1) / 2;
-    //return float4(uv, 0, 1);
-    
-
+  
 
     float3 albedo = _albedoinput.rgb;
     float3 normal = OctahedronNormalDecode(_normalinput.rg);
