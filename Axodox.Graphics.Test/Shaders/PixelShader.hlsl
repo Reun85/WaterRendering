@@ -2,7 +2,6 @@
 Texture2D<float4> _texture : register(t0);
 SamplerState _sampler : register(s0);
 
-#define PI 3.14159265359
 
 cbuffer CameraBuffer : register(b0)
 {
@@ -118,16 +117,15 @@ output_t main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
    
     				
     float3 albedo = Albedo;
-    albedo = lerp(albedo, _TipColor, saturate(foam));
 
     //low
-    output.albedo = float4(albedo, 1);
+    output.albedo = float4(albedo, saturate(foam));
     //high
-    output.position = float4(input.localPos, _HeightModifier * _WavePeakScatterStrength);
+    output.position = float4(input.localPos, 0);
     //high
     output.normal = float4(normal, 1);
     //low
-    output.materialValues = float4(a, 0, _ScatterShadowStrength, 1);
+    output.materialValues = float4(a, _HeightModifier * _WavePeakScatterStrength, _ScatterShadowStrength, 1);
     return output;
     
 }

@@ -23,8 +23,9 @@ struct TextureBuffers {
   // Get ready for next frame
   virtual void Clear(CommandAllocator &allocator) = 0;
 
-  ~TextureBuffers() {}
+  virtual ~TextureBuffers() = default;
 };
+
 struct WaterGraphicRootDescription : public RootSignatureMask {
 
   struct cameraConstants {
@@ -45,14 +46,14 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
       XMFLOAT2 scaling;
       XMFLOAT2 offset;
     };
-    InstanceData instanceData[DefaultsValues::App::maxInstances];
+    std::array<InstanceData, DefaultsValues::App::maxInstances> instanceData;
   };
   struct HullConstants {
     struct InstanceData {
       XMFLOAT4 TesselationFactor;
     };
     // zneg,xneg, zpos, xpos
-    InstanceData instanceData[DefaultsValues::App::maxInstances];
+    std::array<InstanceData, DefaultsValues::App::maxInstances> instanceData;
   };
 
   struct PixelLighting {
@@ -61,25 +62,25 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
     int lightCount;
 
     static constexpr PixelLighting SunData() {
-      PixelLighting data;
+      PixelLighting data = {};
       data.lightCount = 1;
-      data.lights[0].lightPos = XMFLOAT4(1, 0.109, 0.964, 0);
+      data.lights[0].lightPos = XMFLOAT4(1.f, 0.109f, 0.964f, 0.f);
       data.lights[0].lightColor =
-          XMFLOAT4(234.f / 255.f, 204.f / 255.f, 118.f / 255.f, 0.446);
+          XMFLOAT4(234.f / 255.f, 204.f / 255.f, 118.f / 255.f, 0.446f);
 
       data.lights[0].AmbientColor =
-          XMFLOAT4(15.f / 255.f, 14.f / 255.f, 5.f / 255.f, .185);
+          XMFLOAT4(15.f / 255.f, 14.f / 255.f, 5.f / 255.f, .185f);
 
       return data;
     }
     // old
   private:
     static constexpr PixelLighting old() {
-      PixelLighting data;
+      PixelLighting data = {};
       data.lightCount = 1;
-      data.lights[0].lightPos = XMFLOAT4(1, 0.109, 0.964, 0);
+      data.lights[0].lightPos = XMFLOAT4(1, 0.109f, 0.964f, 0);
       data.lights[0].lightColor =
-          XMFLOAT4(243.f / 255.f, 206.f / 255.f, 97.f / 255.f, 0.446);
+          XMFLOAT4(243.f / 255.f, 206.f / 255.f, 97.f / 255.f, 0.446f);
 
       data.lights[0].AmbientColor =
           XMFLOAT4(15.f / 255.f, 14.f / 255.f, 5.f / 255.f, .639f);
@@ -103,7 +104,7 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
     float ClearcoatGloss;
 
     static constexpr PixelShaderPBRData WaterData() {
-      PixelShaderPBRData data;
+      PixelShaderPBRData data = {};
       data.SurfaceColor = float3(0.109f, 0.340f, 0.589f);
       data.Roughness = 0.285f;
       data.SubsurfaceScattering = 0.571f;
@@ -122,9 +123,9 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
   struct WaterPixelShaderData {
 
     float3 AlbedoColor = float3(11.f, 53.f, 108.f) / 255.f;
-    float Roughness = 0.192;
+    float Roughness = 0.192f;
     float3 _TipColor = float3(231.f, 231.f, 231.f) / 255.f;
-    float foamDepthFalloff = 0.245;
+    float foamDepthFalloff = 0.245f;
     float foamRoughnessModifier = 5.0f;
     float NormalDepthAttenuation = 1;
     float _HeightModifier = 1.871f;
@@ -198,8 +199,9 @@ struct DeferredShading : public RootSignatureMask {
 
     //
     constexpr static std::array<Format, NumberOfBuffers> GetGBufferFormats() {
-      return {Format::B8G8R8A8_UNorm, Format::R16G16B16A16_Float,
-              Format::R16G16B16A16_Float, Format::R16G16B16A16_Float};
+      using enum Axodox::Graphics::D3D12::Format;
+      return {B8G8R8A8_UNorm, R16G16B16A16_Float, R16G16B16A16_Float,
+              R16G16B16A16_Float};
     };
 
     std::array<MutableTexture *, NumberOfBuffers> GetBuffers() {
@@ -218,9 +220,11 @@ struct DeferredShading : public RootSignatureMask {
     void Clear(CommandAllocator &allocator) override;
     void TranslateToTarget(CommandAllocator &allocator);
     void TranslateToView(CommandAllocator &allocator);
+    ~GBuffer() override = default;
   };
 
   struct DeferredShaderBuffers {
+    float3 _TipColor = float3(231.f, 231.f, 231.f) / 255.f;
     float EnvMapMult = 1.f;
   };
 
@@ -248,7 +252,8 @@ struct DeferredShading : public RootSignatureMask {
         normal(this, {DescriptorRangeType::ShaderResource, 1}),
         position(this, {DescriptorRangeType::ShaderResource, 2}),
         materialValues(this, {DescriptorRangeType::ShaderResource, 3}),
-        geometryDepth(this, {DescriptorRangeType::ShaderResource, 4}),
+        geometryDepth(this, {DescriptorRangeType::ShaderResource, 4},
+                      ShaderVisibility::Pixel),
         skybox(this, {DescriptorRangeType::ShaderResource, {5}},
                ShaderVisibility::Pixel),
         gradientsHighest(this, {DescriptorRangeType::ShaderResource, 20},
@@ -287,11 +292,12 @@ struct ShadowMapping : public RootSignatureMask {
     void TranslateToView(
         CommandAllocator &allocator,
         const ResourceStates &newState = ResourceStates::AllShaderResource);
+    ~Textures() override = default;
   };
 
-  struct Buffer {
+  struct Data {
     struct LOD {
-      XMMATRIX viewProj;
+      XMMATRIX lightViewProjFromCamViewProj;
       f32 farPlane;
     };
 
@@ -299,39 +305,79 @@ struct ShadowMapping : public RootSignatureMask {
 
     constexpr static f32 zMult = 10.f;
 
+    GpuVirtualAddress Upload(DynamicBufferManager &manager) const;
     void Update(const Camera &cam, const LightData &light);
-    explicit Buffer(const Camera &cam, f32 closestFrustumEnd = 200.f,
-                    f32 midFrustumEnd = 600.f);
+    explicit Data(const Camera &cam, f32 closestFrustumEnd = 200.f,
+                  f32 midFrustumEnd = 600.f);
+
+  private:
+    struct GPULayout {
+      std::array<XMFLOAT4X4, DefaultsValues::App::maxShadowMapMatrices>
+          lightSpaceMatrices;
+      u32 shadowMapMatrixCount;
+    };
   };
 
-  RootDescriptorTable<LODCOUNT> lightBuffer;
+  RootDescriptor<RootDescriptorType::ConstantBuffer> vertexBuffer;
+  RootDescriptor<RootDescriptorType::ConstantBuffer> hullBuffer;
+  RootDescriptor<RootDescriptorType::ConstantBuffer> cameraBuffer;
+  RootDescriptor<RootDescriptorType::ConstantBuffer> modelBuffer;
+  RootDescriptor<RootDescriptorType::ConstantBuffer> debugBuffer;
+  RootDescriptor<RootDescriptorType::ConstantBuffer> lightingMatrices;
+
+  // Optional
+  RootDescriptorTable<1> texture;
+
+  RootDescriptorTable<1> heightMapHighest;
+  RootDescriptorTable<1> heightMapMedium;
+  RootDescriptorTable<1> heightMapLowest;
+  RootDescriptorTable<1> gradientsHighest;
+  RootDescriptorTable<1> gradientsMedium;
+  RootDescriptorTable<1> gradientsLowest;
+
+  StaticSampler _textureSampler;
 
   explicit ShadowMapping(const RootSignatureContext &context)
       : RootSignatureMask(context),
-        lightBuffer(this, {{{DescriptorRangeType::ShaderResource, 0},
-                            {DescriptorRangeType::ShaderResource, 1},
-                            {DescriptorRangeType::ShaderResource, 2}}}) {
+        vertexBuffer(this, {2}, ShaderVisibility::Vertex),
+        hullBuffer(this, {1}, ShaderVisibility::Hull),
+        cameraBuffer(this, {0}, ShaderVisibility::All),
+        modelBuffer(this, {1}, ShaderVisibility::Vertex),
+        debugBuffer(this, {9}, ShaderVisibility::All),
+        lightingMatrices(this, {4}, ShaderVisibility::Geometry),
 
+        texture(this, {DescriptorRangeType::ShaderResource, {0}},
+                ShaderVisibility::Pixel),
+        heightMapHighest(this, {DescriptorRangeType::ShaderResource, {0}},
+                         ShaderVisibility::Domain),
+        heightMapMedium(this, {DescriptorRangeType::ShaderResource, {1}},
+                        ShaderVisibility::Domain),
+        heightMapLowest(this, {DescriptorRangeType::ShaderResource, {2}},
+                        ShaderVisibility::Domain),
+        gradientsHighest(this, {DescriptorRangeType::ShaderResource, {3}},
+                         ShaderVisibility::Domain),
+        gradientsMedium(this, {DescriptorRangeType::ShaderResource, {4}},
+                        ShaderVisibility::Domain),
+        gradientsLowest(this, {DescriptorRangeType::ShaderResource, {5}},
+                        ShaderVisibility::Domain),
+        _textureSampler(this, {0}, Filter::Linear, TextureAddressMode::Wrap,
+                        ShaderVisibility::All) {
     Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
   }
 };
 struct SSRPostProcessing : public RootSignatureMask {
   RootDescriptor<RootDescriptorType::ConstantBuffer> CameraBuffer;
-  // RootDescriptor<RootDescriptorType::ConstantBuffer> CameraBuffer;
   RootDescriptorTable<1> InpColor;
   RootDescriptorTable<1> NormalBuffer;
   RootDescriptorTable<1> DepthBuffer;
-  // RootDescriptorTable<1> DepthBuffer;
   RootDescriptorTable<1> OutputTexture;
   StaticSampler Sampler;
 
-  SSRPostProcessing(const RootSignatureContext &context)
+  explicit SSRPostProcessing(const RootSignatureContext &context)
       : RootSignatureMask(context), CameraBuffer(this, {0}),
-        // CameraBuffer(this, {1}),
         InpColor(this, {DescriptorRangeType::ShaderResource, {0}}),
         NormalBuffer(this, {DescriptorRangeType::ShaderResource, {1}}),
         DepthBuffer(this, {DescriptorRangeType::ShaderResource, {9}}),
-        // DepthBuffer(this, {DescriptorRangeType::ShaderResource, {1}}),
         OutputTexture(this, {DescriptorRangeType::UnorderedAccess, {0}}),
         Sampler(this, {0}, Filter::Linear, TextureAddressMode::Clamp) {
     Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
@@ -357,4 +403,6 @@ struct FrameResources : TextureBuffers {
   void Clear(CommandAllocator &allocator) override;
 
   explicit FrameResources(const ResourceAllocationContext &context);
+
+  ~FrameResources() override = default;
 };

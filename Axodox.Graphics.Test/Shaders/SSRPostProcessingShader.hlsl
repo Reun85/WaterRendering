@@ -64,7 +64,7 @@ void main(uint3 index : SV_DispatchThreadID)
     (cam.vMatrix)).rgb;
     float pixelDepth = depthMap.SampleLevel(_sampler, pixelPositionTexture.xy, 0).r; // 0< <1
     pixelPositionTexture.z = pixelDepth;
-    float4 positionView = mul(float4(pixelPositionTexture * 2 - float3(1, 1, 1), 1), cam.INVpMatrix);
+    float4 positionView = mul(float4(pixelPositionTexture * float3(2, 2, 2) - float3(1, 1, 1), 1), cam.INVpMatrix);
     positionView /= positionView.w;
     float3 reflectionView = normalize(reflect(positionView.xyz, normalView));
     if (reflectionView.z > 0)
@@ -77,8 +77,9 @@ void main(uint3 index : SV_DispatchThreadID)
 
 	//Texture Space ray calculation
     float4 rayEndPositionTexture = mul(float4(rayEndPositionView, 1), cam.pMatrix);
-    rayEndPositionTexture /= rayEndPositionTexture.w;
+    
     rayEndPositionTexture.xyz = (rayEndPositionTexture.xyz + float3(1, 1, 1)) / 2.0f;
+    //rayEndPositionTexture.xyz = rayEndPositionTexture.xyz * float3(2, 2, 1) - float3(1, 1, 0);
     float3 rayDirectionTexture = rayEndPositionTexture.xyz - pixelPositionTexture;
 
     int2 screenSpaceStartPosition = int2(

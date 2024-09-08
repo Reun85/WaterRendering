@@ -25,7 +25,6 @@ using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
 using namespace DirectX;
 using namespace DirectX::PackedVector;
-
 struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   IFrameworkView CreateView() const { return *this; }
   void Initialize(CoreApplicationView const &) const {
@@ -80,7 +79,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     std::array<bool, 31 - 0 + 1> DebugBits{false, false, true,
                                            true,  true,  false};
 
-    bool enableSSR = true;
+    bool enableSSR = false;
     const static constexpr std::initializer_list<
         std::pair<u8, std::optional<const char *>>>
         DebugBitsDesc = {{2, "Use Foam"},
@@ -92,6 +91,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                          {10, "Show neg normal"},
                          {11, "Show worldPos"},
                          {12, "Show materialValues"},
+                         {13, "Show depth"},
                          {24, "Normal overflow"},
                          {25, "Display Foam"},
                          {26, std::nullopt},
@@ -555,7 +555,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     VertexShader atmosphereVS{app_folder() / L"AtmosphereVS.cso"};
     PixelShader atmospherePS{app_folder() / L"AtmospherePS.cso"};
     RootSignature<SkyboxRootDescription> skyboxRootSignature{device};
-    DepthStencilState skyboxDepthStencilState{DepthStencilMode::ReadDepth};
+    DepthStencilState skyboxDepthStencilState{DepthStencilMode::WriteDepth};
     skyboxDepthStencilState.Comparison = ComparisonFunction::LessOrEqual;
 
     GraphicsPipelineStateDefinition skyboxPipelineStateDefinition{
@@ -593,6 +593,27 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         pipelineStateProvider
             .CreatePipelineStateAsync(deferredShadingPipelineStateDefinition)
             .get();
+    RootSignature<ShadowMapping> shadowMappingRootSignature{device};
+    GeometryShader shadowMappingGeometryShader{app_folder() /
+                                               L"ShadowMapGS.cso"};
+    PixelShader shadowMappingPixelShader{app_folder() / L"ShadowMapPS.cso"};
+
+    GraphicsPipelineStateDefinition shadowMappingPipelineStateDefinition{
+        .RootSignature = &shadowMappingRootSignature,
+        .VertexShader = &simpleVertexShader,
+        .DomainShader = &domainShader,
+        .HullShader = &hullShader,
+        .GeometryShader = &shadowMappingGeometryShader,
+        .PixelShader = &shadowMappingPixelShader,
+        .RasterizerState = debugValues.rasterizerFlags,
+        .DepthStencilState = DepthStencilMode::WriteDepth,
+        .InputLayout = VertexPosition::Layout,
+        .TopologyType = PrimitiveTopologyType::Patch,
+        .DepthStencilFormat = Format::D32_Float};
+    Axodox::Graphics::D3D12::PipelineState shadowMappingPipelineState =
+        pipelineStateProvider
+            .CreatePipelineStateAsync(shadowMappingPipelineStateDefinition)
+            .get();
 
     RootSignature<SSRPostProcessing> postProcessingRootSignature{device};
     ComputeShader postProcessingComputeShader{app_folder() /
@@ -610,7 +631,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     WaterGraphicRootDescription::PixelLighting sunData =
         WaterGraphicRootDescription::PixelLighting::SunData();
 
-    ShadowMapping::Buffer shadowMapData(cam);
+    ShadowMapping::Data shadowMapData(cam);
 
     // Compute pipeline
 
@@ -1012,6 +1033,71 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             }
           }
 
+          // Start Draw pass
+          // Debug Data
+          {
+            switch (debugValues.mode) {
+            case DebugValues::Mode::DisplacementHighest:
+              usedTexture = &drawingSimResource.HighestBuffer.displacementMap;
+              break;
+            case DebugValues::Mode::GradientsHighest:
+              usedTexture = &drawingSimResource.HighestBuffer.gradients;
+              break;
+            case DebugValues::Mode::DisplacementMedium:
+              usedTexture = &drawingSimResource.MediumBuffer.displacementMap;
+              break;
+            case DebugValues::Mode::GradientsMedium:
+              usedTexture = &drawingSimResource.MediumBuffer.gradients;
+              break;
+            case DebugValues::Mode::DisplacementLowest:
+              usedTexture = &drawingSimResource.LowestBuffer.displacementMap;
+              break;
+            case DebugValues::Mode::GradientsLowest:
+              usedTexture = &drawingSimResource.LowestBuffer.gradients;
+              break;
+            default:
+              break;
+            }
+
+            if (usedTexture) {
+              usedTextureAddress = *(*usedTexture)->ShaderResource(allocator);
+            }
+          }
+
+          // Ocean Buffers
+          WaterGraphicRootDescription::ModelConstants modelConstants{};
+
+          XMStoreFloat4x4(&modelConstants.mMatrix,
+                          XMMatrixTranspose(modelMatrix));
+
+          // Upload absolute contants
+
+          GpuVirtualAddress modelBuffer =
+              frameResource.DynamicBuffer.AddBuffer(modelConstants);
+
+          GpuVirtualAddress waterDataBuffer =
+              frameResource.DynamicBuffer.AddBuffer(waterData);
+
+          // Pre translate resources
+          GpuVirtualAddress displacementMapAddressHighest =
+              *drawingSimResource.HighestBuffer.displacementMap.ShaderResource(
+                  allocator);
+          GpuVirtualAddress gradientsAddressHighest =
+              *drawingSimResource.HighestBuffer.gradients.ShaderResource(
+                  allocator);
+          GpuVirtualAddress displacementMapAddressMedium =
+              *drawingSimResource.MediumBuffer.displacementMap.ShaderResource(
+                  allocator);
+          GpuVirtualAddress gradientsAddressMedium =
+              *drawingSimResource.MediumBuffer.gradients.ShaderResource(
+                  allocator);
+          GpuVirtualAddress displacementMapAddressLowest =
+              *drawingSimResource.LowestBuffer.displacementMap.ShaderResource(
+                  allocator);
+          GpuVirtualAddress gradientsAddressLowest =
+              *drawingSimResource.LowestBuffer.gradients.ShaderResource(
+                  allocator);
+
           // Shadow Map pass
           {
             // ...
@@ -1027,68 +1113,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                 std::initializer_list(std::to_address(gBufferViews.begin()),
                                       std::to_address(gBufferViews.end())),
                 frameResource.DepthBuffer.DepthStencil());
-            WaterGraphicRootDescription::ModelConstants modelConstants{};
-
-            XMStoreFloat4x4(&modelConstants.mMatrix,
-                            XMMatrixTranspose(modelMatrix));
-
-            // Debug stuff
-            {
-              switch (debugValues.mode) {
-              case DebugValues::Mode::DisplacementHighest:
-                usedTexture = &drawingSimResource.HighestBuffer.displacementMap;
-                break;
-              case DebugValues::Mode::GradientsHighest:
-                usedTexture = &drawingSimResource.HighestBuffer.gradients;
-                break;
-              case DebugValues::Mode::DisplacementMedium:
-                usedTexture = &drawingSimResource.MediumBuffer.displacementMap;
-                break;
-              case DebugValues::Mode::GradientsMedium:
-                usedTexture = &drawingSimResource.MediumBuffer.gradients;
-                break;
-              case DebugValues::Mode::DisplacementLowest:
-                usedTexture = &drawingSimResource.LowestBuffer.displacementMap;
-                break;
-              case DebugValues::Mode::GradientsLowest:
-                usedTexture = &drawingSimResource.LowestBuffer.gradients;
-                break;
-              default:
-                break;
-              }
-
-              if (usedTexture) {
-                usedTextureAddress = *(*usedTexture)->ShaderResource(allocator);
-              }
-            }
-
-            // Upload absolute contants
-
-            GpuVirtualAddress modelBuffer =
-                frameResource.DynamicBuffer.AddBuffer(modelConstants);
-
-            GpuVirtualAddress waterDataBuffer =
-                frameResource.DynamicBuffer.AddBuffer(waterData);
-
-            // Pre translate resources
-            GpuVirtualAddress displacementMapAddressHighest =
-                *drawingSimResource.HighestBuffer.displacementMap
-                     .ShaderResource(allocator);
-            GpuVirtualAddress gradientsAddressHighest =
-                *drawingSimResource.HighestBuffer.gradients.ShaderResource(
-                    allocator);
-            GpuVirtualAddress displacementMapAddressMedium =
-                *drawingSimResource.MediumBuffer.displacementMap.ShaderResource(
-                    allocator);
-            GpuVirtualAddress gradientsAddressMedium =
-                *drawingSimResource.MediumBuffer.gradients.ShaderResource(
-                    allocator);
-            GpuVirtualAddress displacementMapAddressLowest =
-                *drawingSimResource.LowestBuffer.displacementMap.ShaderResource(
-                    allocator);
-            GpuVirtualAddress gradientsAddressLowest =
-                *drawingSimResource.LowestBuffer.gradients.ShaderResource(
-                    allocator);
 
             for (auto &curr : cpuBuffers.oceanData) {
               if (curr.N == 0)
@@ -1119,36 +1143,37 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
               planeMesh.Draw(allocator, curr.N);
             }
             // skybox
-            {
-              skyboxPipelineState.Apply(allocator);
+            //{
+            //  skyboxPipelineState.Apply(allocator);
 
-              auto mask = skyboxRootSignature.Set(allocator,
-                                                  RootSignatureUsage::Graphics);
+            //  auto mask = skyboxRootSignature.Set(allocator,
+            //                                      RootSignatureUsage::Graphics);
 
-              mask.skybox = skyboxTexture;
-              mask.lightingBuffer = sunDataBuffer;
+            //  mask.skybox = skyboxTexture;
+            //  mask.lightingBuffer = sunDataBuffer;
 
-              mask.cameraBuffer = cameraConstantBuffer;
+            //  mask.cameraBuffer = cameraConstantBuffer;
 
-              skyboxMesh.Draw(allocator);
-            }
+            //  skyboxMesh.Draw(allocator);
+            //}
           }
 
           // Deferred Shading Pass
           {
+            allocator.SetRenderTargets({renderTargetView}, nullptr);
             deferredShadingPipelineState.Apply(allocator);
-            allocator.SetRenderTargets({renderTargetView});
             frameResource.GBuffer.TranslateToView(allocator);
-            allocator.TransitionResource(frameResource.DepthBuffer,
-                                         ResourceStates::DepthWrite,
-                                         ResourceStates::PixelShaderResource);
+            allocator.TransitionResource(
+                frameResource.DepthBuffer.
+                operator Axodox::Graphics::D3D12::ResourceArgument(),
+                ResourceStates::DepthWrite,
+                ResourceStates::PixelShaderResource);
             auto mask = deferredShadingRootSignature.Set(
                 allocator, RootSignatureUsage::Graphics);
 
             mask.BindGBuffer(frameResource.GBuffer);
 
             // Textures
-            mask.geometryDepth = *frameResource.DepthBuffer.ShaderResource();
             mask.skybox = skyboxTexture;
             mask.gradientsHighest =
                 *drawingSimResource.HighestBuffer.gradients.ShaderResource(
@@ -1167,6 +1192,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
             mask.deferredShaderBuffer =
                 frameResource.DynamicBuffer.AddBuffer(defData);
+
+            mask.geometryDepth = *frameResource.DepthBuffer.ShaderResource();
 
             deferredShadingPlane.Draw(allocator);
           }

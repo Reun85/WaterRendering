@@ -42,7 +42,7 @@ void MutableTextureWithViews::Allocate(
   _texture = _context.ResourceAllocator->CreateTexture(definition);
   _allocatedSubscription =
       _texture->Allocated([this, viewDefinitions](Resource *resource) {
-        OnAllocated(resource, viewDefinitions);
+        MutableTextureWithViews::OnAllocated(resource, viewDefinitions);
       });
 }
 void MutableTextureWithViews::OnAllocated(
@@ -111,6 +111,8 @@ TextureViewDefinitions::GetDepthStencilWithShaderView(const Format &DSFormat,
   depthViews.ShaderResource->Shader4ComponentMapping =
       D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
   depthViews.ShaderResource->Texture2D.MipLevels = 1;
+  depthViews.ShaderResource->Texture2D.MostDetailedMip = 0;
+
   return depthViews;
 }
 

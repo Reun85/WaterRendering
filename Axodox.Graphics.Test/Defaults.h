@@ -42,6 +42,8 @@ public:
 
   struct App {
     CONST_QUALIFIER u16 maxInstances = ShaderConstantCompat::numInstances;
+    CONST_QUALIFIER u32 maxShadowMapMatrices =
+        ShaderConstantCompat::maxShadowMapMatrices;
     QUALIFIER f32 oceanSize = 1000.f;
 
     QUALIFIER XMFLOAT4 clearColor = {37.f / 255.f, 37.f / 255.f, 37.f / 255.f,

@@ -30,10 +30,10 @@ D3D12_RESOURCE_DESC Texture::Description() const {
 D3D12_RESOURCE_STATES Texture::DefaultState() const {
   if (has_flag(_definition.Flags, TextureFlags::RenderTarget)) {
     return D3D12_RESOURCE_STATE_RENDER_TARGET;
-  } else if (has_flag(_definition.Flags, TextureFlags::DepthStencil)) {
-    return D3D12_RESOURCE_STATE_DEPTH_WRITE;
   } else if (has_flag(_definition.Flags,
                       TextureFlags::ShaderResourceDepthStencil)) {
+    return D3D12_RESOURCE_STATE_DEPTH_WRITE;
+  } else if (has_flag(_definition.Flags, TextureFlags::DepthStencil)) {
     return D3D12_RESOURCE_STATE_DEPTH_WRITE;
   } else if (has_flag(_definition.Flags, TextureFlags::UnorderedAccess)) {
     return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
@@ -42,15 +42,36 @@ D3D12_RESOURCE_STATES Texture::DefaultState() const {
   }
 }
 
+Format DepthFormatEquivalentOfTypelessVar(Format typeless) {
+  switch (typeless) {
+  case Format::D32_Float:
+  case Format::R32_Typeless:
+    return Format::D32_Float;
+  case Format::R24G8_Typeless:
+  case Format::D24_UNorm_S8_UInt:
+    return Format::D24_UNorm_S8_UInt;
+  case Format::R16_Typeless:
+  case Format::D16_UNorm:
+    return Format::D16_UNorm;
+  case Format::R32_Float_X8X24_Typeless:
+  case Format::D32_Float_S8X24_UInt:
+    return Format::D32_Float_S8X24_UInt;
+  default:
+    throw invalid_argument("Invalid typeless format");
+  }
+}
+
 std::optional<D3D12_CLEAR_VALUE> Texture::DefaultClearValue() const {
   if (has_flag(_definition.Flags, TextureFlags::RenderTarget)) {
     return D3D12_CLEAR_VALUE{.Format = DXGI_FORMAT(_definition.PixelFormat),
                              .Color = {0.f, 0.f, 0.f, 0.f}};
-  } else if (has_flag(_definition.Flags, TextureFlags::DepthStencil)) {
-    return D3D12_CLEAR_VALUE{.Format = DXGI_FORMAT(_definition.PixelFormat),
-                             .DepthStencil = {1.f, 0}};
   } else if (has_flag(_definition.Flags,
                       TextureFlags::ShaderResourceDepthStencil)) {
+    return D3D12_CLEAR_VALUE{
+        .Format = DXGI_FORMAT(
+            DepthFormatEquivalentOfTypelessVar(_definition.PixelFormat)),
+        .DepthStencil = {1.f, 0}};
+  } else if (has_flag(_definition.Flags, TextureFlags::DepthStencil)) {
     return D3D12_CLEAR_VALUE{.Format = DXGI_FORMAT(_definition.PixelFormat),
                              .DepthStencil = {1.f, 0}};
   } else {

@@ -4,8 +4,6 @@ RWTexture2D<float2> writebuff : register(u0);
 
 #define N DISP_MAP_SIZE
 #define LOG2_N DISP_MAP_LOG2
-#define PI		3.1415926535897932
-#define TWO_PI	6.2831853071795864
 
 
 groupshared float2 pingpong[2][N];

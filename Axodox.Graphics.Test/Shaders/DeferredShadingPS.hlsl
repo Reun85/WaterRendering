@@ -4,7 +4,7 @@ Texture2D<float4> _albedo : register(t0);
 Texture2D<float4> _normal : register(t1);
 Texture2D<float4> _position : register(t2);
 Texture2D<float4> _materialValues : register(t3);
-Texture2D<float> _depthTex : register(t4);
+Texture2D<float1> _depthTex : register(t4);
 TextureCube<float4> _skybox : register(t5);
 
 
@@ -16,7 +16,13 @@ Texture2D<float4> gradients3 : register(t22);
 
 SamplerState _sampler : register(s0);
 
-
+float LinearizeDepth(float depth, float near, float far)
+{
+    return depth / far;
+    return (depth - near) / (far - near);
+    return (2.0f * near) / (far + near - depth * (far - near));
+    return near / (far - depth * (far - near));
+}
 
 
 cbuffer DebugBuffer : register(b9)
@@ -46,14 +52,16 @@ cbuffer Lighting : register(b1)
 
 cbuffer DSBuffer : register(b2)
 {
+    float3 _TipColor;
     float EnvMapMult;
 }
 
 
 struct input_t
 {
-    float4 screen : SV_Position;
-    float2 texCoord : TEXCOORD;
+    //float4 screen : ScreenPos;
+    float4 SV_Position : SV_POSITION;
+    float2 uv : TEXCOORD;
 };
 
 
@@ -63,20 +71,39 @@ struct input_t
 #define RETURNALBEDO_BITMASK (1 << 6 | 1<<24  | 1<<25)
 float4 main(input_t input) : SV_TARGET
 {
-    float4 _albedoinput = _albedo.Sample(_sampler, input.texCoord);
+
+    
+    float2 pixelCoordsFloat = input.SV_Position.xy / input.SV_Position.w;
+    uint2 pixelCoords = uint2(pixelCoordsFloat);
+
+    uint3 pixelLoadCoords = uint3(pixelCoords, 0);
+    
+    float4 _albedoinput = _albedo.Load(pixelLoadCoords);
     if ((debugValues.flags & RETURNALBEDO_BITMASK) != 0)
     {
         return float4(_albedoinput.rgb, 1);
     }
-    
-    float4 _normalinput = _normal.Sample(_sampler, input.texCoord);
-    float4 _positioninput = _position.Sample(_sampler, input.texCoord);
-    float4 _materialValuesinput = _materialValues.Sample(_sampler, input.texCoord);
-    float _depth = _depthTex.Sample(_sampler, input.texCoord);
+   
+    float4 _normalinput = _normal.Load(pixelLoadCoords);
+    float4 _positioninput = _position.Load(pixelLoadCoords);
+    float4 _materialValuesinput = _materialValues.Load(pixelLoadCoords);
+    //const float depth = LinearizeDepth(_depthTex.Load(pixelLoadCoords), 0.01, 1000);
+    const float depth = _depthTex.Load(pixelLoadCoords);
+
+    float2 ndc = input.uv * 2.0f - 1.0f; // Convert UV [0,1] -> NDC [-1,1]
+    float4 clipSpacePos = float4(ndc, depth, 1.0f);
+
+// Apply inverse view-projection matrix to get world space position
+    //float4 worldPos = mul(clipSpacePos, camConstants.INVvpMatrix);
+    float4 worldPos = mul(clipSpacePos, camConstants.INVvpMatrix);
+
+// Perform perspective divide to get the world-space position
+    float3 localPos = worldPos.xyz / worldPos.w;
+  //  float3 localPos = _positioninput.rgb;
+
 
     float3 albedo = _albedoinput.rgb;
     float3 normal = _normalinput.rgb;
-    float3 localPos = _positioninput.rgb;
     // The albedo.w channel is was stored in only 8bits, while the rest are 16bits!
     float Roughness = _materialValuesinput.x;
     float matId = _materialValuesinput.w;
@@ -109,12 +136,18 @@ float4 main(input_t input) : SV_TARGET
     }
     if (has_flag(debugValues.flags, 11))
     {
-        return _positioninput;
+        return float4(localPos, 1);
     }
     if (has_flag(debugValues.flags, 12))
     {
         return _materialValuesinput;
     }
+    
+    //if (has_flag(debugValues.flags, 13))
+    //{
+    //    float x = depth;
+    //    return float4(x, x, x, 1);
+    //}
 
     //if (matId > matIdEPS)
     //{
@@ -247,9 +280,9 @@ float4 main(input_t input) : SV_TARGET
     {
         if (matId < 1 + matIdEPS)
         {
-            const float ScatterStrength = _materialValuesinput.y;
+            const float foam = _albedoinput.w;
             const float ScatterShadowStrength = _materialValuesinput.z;
-            const float HeightModifierAndWavePeakScatterStrength = _positioninput.w;
+            const float HeightModifierAndWavePeakScatterStrength = _materialValuesinput.y;
             // water
             float H = max(0.0f, localPos.y) * HeightModifierAndWavePeakScatterStrength;
             const float3 scatterColor = albedo;
@@ -285,6 +318,7 @@ float4 main(input_t input) : SV_TARGET
             float3 scatter = k1 * scatterColor;
             scatter += k3 * scatterColor;
             output = (1 - F) * scatter * sunIrradiance;
+            output = lerp(output, _TipColor, foam);
             output += sunIrradiance * specular;
 
         }

@@ -11,7 +11,7 @@ void FrameResources::MakeCompatible(
                                             finalTarget.Definition())) {
 
     auto depthDefinition = finalTarget.Definition().MakeSizeCompatible(
-        Format::D32_Float, TextureFlags::ShaderResourceDepthStencil);
+        Format::R32_Typeless, TextureFlags::ShaderResourceDepthStencil);
 
     auto depthViews = TextureViewDefinitions::GetDepthStencilWithShaderView(
         Format::D32_Float, Format::R32_Float);
@@ -45,7 +45,7 @@ void FrameResources::MakeCompatible(
 void FrameResources::Clear(CommandAllocator &allocator) {
 
   // Clears frame with background color
-  DepthBuffer.DepthStencil()->Clear(allocator);
+  DepthBuffer.DepthStencil()->Clear(allocator, 1);
   GBuffer.Clear(allocator);
   ShadowMapTextures.Clear(allocator);
 }
@@ -53,8 +53,8 @@ void FrameResources::Clear(CommandAllocator &allocator) {
 FrameResources::FrameResources(const ResourceAllocationContext &context)
     : Allocator(*context.Device), Fence(*context.Device),
       DynamicBuffer(*context.Device), DepthBuffer(context),
-      PostProcessingBuffer(context), GBuffer(context),
-      ShadowMapTextures(context) {}
+      ShadowMapTextures(context), GBuffer(context),
+      PostProcessingBuffer(context) {}
 
 ShadowMapping::Textures::Textures(const ResourceAllocationContext &context,
                                   const u32 N)
@@ -202,7 +202,17 @@ XMVECTOR GetCenter(const std::array<XMVECTOR, N> &inp) {
   }
   return XMVectorDivide(sum, XMVectorReplicate(N));
 }
-void ShadowMapping::Buffer::Update(const Camera &cam, const LightData &light) {
+GpuVirtualAddress
+ShadowMapping::Data::Upload(DynamicBufferManager &manager) const {
+  GPULayout data = {};
+  for (int i = 0; i < LODCOUNT; ++i) {
+    XMStoreFloat4x4(&data.lightSpaceMatrices[i],
+                    XMMatrixTranspose(lods[i].lightViewProjFromCamViewProj));
+  }
+  data.shadowMapMatrixCount = LODCOUNT;
+  return manager.AddBuffer(data);
+}
+void ShadowMapping::Data::Update(const Camera &cam, const LightData &light) {
   f32 closePlane = cam.GetZNear();
   const XMVECTOR lightP = XMLoadFloat4(&light.lightPos);
   for (auto &lod : lods) {
@@ -255,13 +265,17 @@ void ShadowMapping::Buffer::Update(const Camera &cam, const LightData &light) {
       assert("IMPLEMENT THIS");
     }
 
-    lod.viewProj = XMMatrixMultiply(lightView, lightProj);
+    lod.lightViewProjFromCamViewProj = XMMatrixMultiply(lightView, lightProj);
+    // Todo: multiply by inverse from front or back?
+    lod.lightViewProjFromCamViewProj = XMMatrixMultiply(
+        cam.GetINVViewProj(), lod.lightViewProjFromCamViewProj);
+
     closePlane = lod.farPlane;
   }
 }
 
-ShadowMapping::Buffer::Buffer(const Camera &cam, f32 closestFrustumEnd,
-                              f32 midFrustumEnd) {
+ShadowMapping::Data::Data(const Camera &cam, f32 closestFrustumEnd,
+                          f32 midFrustumEnd) {
 
   lods[0].farPlane = closestFrustumEnd;
   lods[1].farPlane = midFrustumEnd;

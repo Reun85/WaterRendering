@@ -112,6 +112,28 @@ void CommandAllocator::SetRenderTargets(
     renderTargetHandles.push_back(renderTarget->CpuHandle());
   }
 
+  auto depthStencilHandle = depthStencilView ? depthStencilView->CpuHandle()
+                                             : D3D12_CPU_DESCRIPTOR_HANDLE(0);
+  auto pDepthStencilHandle = depthStencilView ? &depthStencilHandle : nullptr;
+  (*this)->OMSetRenderTargets(uint32_t(renderTargetHandles.size()),
+                              renderTargetHandles.data(), false,
+                              pDepthStencilHandle);
+
+  D3D12_RECT scissorRect{0, 0, int32_t(definition.Width),
+                         int32_t(definition.Height)};
+  (*this)->RSSetScissorRects(1, &scissorRect);
+
+  D3D12_VIEWPORT viewport{
+      0, 0, float(definition.Width), float(definition.Height), 0.f, 1.f};
+  (*this)->RSSetViewports(1, &viewport);
+  /*auto &definition = (*renderTargets.begin())->Definition();
+
+  std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> renderTargetHandles;
+  renderTargetHandles.reserve(renderTargets.size());
+  for (auto renderTarget : renderTargets) {
+    renderTargetHandles.push_back(renderTarget->CpuHandle());
+  }
+
   D3D12_CPU_DESCRIPTOR_HANDLE depthStencilHandle = {};
   const D3D12_CPU_DESCRIPTOR_HANDLE *pDepthStencilHandle = nullptr;
 
@@ -129,7 +151,7 @@ void CommandAllocator::SetRenderTargets(
 
   D3D12_VIEWPORT viewport{
       0, 0, float(definition.Width), float(definition.Height), 0.f, 1.f};
-  (*this)->RSSetViewports(1, &viewport);
+  (*this)->RSSetViewports(1, &viewport);*/
 }
 
 void CommandAllocator::Dispatch(uint32_t x, uint32_t y, uint32_t z) {

@@ -1,6 +1,7 @@
 
 #include "constants.hlsli"
-#define PI 3.14159265359
+#define PI		3.1415926535897932
+#define TWO_PI	6.2831853071795864
 struct cameraConstants
 {
     float4x4 vMatrix;
@@ -29,6 +30,7 @@ struct DebugValues
     // 10: DS show neg normal
     // 11: DS show pos
     // 12: DS show materialVal
+    // 13: DS show depth
     // Bits [24,31] are reversed for debug reasons
     uint flags;
 
