@@ -37,7 +37,7 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3
     int2 loc = (groupID * M + threadID.xy - 1) & (DISP_MAP_SIZE - 1);
     cache[threadID.x][threadID.y] = displacement[loc].xyz;
 
-        // These threads only existed to read from texture
+        // These threads only exist to read from texture
     if (threadID.x == 0 || threadID.y == 0 || threadID.x == M + 1 || threadID.y == M + 1)
     {
         return;
