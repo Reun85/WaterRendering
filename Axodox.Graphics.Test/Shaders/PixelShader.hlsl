@@ -29,7 +29,6 @@ struct output_t
 {
     float4 albedo;
     float4 normal;
-    float4 position;
     float4 materialValues;
 };
 
@@ -120,8 +119,6 @@ output_t main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
 
     //low
     output.albedo = float4(albedo, saturate(foam));
-    //high
-    output.position = float4(input.localPos, 0);
     //high
     output.normal = float4(normal, 1);
     //low

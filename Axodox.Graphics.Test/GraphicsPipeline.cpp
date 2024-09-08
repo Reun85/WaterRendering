@@ -89,7 +89,6 @@ void ShadowMapping::Textures::TranslateToView(CommandAllocator &allocator,
 void DeferredShading::BindGBuffer(const GBuffer &buffers) {
   albedo = *buffers.Albedo.ShaderResource();
   normal = *buffers.Normal.ShaderResource();
-  position = *buffers.Position.ShaderResource();
   materialValues = *buffers.MaterialValues.ShaderResource();
 }
 
@@ -128,7 +127,6 @@ void DeferredShading::GBuffer::MakeCompatible(
 void DeferredShading::GBuffer::Clear(CommandAllocator &allocator) {
   Albedo.RenderTarget()->Clear(allocator);
   Normal.RenderTarget()->Clear(allocator);
-  Position.RenderTarget()->Clear(allocator);
   MaterialValues.RenderTarget()->Clear(allocator);
 }
 
@@ -138,8 +136,6 @@ void DeferredShading::GBuffer::TranslateToTarget(CommandAllocator &allocator) {
       {Albedo.operator Axodox::Graphics::D3D12::ResourceArgument(),
        ResourceStates::PixelShaderResource, ResourceStates::RenderTarget},
       {Normal.operator Axodox::Graphics::D3D12::ResourceArgument(),
-       ResourceStates::PixelShaderResource, ResourceStates::RenderTarget},
-      {Position.operator Axodox::Graphics::D3D12::ResourceArgument(),
        ResourceStates::PixelShaderResource, ResourceStates::RenderTarget},
       {MaterialValues.operator Axodox::Graphics::D3D12::ResourceArgument(),
        ResourceStates::PixelShaderResource, ResourceStates::RenderTarget},
@@ -151,8 +147,6 @@ void DeferredShading::GBuffer::TranslateToView(CommandAllocator &allocator) {
       {Albedo.operator Axodox::Graphics::D3D12::ResourceArgument(),
        ResourceStates::RenderTarget, ResourceStates::PixelShaderResource},
       {Normal.operator Axodox::Graphics::D3D12::ResourceArgument(),
-       ResourceStates::RenderTarget, ResourceStates::PixelShaderResource},
-      {Position.operator Axodox::Graphics::D3D12::ResourceArgument(),
        ResourceStates::RenderTarget, ResourceStates::PixelShaderResource},
       {MaterialValues.operator Axodox::Graphics::D3D12::ResourceArgument(),
        ResourceStates::RenderTarget, ResourceStates::PixelShaderResource},

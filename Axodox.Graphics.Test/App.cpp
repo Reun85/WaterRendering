@@ -104,6 +104,10 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     Mode mode = Mode::Full;
 
+    std::array<bool, 3> getChannels() {
+      // I am sorry, I am lazy
+      return {DebugBits[3], DebugBits[4], DebugBits[5]};
+    }
     RasterizerFlags rasterizerFlags = RasterizerFlags::CullNone;
     void DrawImGui(NeedToDo &out, bool exclusiveWindow = true) {
       bool cont = true;
@@ -789,13 +793,16 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
       RuntimeResults runtimeResults;
 
+      auto oceanModelMatrix =
+          XMMatrixTranslationFromVector(XMVECTOR{0, -5, 0, 1});
       auto oceanDataFut = threadpool_execute<
           std::vector<WaterGraphicRootDescription::OceanData>
-              &>([&cpuBuffers, cam, simData, &runtimeResults]()
+              &>([&cpuBuffers, cam, simData, &runtimeResults,
+                  oceanModelMatrix]()
                      -> std::vector<WaterGraphicRootDescription::OceanData> & {
         cpuBuffers.oceanData.clear();
         return WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
-            cpuBuffers.oceanData, cam, XMMatrixIdentity(),
+            cpuBuffers.oceanData, cam, oceanModelMatrix,
             simData.quadTreeDistanceThreshold, &runtimeResults);
       });
 
@@ -848,7 +855,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
         WaterSimulationComputeShader(
             simResource, simulationConstantSources, simulationMutableSources,
-            simData, fullSimPipeline, computeAllocator, timeDataBuffer, N);
+            simData, fullSimPipeline, computeAllocator, timeDataBuffer, N,
+            debugValues.getChannels());
 
         // Upload queue
         {
@@ -918,7 +926,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         {
 
           // Will be accessed in multiple parts
-          auto modelMatrix = XMMatrixIdentity();
+          const auto &modelMatrix = oceanModelMatrix;
 
           // Need to reset after drawing
           std::optional<GpuVirtualAddress> usedTextureAddress;

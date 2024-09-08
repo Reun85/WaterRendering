@@ -152,34 +152,31 @@ struct DeferredShading : public RootSignatureMask {
 
   struct GBuffer : TextureBuffers {
     MutableTexture Albedo;
-    MutableTexture Position;
     MutableTexture Normal;
     MutableTexture MaterialValues;
 
-    const static constexpr u8 NumberOfBuffers = 4;
+    const static constexpr u8 NumberOfBuffers = 3;
 
     std::array<const RenderTargetView *, NumberOfBuffers>
     GetGBufferViews() const {
       return {Albedo.RenderTarget(), Normal.RenderTarget(),
-              Position.RenderTarget(), MaterialValues.RenderTarget()};
+              MaterialValues.RenderTarget()};
     }
 
     //
     constexpr static std::array<Format, NumberOfBuffers> GetGBufferFormats() {
       using enum Axodox::Graphics::D3D12::Format;
-      return {B8G8R8A8_UNorm, R16G16B16A16_Float, R16G16B16A16_Float,
-              R16G16B16A16_Float};
+      return {B8G8R8A8_UNorm, R16G16B16A16_Float, R16G16B16A16_Float};
     };
 
     std::array<MutableTexture *, NumberOfBuffers> GetBuffers() {
-      return {&Albedo, &Normal, &Position, &MaterialValues};
+      return {&Albedo, &Normal, &MaterialValues};
     }
     std::array<std::pair<MutableTexture *, Format>, NumberOfBuffers>
     GetBuffersAndFormats();
 
     explicit GBuffer(const ResourceAllocationContext &context)
-        : Albedo(context), Position(context), Normal(context),
-          MaterialValues(context) {}
+        : Albedo(context), Normal(context), MaterialValues(context) {}
 
     void MakeCompatible(const RenderTargetView &finalTarget,
                         ResourceAllocationContext &allocationContext) override;
@@ -230,7 +227,7 @@ struct DeferredShading : public RootSignatureMask {
         gradientsLowest(this, {DescriptorRangeType::ShaderResource, 22},
                         ShaderVisibility::Pixel),
         lightingBuffer(this, {1}, ShaderVisibility::Pixel),
-        cameraBuffer(this, {0}, ShaderVisibility::Pixel),
+        cameraBuffer(this, {31}, ShaderVisibility::Pixel),
         debugBuffer(this, {9}, ShaderVisibility::Pixel),
         deferredShaderBuffer(this, {2}, ShaderVisibility::Pixel),
         Sampler(this, {0}, Filter::Linear, TextureAddressMode::Clamp) {

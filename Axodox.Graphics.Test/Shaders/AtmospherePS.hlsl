@@ -23,7 +23,6 @@ struct output_t
 {
     float4 albedo;
     float4 normal;
-    float4 position;
     float4 materialValues;
 };
 

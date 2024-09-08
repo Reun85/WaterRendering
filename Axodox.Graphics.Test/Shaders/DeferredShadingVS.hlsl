@@ -15,7 +15,6 @@ struct output_t
 
 output_t main(input_t input)
 {
-
     output_t output;
     output.position = float4(input.position, 1);
     output.textureCoord = input.texture;

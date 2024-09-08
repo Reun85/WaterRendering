@@ -18,8 +18,8 @@ SamplerState _sampler : register(s0);
 
 float LinearizeDepth(float depth, float near, float far)
 {
-    return depth / far;
-    return (depth - near) / (far - near);
+    //return depth / far;
+   // return (depth - near) / (far - near);
     return (2.0f * near) / (far + near - depth * (far - near));
     return near / (far - depth * (far - near));
 }
@@ -31,7 +31,7 @@ cbuffer DebugBuffer : register(b9)
 }
 
 
-cbuffer CameraBuffer : register(b0)
+cbuffer CameraBuffer : register(b31)
 {
     cameraConstants camConstants;
 }
@@ -85,21 +85,23 @@ float4 main(input_t input) : SV_TARGET
     }
    
     float4 _normalinput = _normal.Load(pixelLoadCoords);
-    float4 _positioninput = _position.Load(pixelLoadCoords);
     float4 _materialValuesinput = _materialValues.Load(pixelLoadCoords);
     //const float depth = LinearizeDepth(_depthTex.Load(pixelLoadCoords), 0.01, 1000);
     const float depth = _depthTex.Load(pixelLoadCoords);
 
     float2 ndc = input.uv * 2.0f - 1.0f; // Convert UV [0,1] -> NDC [-1,1]
-    float4 clipSpacePos = float4(ndc, depth, 1.0f);
+    double4 clipSpacePos = double4(ndc, depth, 1.0f);
 
 // Apply inverse view-projection matrix to get world space position
-    //float4 worldPos = mul(clipSpacePos, camConstants.INVvpMatrix);
-    float4 worldPos = mul(clipSpacePos, camConstants.INVvpMatrix);
+    double4 worldPos = mul(clipSpacePos, camConstants.INVvpMatrix);
 
 // Perform perspective divide to get the world-space position
-    float3 localPos = worldPos.xyz / worldPos.w;
-  //  float3 localPos = _positioninput.rgb;
+    float3 localPos = hetdiv(worldPos);
+
+    //float3 ps = hetdiv(mul(float4(localPos, 1), camConstants.vpMatrix));
+    //float2 uv = (ps.xy + 1) / 2;
+    //return float4(uv, 0, 1);
+    
 
 
     float3 albedo = _albedoinput.rgb;
@@ -143,11 +145,11 @@ float4 main(input_t input) : SV_TARGET
         return _materialValuesinput;
     }
     
-    //if (has_flag(debugValues.flags, 13))
-    //{
-    //    float x = depth;
-    //    return float4(x, x, x, 1);
-    //}
+    if (has_flag(debugValues.flags, 13))
+    {
+        float x = LinearizeDepth(depth, 0.01, 1000);
+        return float4(x, x, x, 1);
+    }
 
     //if (matId > matIdEPS)
     //{

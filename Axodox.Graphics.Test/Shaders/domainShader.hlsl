@@ -38,6 +38,8 @@ struct HS_CONSTANT_DATA_OUTPUT
     float inside[2] : SV_InsideTessFactor;
 };
 
+
+
 // Ran once per output vertex
 [domain("quad")]
 DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
@@ -111,6 +113,8 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
     
     float4 position = mul(float4(localPos, 1), camConstants.vpMatrix);
     output.Position = position;
+    //position = float4(hetdiv(position), 1);
+    //localPos = hetdiv(mul(position, camConstants.INVvpMatrix)).xyz;
     output.TexCoord = planeCoord;
     output.localPos = localPos;
     output.grad = grad;

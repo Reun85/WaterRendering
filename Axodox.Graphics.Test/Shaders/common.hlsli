@@ -197,4 +197,12 @@ float G_Smith(float NdotL, float NdotV, float roughness)
     float G_L = NdotL / (NdotL * (1.0 - k) + k);
     return G_V * G_L;
 }
+double3 hetdiv(double4 v)
+{
+    return v.xyz / v.w;
+}
+float3 hetdiv(float4 v)
+{
+    return v.xyz / v.w;
+}
 

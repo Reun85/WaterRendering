@@ -177,7 +177,7 @@ inline MeshDescription CreateBackwardsPlane(float size,
     for (uint32_t i = 0; i < subdivisions.x; i++) {
       *pVertex++ = {XMFLOAT3{xstart + i * xstep, ystart + j * ystep, 0.f},
                     XMBYTEN4{0.f, 0.f, 1.f, 1.f},
-                    XMUSHORTN2{i * xtexstep, 1 - j * ytexstep}};
+                    XMUSHORTN2{i * xtexstep, j * ytexstep}};
     }
   }
 

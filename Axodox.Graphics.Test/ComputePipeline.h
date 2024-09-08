@@ -338,27 +338,37 @@ static void WaterSimulationComputeShader(
     const SimulationData &simData,
     SimulationStage::FullPipeline &fullSimPipeline,
     Axodox::Graphics::D3D12::CommandAllocator &computeAllocator,
-    Axodox::Graphics::D3D12::GpuVirtualAddress timeDataBuffer, const u32 &N) {
+    Axodox::Graphics::D3D12::GpuVirtualAddress timeDataBuffer, const u32 &N,
+    const std::array<bool, 3> useLod = {true, true, true}) {
   struct LODData {
+  public:
     SimulationStage::SimulationResources::LODDataBuffers &buffers;
     SimulationStage::ConstantGpuSources<>::LODDataSource &sources;
     MutableTexture &Foam;
     GpuVirtualAddress constantBuffer;
   };
 
-  std::array<LODData, 3> lodData = {
-      LODData{simResource.HighestBuffer, simulationConstantSources.Highest,
-              simulationMutableSources.Highest.Foam,
-              simResource.DynamicBuffer.AddBuffer(
-                  SimulationStage::LODComputeBuffer(simData.Highest))},
-      LODData{simResource.MediumBuffer, simulationConstantSources.Medium,
-              simulationMutableSources.Medium.Foam,
-              simResource.DynamicBuffer.AddBuffer(
-                  SimulationStage::LODComputeBuffer(simData.Medium))},
-      LODData{simResource.LowestBuffer, simulationConstantSources.Lowest,
-              simulationMutableSources.Lowest.Foam,
-              simResource.DynamicBuffer.AddBuffer(
-                  SimulationStage::LODComputeBuffer(simData.Lowest))}};
+  std::vector<LODData> lodData;
+  if (useLod[0])
+    lodData.emplace_back(
+        simResource.HighestBuffer, simulationConstantSources.Highest,
+        simulationMutableSources.Highest.Foam,
+        simResource.DynamicBuffer.AddBuffer(
+            SimulationStage::LODComputeBuffer(simData.Highest)));
+  if (useLod[1])
+    lodData.emplace_back(
+        simResource.MediumBuffer, simulationConstantSources.Medium,
+        simulationMutableSources.Medium.Foam,
+        simResource.DynamicBuffer.AddBuffer(
+            SimulationStage::LODComputeBuffer(simData.Medium)));
+
+  if (useLod[2])
+    lodData.emplace_back(
+        simResource.LowestBuffer, simulationConstantSources.Lowest,
+        simulationMutableSources.Lowest.Foam,
+        simResource.DynamicBuffer.AddBuffer(
+            SimulationStage::LODComputeBuffer(simData.Lowest)));
+
   // Spektrums
   fullSimPipeline.spektrumPipeline.Apply(computeAllocator);
   for (const LODData &dat : lodData) {
