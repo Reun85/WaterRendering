@@ -6,7 +6,6 @@ RWTexture2D<float2> tilde_h : register(u0);
 RWTexture2D<float2> tilde_D : register(u1);
 
 
-#define N DISP_MAP_SIZE
 
 cbuffer Constants : register(b0)
 {
@@ -15,6 +14,7 @@ cbuffer Constants : register(b0)
 
 
 
+#define N DISP_MAP_SIZE
 #define LOG2_M 4
 #define M (1<<LOG2_M)
 #define MHalf (M>>1)
@@ -24,14 +24,12 @@ cbuffer Constants : register(b0)
 
 
 groupshared float2 cache[M][M];
-// What would the group sizes be?
 [numthreads(MHalf, M, 2)]
-//[numthreads(M, M, 1)]
-void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3 LTid : SV_GroupID)
+void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3 GTid : SV_GroupID)
 {
-    int2 groupID = LTid.xy;
-    int2 threadID = GTid.xy;
-    bool mirroredInMiddle = GTid.z == 1;
+    int2 groupID = GTid.xy;
+    int2 threadID = LTid.xy;
+    bool mirroredInMiddle = LTid.z == 1;
 
     if (mirroredInMiddle)
     {
