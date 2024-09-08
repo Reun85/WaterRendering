@@ -14,12 +14,23 @@ cbuffer Test : register(b9)
     ComputeConstants constants;
 }
 
+#define LOG2_M 4
 
-[numthreads(16, 16, 1)]
-void main(uint3 dispatchThreadID : SV_DispatchThreadID)
+#define N DISP_MAP_SIZE
+#define M (1<<LOG2_M)
+#define MHalf (M>>1)
+#define LOG2_N_DIV_M (DISP_MAP_LOG2-LOG2_M)
+#define N_DIV_M (1 << LOG2_N_DIV_M)
+
+
+
+
+
+[numthreads(M, M, 1)]
+void main(uint3 DTid : SV_DispatchThreadID)
 {
     const float decayRate = constants.foamExponentialDecay * 60;
-    const int2 loc = int2(dispatchThreadID.xy);
+    const int2 loc = int2(DTid.xy);
 
     const float minEPS = 0.0001;
 
