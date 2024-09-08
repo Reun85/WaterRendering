@@ -294,3 +294,15 @@ struct RuntimeResults {
       ImGui::End();
   }
 };
+
+inline float3 XMVECTORToFloat3(const XMVECTOR &x) {
+  float3 result;
+  XMStoreFloat3(&result, x);
+  return result;
+}
+
+inline float4x4 XMMatrixToFloat4x4(const XMMATRIX &x) {
+  float4x4 result;
+  XMStoreFloat4x4(&result, x);
+  return result;
+}

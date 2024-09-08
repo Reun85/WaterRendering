@@ -662,10 +662,13 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     const u32 &N = simData.N;
 
     swapChain.Resizing(
-        no_revoke, [&frameResources, &commonDescriptorHeap](SwapChain const *) {
+        no_revoke,
+        [&cam, &frameResources, &commonDescriptorHeap](SwapChain const *self) {
           for (auto &frame : frameResources)
             frame.ScreenResourceView.reset();
           commonDescriptorHeap.Clean();
+          auto resolution = self->Resolution();
+          cam.SetAspect(float(resolution.x) / float(resolution.y));
         });
 
     std::string ImGuiIniPath;
@@ -778,9 +781,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
       frameResource.MakeCompatible(*renderTargetView, mutableAllocationContext);
 
-      auto resolution = swapChain.Resolution();
-      cam.SetAspect(float(resolution.x) / float(resolution.y));
-      cam.Update(deltaTime);
+      bool camChanged = cam.Update(deltaTime);
       shadowMapData.Update(cam, sunData.lights[0]);
 
       // Frame Begin
@@ -797,13 +798,16 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           XMMatrixTranslationFromVector(XMVECTOR{0, -5, 0, 1});
       auto oceanDataFut = threadpool_execute<
           std::vector<WaterGraphicRootDescription::OceanData>
-              &>([&cpuBuffers, cam, simData, &runtimeResults,
+              &>([&cpuBuffers, cam, simData, &runtimeResults, camChanged,
                   oceanModelMatrix]()
                      -> std::vector<WaterGraphicRootDescription::OceanData> & {
-        cpuBuffers.oceanData.clear();
-        return WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
-            cpuBuffers.oceanData, cam, oceanModelMatrix,
-            simData.quadTreeDistanceThreshold, &runtimeResults);
+        if (camChanged) {
+          cpuBuffers.oceanData.clear();
+          return WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
+              cpuBuffers.oceanData, cam, oceanModelMatrix,
+              simData.quadTreeDistanceThreshold, &runtimeResults);
+        }
+        return cpuBuffers.oceanData;
       });
 
       // Compute shader stage
