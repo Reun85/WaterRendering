@@ -43,7 +43,12 @@ float4 TraceRay(float3 rayPos, float3 dir, int iterationCount)
     return hitColor;
 }
 
-[numthreads(16, 16, 1)]
+#define LOG2_M 4
+
+#define M (1<<LOG2_M)
+#define MHalf (M>>1)
+
+[numthreads(M, M, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
     uint2 size;
@@ -53,7 +58,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
     float4 color = colorBuffer.Load(int3(DTid.xy, 0));
   
 
-    float maxRayDistance = 200.0f;
+    float maxRayDistance = 50.0f;
 
     float4 reflectionColor;
     

@@ -63,7 +63,7 @@
     <AppxBundlePlatforms>x64</AppxBundlePlatforms>
     <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
     <AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>
-    <PackageCertificateThumbprint>51794976F1ECE87F896379C2CC2C945B6D20979B</PackageCertificateThumbprint>
+    <PackageCertificateThumbprint>8F86BED8218E9CC4A993B116BD27BB209BB64E45</PackageCertificateThumbprint>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(ProjectDir)/includes</IncludePath>

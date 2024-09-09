@@ -411,14 +411,20 @@ static void WaterSimulationComputeShader(
     };
 
     fullSimPipeline.FFTPipeline.Apply(computeAllocator);
-    // UAV+Transition
+    // UAV
     for (const LODData &dat : lodData) {
       MutableTextureWithState &text = dat.buffers.tildeh;
       computeAllocator.AddUAVBarrier(*text.UnorderedAccess(computeAllocator));
-      text.ShaderResource(computeAllocator);
 
       MutableTextureWithState &text2 = dat.buffers.tildeD;
       computeAllocator.AddUAVBarrier(*text2.UnorderedAccess(computeAllocator));
+    }
+    // Transition
+    for (const LODData &dat : lodData) {
+      MutableTextureWithState &text = dat.buffers.tildeh;
+      text.ShaderResource(computeAllocator);
+
+      MutableTextureWithState &text2 = dat.buffers.tildeD;
       text2.ShaderResource(computeAllocator);
     }
     // Stage1
@@ -426,14 +432,20 @@ static void WaterSimulationComputeShader(
       doFFT(dat.buffers.tildeh, dat.buffers.tildehBuffer);
       doFFT(dat.buffers.tildeD, dat.buffers.tildeDBuffer);
     }
-    // UAV+Transition
+    // UAV
     for (const LODData &dat : lodData) {
       MutableTextureWithState &text = dat.buffers.tildehBuffer;
       computeAllocator.AddUAVBarrier(*text.UnorderedAccess(computeAllocator));
-      text.ShaderResource(computeAllocator);
 
       MutableTextureWithState &text2 = dat.buffers.tildeDBuffer;
       computeAllocator.AddUAVBarrier(*text2.UnorderedAccess(computeAllocator));
+    }
+    // Transition
+    for (const LODData &dat : lodData) {
+      MutableTextureWithState &text = dat.buffers.tildehBuffer;
+      text.ShaderResource(computeAllocator);
+
+      MutableTextureWithState &text2 = dat.buffers.tildeDBuffer;
       text2.ShaderResource(computeAllocator);
     }
     // Stage2
@@ -452,6 +464,10 @@ static void WaterSimulationComputeShader(
           *dat.buffers.FFTTildeh.UnorderedAccess(computeAllocator));
       computeAllocator.AddUAVBarrier(
           *dat.buffers.FFTTildeD.UnorderedAccess(computeAllocator));
+    }
+    for (const LODData &dat : lodData) {
+      *dat.buffers.FFTTildeh.ShaderResource(computeAllocator);
+      *dat.buffers.FFTTildeD.ShaderResource(computeAllocator);
     }
     for (const LODData &dat : lodData) {
       auto mask = fullSimPipeline.displacementRootDescription.Set(
@@ -479,6 +495,10 @@ static void WaterSimulationComputeShader(
     for (const LODData &dat : lodData) {
       computeAllocator.AddUAVBarrier(
           *dat.buffers.displacementMap.UnorderedAccess(computeAllocator));
+    }
+    // Transition
+    for (const LODData &dat : lodData) {
+      *dat.buffers.displacementMap.ShaderResource(computeAllocator);
     }
     for (const LODData &dat : lodData) {
       auto mask = fullSimPipeline.gradientRootDescription.Set(

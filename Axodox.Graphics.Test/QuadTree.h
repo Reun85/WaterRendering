@@ -87,7 +87,6 @@ private:
 };
 // The plane must be perpendicular to the Y-axis.
 class QuadTree {
-
 public:
   struct Defaults {
     static constexpr Depth maxDepth = 40;
