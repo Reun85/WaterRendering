@@ -5,24 +5,21 @@ using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
 
 struct CubeMapPaths {
-public:
-  struct SidesInfo {
-    const std::filesystem::path PosX;
-    const std::filesystem::path NegX;
-    const std::filesystem::path PosY;
-    const std::filesystem::path NegY;
-    const std::filesystem::path PosZ;
-    const std::filesystem::path NegZ;
-  };
   union {
-    SidesInfo sides;
+    struct {
+      std::filesystem::path PosX;
+      std::filesystem::path NegX;
+      std::filesystem::path PosY;
+      std::filesystem::path NegY;
+      std::filesystem::path PosZ;
+      std::filesystem::path NegZ;
+    };
     std::array<const std::filesystem::path, 6> paths;
   };
   ~CubeMapPaths() noexcept {};
 };
 
 class CubeMapTexture {
-
 public:
   CubeMapTexture(const ResourceAllocationContext &context,
                  const CubeMapPaths &paths);

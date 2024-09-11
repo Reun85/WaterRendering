@@ -1,4 +1,3 @@
-
 #pragma once
 #include "pch.h"
 #include "Defaults.h"
@@ -38,9 +37,17 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
   };
   struct HullConstants {
     struct InstanceData {
-      XMFLOAT4 TesselationFactor;
+      // zneg,xneg, zpos, xpos
+      union {
+        struct {
+          f32 zneg;
+          f32 xneg;
+          f32 zpos;
+          f32 xpos;
+        };
+        XMFLOAT4 TesselationFactor;
+      };
     };
-    // zneg,xneg, zpos, xpos
     std::array<InstanceData, DefaultsValues::App::maxInstances> instanceData;
   };
   struct OceanData {
@@ -50,7 +57,6 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
   };
 
   struct PixelShaderPBRData {
-
     float3 SurfaceColor;
     float Roughness;
     float SubsurfaceScattering;
@@ -81,7 +87,6 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
   };
 
   struct WaterPixelShaderData {
-
     float3 AlbedoColor = float3(11.f, 53.f, 108.f) / 255.f;
     float Roughness = 0.192f;
     float3 _TipColor = float3(231.f, 231.f, 231.f) / 255.f;
@@ -149,7 +154,6 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
 };
 
 struct DeferredShading : public RootSignatureMask {
-
   struct GBuffer : TextureBuffers {
     MutableTexture Albedo;
     MutableTexture Normal;
@@ -231,7 +235,6 @@ struct DeferredShading : public RootSignatureMask {
         debugBuffer(this, {9}, ShaderVisibility::Pixel),
         deferredShaderBuffer(this, {2}, ShaderVisibility::Pixel),
         Sampler(this, {0}, Filter::Linear, TextureAddressMode::Clamp) {
-
     Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
   }
 

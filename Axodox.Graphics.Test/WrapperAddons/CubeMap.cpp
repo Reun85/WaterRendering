@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "../pch.h"
 #include "CubeMap.h"
 #include <DirectXTex.h>
 #include <ranges>
@@ -136,9 +137,7 @@ ConvertEquirectangularToCubeMap(const std::span<const PixelType> &src,
                                 const std::span<PixelType> &dest,
                                 const u32 outSize, const u32 inSizex,
                                 const u32 inSizey, const CubeMapFace &face) {
-
   for (u32 i = 0; i < outSize; ++i) {
-
     for (u32 j = 0; j < outSize; ++j) {
       auto [x, y, z] = FaceCoordinatesToWorldCoordinates(i, j, outSize, face);
       f32 theta = atan2(y, x); // [-pi, pi]
@@ -219,7 +218,6 @@ CubeMapTexture::CubeMapTexture(const ResourceAllocationContext &context,
       reinterpret_cast<const PixelType *>(image->pixels),
       image->width * image->height);
   for (int i = 0; i < faceCount; ++i) {
-
     std::span<PixelType> dest = textureData.AsTypedSpan<PixelType>(nullptr, i);
     ConvertEquirectangularToCubeMap<float4>(src, dest, width, image->width,
                                             image->height, (CubeMapFace)i);
@@ -249,7 +247,6 @@ CubeMapTexture::CubeMapTexture(const ResourceAllocationContext &context,
 
 CubeMapTexture::CubeMapTexture(const ResourceAllocationContext &context,
                                const CubeMapPaths &inp) {
-
   const u8 faceCount = 6;
 
   std::vector<TextureData> data;
@@ -271,7 +268,6 @@ CubeMapTexture::CubeMapTexture(const ResourceAllocationContext &context,
   TextureData textureData(header.PixelFormat, header.Width, header.Height,
                           faceCount);
   for (int i = 0; i < faceCount; ++i) {
-
     std::span<const u8> srcPtr = data[i].AsRawSpan();
     std::span<u8> destPtr = textureData.AsRawSpan(nullptr, i);
 

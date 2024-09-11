@@ -48,7 +48,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     bool timeRunning = true;
     XMFLOAT4 clearColor = DefaultsValues::App::clearColor;
     bool quit = false;
-    void DrawImGui(NeedToDo &out, bool exclusiveWindow = false) {
+    void DrawImGui([[maybe_unused]] NeedToDo &out,
+                   bool exclusiveWindow = false) {
       bool cont = true;
       if (exclusiveWindow)
         cont = ImGui::Begin("Runtime Settings");
@@ -122,7 +123,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         ImGui::InputFloat4("Blend Distances", (float *)&blendDistances);
         ImGui::Checkbox("Enable SSR", &enableSSR);
         for (auto &[id, name] : DebugBitsDesc) {
-
           if (name)
             ImGui::Checkbox(*name, &DebugBits[id]);
           else
@@ -624,17 +624,16 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                                        CreateBackwardsPlane(2, XMUINT2(2, 2))};
     ImmutableMesh skyboxMesh{immutableAllocationContext, CreateCube(2)};
 
-    const CubeMapPaths paths = {
-        .sides = {.PosX = app_folder() / "Assets/skybox/px.png",
-                  .NegX = app_folder() / "Assets/skybox/nx.png",
-                  .PosY = app_folder() / "Assets/skybox/py.png",
-                  .NegY = app_folder() / "Assets/skybox/ny.png",
-                  .PosZ = app_folder() / "Assets/skybox/pz.png",
-                  .NegZ = app_folder() / "Assets/skybox/nz.png"}};
-    CubeMapTexture skyboxTexture{immutableAllocationContext,
-                                 paths}; /*CubeMapTexture
-   skyboxTexture{immutableAllocationContext, app_folder() /
-   "Assets/skybox/skybox3.hdr", 2024};*/
+    const CubeMapPaths paths = {.PosX = app_folder() / "Assets/skybox/px.png",
+                                .NegX = app_folder() / "Assets/skybox/nx.png",
+                                .PosY = app_folder() / "Assets/skybox/py.png",
+                                .NegY = app_folder() / "Assets/skybox/ny.png",
+                                .PosZ = app_folder() / "Assets/skybox/pz.png",
+                                .NegZ = app_folder() / "Assets/skybox/nz.png"};
+    CubeMapTexture skyboxTexture{immutableAllocationContext, paths};
+    // CubeMapTexture skyboxTexture{immutableAllocationContext,
+    //                              app_folder() / "Assets/skybox/skybox3.hdr",
+    //                              2024};
 
     //  Acquire memory
     groupedResourceAllocator.Build();
@@ -884,7 +883,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
       // Graphics Stage
       {
-
         auto &allocator = frameResource.Allocator;
         {
           allocator.Reset();
@@ -931,7 +929,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
         // Draw Ocean
         {
-
           // Will be accessed in multiple parts
           const auto &modelMatrix = oceanModelMatrix;
 
