@@ -56,7 +56,6 @@ TextureData constexpr CreateTextureData(const Format &f, const u32 width,
 }
 
 inline MeshDescription CreateQuadPatch() {
-
   float size = 0.5f;
   MeshDescription result;
 
@@ -78,18 +77,18 @@ static ResourceStates GetResourceStateFromFlags(const TextureFlags &flags) {
     return ResourceStates::DepthWrite;
   } else if (has_flag(flags, TextureFlags::ShaderResourceDepthStencil)) {
     return ResourceStates::DepthWrite;
-  }
-
-  else if (has_flag(flags, TextureFlags::UnorderedAccess)) {
+  } else if (has_flag(flags, TextureFlags::UnorderedAccess)) {
     return ResourceStates::UnorderedAccess;
   } else {
     return ResourceStates::Common;
   }
 }
 
+// A class meant to simplify keeping track of a GPU resource's state.
+// If multiple threads (cpu or gpu command queues) use this in parallel, this
+// abstraction will cause more issues than it solves.
 class MutableTextureWithState
     : private Axodox::Graphics::D3D12::MutableTexture {
-
   ResourceStates _state;
 
 public:
@@ -98,11 +97,11 @@ public:
       : MutableTexture(context, definition),
         _state(GetResourceStateFromFlags(definition.Flags)) {}
 
-  // On the GPU this will happen when the queue reaches this command,
-  // on the CPU this will happen when this function is executed.
+  // On the GPU the transition happen when the queue reaches this command,
+  // on the CPU the "transition" will happen when this function is executed.
   // Therefore if this resource is only used linearly this is fine,
-  // but if multiple CPU threads or GPU queues use this function the state
-  // will not be correct.
+  // but if multiple CPU threads or GPU queues use this resource this
+  // abstraction will cause more issues than it solves.
   void Transition(CommandAllocator &allocator, const ResourceStates &newState) {
     if (_state == newState)
       return;
@@ -112,24 +111,22 @@ public:
     _state = newState;
   }
 
-  // On the GPU this will happen when the queue reaches this command,
-  // on the CPU this will happen when this function is executed.
+  // On the GPU the transition happen when the queue reaches this command,
+  // on the CPU the "transition" will happen when this function is executed.
   // Therefore if this resource is only used linearly this is fine,
-  // but if multiple CPU threads or GPU queues use this function the state
-  // will not be correct.
+  // but if multiple CPU threads or GPU queues use this resource this
+  // abstraction will cause more issues than it solves.
   ShaderResourceView *ShaderResource(CommandAllocator &allocator) {
     Transition(allocator, ResourceStates::AllShaderResource);
     return MutableTexture::ShaderResource();
   };
 
-  // On the GPU this will happen when the queue reaches this command,
-  // on the CPU this will happen when this function is executed.
+  // On the GPU the transition happen when the queue reaches this command,
+  // on the CPU the "transition" will happen when this function is executed.
   // Therefore if this resource is only used linearly this is fine,
-  // but if multiple CPU threads or GPU queues use this function the state
-  // will not be correct.
-
+  // but if multiple CPU threads or GPU queues use this resource this
+  // abstraction will cause more issues than it solves.
   UnorderedAccessView *UnorderedAccess(CommandAllocator &allocator) {
-
     Transition(allocator, ResourceStates::UnorderedAccess);
     return MutableTexture::UnorderedAccess();
   };
@@ -141,9 +138,9 @@ inline float frac(float x) { return x - std::floor(x); }
 
 struct NeedToDo {
   std::optional<RasterizerFlags> changeFlag;
-  bool PatchHighestChanged = false;
-  bool PatchMediumChanged = false;
-  bool PatchLowestChanged = false;
+  bool patchHighestChanged = false;
+  bool patchMediumChanged = false;
+  bool patchLowestChanged = false;
 };
 
 /// <summary>
@@ -209,7 +206,6 @@ inline MeshDescription CreateBackwardsPlane(float size,
 template <typename T, const size_t N>
 std::initializer_list<typename std::array<T, N>::value_type>
 to_initializer_list(const std::array<T, N> &arr) {
-
   return std::initializer_list<typename std::array<T, N>::value_type>(
       arr.data(), arr.data() + arr.size());
 }
@@ -230,7 +226,6 @@ struct LightData {
 };
 
 struct PixelLighting {
-
   std::array<LightData, ShaderConstantCompat::maxLightCount> lights;
   int lightCount;
 
@@ -305,4 +300,12 @@ inline float4x4 XMMatrixToFloat4x4(const XMMATRIX &x) {
   float4x4 result;
   XMStoreFloat4x4(&result, x);
   return result;
+}
+
+inline std::string GetLocalFolder() {
+  auto localFolder =
+      winrt::Windows::Storage::ApplicationData::Current().LocalFolder().Path();
+  std::wstring localFolderWstr = localFolder.c_str();
+  auto path = std::string(localFolderWstr.begin(), localFolderWstr.end());
+  return path;
 }

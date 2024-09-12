@@ -134,17 +134,18 @@ struct SimulationStage {
     struct LODDataBuffers {
       MutableTextureWithState tildeh;
       MutableTextureWithState tildeD;
-#if useDifferentFFTOutputBuffers
+#if useDifferentFFTBuffers
       MutableTextureWithState FFTTildeh;
       MutableTextureWithState FFTTildeD;
 #else
       MutableTextureWithState &FFTTildeh = tildeh;
       MutableTextureWithState &FFTTildeD = tildeD;
 #endif
-      MutableTextureWithState tildehBuffer;
-      MutableTextureWithState tildeDBuffer;
       MutableTextureWithState displacementMap;
       MutableTextureWithState gradients;
+
+      MutableTextureWithState tildehBuffer;
+      MutableTextureWithState tildeDBuffer;
 
       LODDataBuffers(const ResourceAllocationContext &context, const u32 N,
                      const u32 M)
@@ -154,7 +155,7 @@ struct SimulationStage {
             tildeD(context, TextureDefinition::TextureDefinition(
                                 Format::R32G32_Float, N, M, 0,
                                 TextureFlags::UnorderedAccess)),
-#if useDifferentFFTOutputBuffers
+#if useDifferentFFTBuffers
             FFTTildeh(context, TextureDefinition::TextureDefinition(
                                    Format::R32G32_Float, N, M, 0,
                                    TextureFlags::UnorderedAccess)),
@@ -169,7 +170,7 @@ struct SimulationStage {
                                       Format::R32G32_Float, N, M, 0,
                                       TextureFlags::UnorderedAccess)),
             displacementMap(context, TextureDefinition::TextureDefinition(
-                                         Format::R32G32B32A32_Float, N, M, 0,
+                                         Format::R16G16B16A16_Float, N, M, 0,
                                          TextureFlags::UnorderedAccess)),
             gradients(context, TextureDefinition::TextureDefinition(
                                    Format::R16G16B16A16_Float, N, M, 0,

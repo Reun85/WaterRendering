@@ -25,9 +25,9 @@ void SimulationData::DrawImGui(NeedToDo &out, bool exclusiveWindow) {
     change |= ImGui::InputFloat("QuadTree distanceThreshold",
                                 &quadTreeDistanceThreshold);
     ImGui::Separator();
-    out.PatchHighestChanged = hig || change;
-    out.PatchMediumChanged = med || change;
-    out.PatchLowestChanged = low || change;
+    out.patchHighestChanged = hig || change;
+    out.patchMediumChanged = med || change;
+    out.patchLowestChanged = low || change;
   }
   if (exclusiveWindow)
     ImGui::End();

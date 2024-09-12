@@ -26,6 +26,7 @@ using namespace Axodox::Storage;
 using namespace Axodox::Threading;
 using namespace DirectX;
 using namespace DirectX::PackedVector;
+
 struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   IFrameworkView CreateView() const { return *this; }
   void Initialize(CoreApplicationView const &) const {
@@ -299,6 +300,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       set_flag(res.flags, 3, false);
       set_flag(res.flags, 4, false);
       set_flag(res.flags, 5, true);
+      break;
+    default:
       break;
     }
     return res;
@@ -670,16 +673,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           cam.SetAspect(float(resolution.x) / float(resolution.y));
         });
 
-    std::string ImGuiIniPath;
-    {
-      auto localFolder = winrt::Windows::Storage::ApplicationData::Current()
-                             .LocalFolder()
-                             .Path();
-      std::wstring localFolderWstr = localFolder.c_str();
-      ImGuiIniPath =
-          std::string(localFolderWstr.begin(), localFolderWstr.end()) +
-          "\\imgui.ini";
-    }
+    std::string ImGuiIniPath = GetLocalFolder() + "/imgui.ini";
 
     ID3D12DescriptorHeap *ImGuiDescriptorHeap =
         InitImGui(device, (u8)frameResources.size(), ImGuiIniPath);
@@ -699,16 +693,16 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         std::chrono::high_resolution_clock::now();
 
     NeedToDo beforeNextFrame;
-    beforeNextFrame.PatchHighestChanged = true;
-    CommandFence beforeNextFence(device);
-    std::vector<CommandFenceMarker> AdditionalMarkers;
+    beforeNextFrame.patchHighestChanged = true;
+    beforeNextFrame.patchMediumChanged = true;
+    beforeNextFrame.patchLowestChanged = true;
 
     RuntimeCPUBuffers cpuBuffers;
 
-    loopStartTime = std::chrono::high_resolution_clock::now();
     auto resolution = swapChain.Resolution();
     cam.SetAspect(float(resolution.x) / float(resolution.y));
 
+    loopStartTime = std::chrono::high_resolution_clock::now();
     while (!settings.quit) {
       // Process user input
       dispatcher.ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
@@ -725,31 +719,39 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
       auto renderTargetView = swapChain.RenderTargetView();
 
-      std::optional<std::future<PipelineState>> newPipelineState;
-      std::optional<SimulationStage::ConstantGpuSources<>::LODDataSource>
-          newHighestData;
-      std::optional<SimulationStage::ConstantGpuSources<>::LODDataSource>
-          newMediumData;
-      std::optional<SimulationStage::ConstantGpuSources<>::LODDataSource>
-          newLowestData;
+      struct NewData {
+        std::optional<std::future<PipelineState>> pipelineState;
+        std::optional<SimulationStage::ConstantGpuSources<>::LODDataSource>
+            highestData;
+        std::optional<SimulationStage::ConstantGpuSources<>::LODDataSource>
+            mediumData;
+        std::optional<SimulationStage::ConstantGpuSources<>::LODDataSource>
+            lowestData;
+      };
+
+      NewData newData;
       {
         if (beforeNextFrame.changeFlag) {
           waterPipelineStateDefinition.RasterizerState.Flags =
               *beforeNextFrame.changeFlag;
-          newPipelineState = pipelineStateProvider.CreatePipelineStateAsync(
-              waterPipelineStateDefinition);
+          newData.pipelineState =
+              pipelineStateProvider.CreatePipelineStateAsync(
+                  waterPipelineStateDefinition);
         }
-        if (beforeNextFrame.PatchHighestChanged) {
-          newHighestData = SimulationStage::ConstantGpuSources<>::LODDataSource(
-              mutableAllocationContext, simData.Highest);
+        if (beforeNextFrame.patchHighestChanged) {
+          newData.highestData =
+              SimulationStage::ConstantGpuSources<>::LODDataSource(
+                  mutableAllocationContext, simData.Highest);
         }
-        if (beforeNextFrame.PatchMediumChanged) {
-          newMediumData = SimulationStage::ConstantGpuSources<>::LODDataSource(
-              mutableAllocationContext, simData.Medium);
+        if (beforeNextFrame.patchMediumChanged) {
+          newData.mediumData =
+              SimulationStage::ConstantGpuSources<>::LODDataSource(
+                  mutableAllocationContext, simData.Medium);
         }
-        if (beforeNextFrame.PatchLowestChanged) {
-          newLowestData = SimulationStage::ConstantGpuSources<>::LODDataSource(
-              mutableAllocationContext, simData.Lowest);
+        if (beforeNextFrame.patchLowestChanged) {
+          newData.lowestData =
+              SimulationStage::ConstantGpuSources<>::LODDataSource(
+                  mutableAllocationContext, simData.Lowest);
         }
       }
 
@@ -760,8 +762,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         drawingSimResource.Fence.Await(drawingSimResource.FrameDoneMarker);
       // This is necessary for the compute queue
 
-      if (beforeNextFrame.changeFlag && newPipelineState) {
-        waterPipelineState = newPipelineState->get();
+      if (beforeNextFrame.changeFlag && newData.pipelineState) {
+        waterPipelineState = newData.pipelineState->get();
         beforeNextFrame.changeFlag = std::nullopt;
       }
 
@@ -783,7 +785,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       frameResource.MakeCompatible(*renderTargetView, mutableAllocationContext);
 
       bool camChanged = cam.Update(deltaTime);
-      shadowMapData.Update(cam, sunData.lights[0]);
+      // shadowMapData.Update(cam, sunData.lights[0]);
 
       // Frame Begin
       {
@@ -821,7 +823,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         commonDescriptorHeap.Set(computeAllocator);
 
         // If a change has been issued change constant buffers
-        if (newHighestData || newMediumData || newLowestData) {
+        if (newData.highestData || newData.mediumData || newData.lowestData) {
           auto copyRes = [&computeAllocator](const MutableTexture &src,
                                              const MutableTexture &dst) {
             computeAllocator.TransitionResources(
@@ -842,17 +844,17 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                 copyRes(src.Tildeh0, dst.Tildeh0);
                 copyRes(src.Frequencies, dst.Frequencies);
               };
-          if (newHighestData) {
-            copyLOD(*newHighestData, simulationConstantSources.Highest);
-            beforeNextFrame.PatchHighestChanged = false;
+          if (newData.highestData) {
+            copyLOD(*newData.highestData, simulationConstantSources.Highest);
+            beforeNextFrame.patchHighestChanged = false;
           }
-          if (newMediumData) {
-            copyLOD(*newMediumData, simulationConstantSources.Medium);
-            beforeNextFrame.PatchMediumChanged = false;
+          if (newData.mediumData) {
+            copyLOD(*newData.mediumData, simulationConstantSources.Medium);
+            beforeNextFrame.patchMediumChanged = false;
           }
-          if (newLowestData) {
-            copyLOD(*newLowestData, simulationConstantSources.Lowest);
-            beforeNextFrame.PatchLowestChanged = false;
+          if (newData.lowestData) {
+            copyLOD(*newData.lowestData, simulationConstantSources.Lowest);
+            beforeNextFrame.patchLowestChanged = false;
           }
         }
 
@@ -929,7 +931,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
         // Draw Ocean
         {
-          // Will be accessed in multiple parts
+          // Will be accessed in multiple sections
           const auto &modelMatrix = oceanModelMatrix;
 
           // Need to reset after drawing
@@ -1007,7 +1009,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           }
 
           // GBuffer Pass
-
           {
             waterPipelineState.Apply(allocator);
 
@@ -1017,7 +1018,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                                       std::to_address(gBufferViews.end())),
                 frameResource.DepthBuffer.DepthStencil());
 
-            auto oceanQuadData = oceanDataFuture.get();
+            const auto &oceanQuadData = oceanDataFuture.get();
             for (auto &curr : oceanQuadData) {
               if (curr.N == 0)
                 continue;
