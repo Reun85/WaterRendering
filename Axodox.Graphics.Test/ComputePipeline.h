@@ -467,8 +467,8 @@ static void WaterSimulationComputeShader(
           *dat.buffers.FFTTildeD.UnorderedAccess(computeAllocator));
     }
     for (const LODData &dat : lodData) {
-      *dat.buffers.FFTTildeh.ShaderResource(computeAllocator);
-      *dat.buffers.FFTTildeD.ShaderResource(computeAllocator);
+      dat.buffers.FFTTildeh.ShaderResource(computeAllocator);
+      dat.buffers.FFTTildeD.ShaderResource(computeAllocator);
     }
     for (const LODData &dat : lodData) {
       auto mask = fullSimPipeline.displacementRootDescription.Set(
@@ -499,7 +499,7 @@ static void WaterSimulationComputeShader(
     }
     // Transition
     for (const LODData &dat : lodData) {
-      *dat.buffers.displacementMap.ShaderResource(computeAllocator);
+      dat.buffers.displacementMap.ShaderResource(computeAllocator);
     }
     for (const LODData &dat : lodData) {
       auto mask = fullSimPipeline.gradientRootDescription.Set(

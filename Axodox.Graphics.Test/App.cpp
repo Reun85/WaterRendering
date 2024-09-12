@@ -484,6 +484,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     GraphicsDevice device{};
     CommandQueue directQueue{device};
+    CommandQueue computeQueue{device /*, CommandKind::Compute*/};
     CoreSwapChain swapChain{directQueue, window,
                             SwapChainFlags::IsTearingAllowed};
     // CoreSwapChain swapChain{directQueue, window, SwapChainFlags::Default};
@@ -858,6 +859,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           }
         }
 
+        // Since we are using this on different queues, it is uploaded twice.
         GpuVirtualAddress timeDataBuffer =
             simResource.DynamicBuffer.AddBuffer(timeConstants);
 
@@ -874,11 +876,11 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           resourceUploader.UploadResourcesAsync(computeAllocator);
           auto initCommandList = computeAllocator.EndList();
 
-          directQueue.Execute(initCommandList);
-          directQueue.Execute(commandList);
+          computeQueue.Execute(initCommandList);
+          computeQueue.Execute(commandList);
 
           simResource.FrameDoneMarker =
-              simResource.Fence.EnqueueSignal(directQueue);
+              simResource.Fence.EnqueueSignal(computeQueue);
         }
         return true;
       });
@@ -892,8 +894,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           allocator.TransitionResource(*renderTargetView,
                                        ResourceStates::Present,
                                        ResourceStates::RenderTarget);
-
           commonDescriptorHeap.Set(allocator);
+
           renderTargetView->Clear(allocator, settings.clearColor);
           frameResource.Clear(allocator);
         }
