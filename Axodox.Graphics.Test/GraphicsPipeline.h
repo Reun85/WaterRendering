@@ -88,7 +88,7 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
 
   struct WaterPixelShaderData {
     float3 AlbedoColor = float3(11.f, 53.f, 108.f) / 255.f;
-    float Roughness = 0.192f;
+    float Roughness = 0.150f;
     float3 _TipColor = float3(231.f, 231.f, 231.f) / 255.f;
     float foamDepthFalloff = 0.245f;
     float foamRoughnessModifier = 5.0f;
@@ -332,6 +332,32 @@ struct ShadowMapping : public RootSignatureMask {
     Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
   }
 };
+
+struct ShadowVolume : RootSignatureMask {
+  struct Textures : TextureBuffers {
+    MutableTextureWithViews StencilBuffer;
+
+    explicit Textures(const ResourceAllocationContext &context);
+
+    void MakeCompatible(const RenderTargetView &finalTarget,
+                        ResourceAllocationContext &allocationContext) override {
+      // No need to allocate
+    }
+    void Clear(CommandAllocator &allocator) override;
+    void TranslateToTarget(CommandAllocator &allocator);
+    void TranslateToView(
+        CommandAllocator &allocator,
+        const ResourceStates &newState = ResourceStates::AllShaderResource);
+    ~Textures() override = default;
+  };
+
+  explicit ShadowVolume(const RootSignatureContext &context)
+      : RootSignatureMask(context) {
+    Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
+  }
+  constexpr static D3D12_DEPTH_STENCIL_DESC GetDepthStencilDesc();
+};
+
 struct SSRPostProcessing : public RootSignatureMask {
   RootDescriptor<RootDescriptorType::ConstantBuffer> CameraBuffer;
   RootDescriptorTable<1> InpColor;

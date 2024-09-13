@@ -562,27 +562,28 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         pipelineStateProvider
             .CreatePipelineStateAsync(deferredShadingPipelineStateDefinition)
             .get();
-    RootSignature<ShadowMapping> shadowMappingRootSignature{device};
-    GeometryShader shadowMappingGeometryShader{app_folder() /
-                                               L"ShadowMapGS.cso"};
-    PixelShader shadowMappingPixelShader{app_folder() / L"ShadowMapPS.cso"};
 
-    GraphicsPipelineStateDefinition shadowMappingPipelineStateDefinition{
-        .RootSignature = &shadowMappingRootSignature,
+    RootSignature<ShadowVolume> shadowVolumeRootSignature{device};
+    GeometryShader shadowVolumeGeometryShader{app_folder() /
+                                              L"ShadowVolGS.cso"};
+    PixelShader shadowVolumePixelShader{app_folder() / L"ShadowVolPS.cso"};
+
+    /*GraphicsPipelineStateDefinition shadowVolumePipelineStateDefinition{
+        .RootSignature = &shadowVolumeRootSignature,
         .VertexShader = &simpleVertexShader,
         .DomainShader = &domainShader,
         .HullShader = &hullShader,
-        .GeometryShader = &shadowMappingGeometryShader,
-        .PixelShader = &shadowMappingPixelShader,
+        .GeometryShader = &shadowVolumeGeometryShader,
+        .PixelShader = &shadowVolumePixelShader,
         .RasterizerState = debugValues.rasterizerFlags,
         .DepthStencilState = DepthStencilMode::WriteDepth,
         .InputLayout = VertexPosition::Layout,
         .TopologyType = PrimitiveTopologyType::Patch,
-        .DepthStencilFormat = Format::D32_Float};
-    Axodox::Graphics::D3D12::PipelineState shadowMappingPipelineState =
+        .DepthStencilFormat = Format::D24_UNorm_S8_UInt};
+    Axodox::Graphics::D3D12::PipelineState shadowVolumePipelineState =
         pipelineStateProvider
-            .CreatePipelineStateAsync(shadowMappingPipelineStateDefinition)
-            .get();
+            .CreatePipelineStateAsync(shadowVolumePipelineStateDefinition)
+            .get();*/
 
     RootSignature<SSRPostProcessing> postProcessingRootSignature{device};
     ComputeShader postProcessingComputeShader{app_folder() /

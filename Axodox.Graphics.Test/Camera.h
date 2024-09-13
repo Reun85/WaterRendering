@@ -141,7 +141,7 @@ private:
   bool m_viewDirty = true;
 
   // projection parameters
-  float m_zNear = 0.01f;
+  float m_zNear = 0.1f;
   float m_zFar = 1000.0f;
 
   float m_angle = XMConvertToRadians(27.0f);

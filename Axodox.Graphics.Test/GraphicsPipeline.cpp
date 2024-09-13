@@ -10,7 +10,6 @@ void FrameResources::MakeCompatible(
   if (!DepthBuffer ||
       !TextureDefinition::AreSizeCompatible(*DepthBuffer.Definition(),
                                             finalTarget.Definition())) {
-
     auto depthDefinition = finalTarget.Definition().MakeSizeCompatible(
         Format::R32_Typeless, TextureFlags::ShaderResourceDepthStencil);
 
@@ -44,7 +43,6 @@ void FrameResources::MakeCompatible(
 }
 
 void FrameResources::Clear(CommandAllocator &allocator) {
-
   // Clears frame with background color
   DepthBuffer.DepthStencil()->Clear(allocator, 1);
   GBuffer.Clear(allocator);
@@ -72,7 +70,6 @@ void ShadowMapping::Textures::Clear(CommandAllocator &allocator) {
 
 void ShadowMapping::Textures::TranslateToTarget(CommandAllocator &allocator) {
   allocator.TransitionResources({
-
       {DepthBuffer.operator Axodox::Graphics::D3D12::ResourceArgument(),
        ResourceStates::PixelShaderResource, ResourceStates::DepthWrite},
   });
@@ -132,7 +129,6 @@ void DeferredShading::GBuffer::Clear(CommandAllocator &allocator) {
 
 void DeferredShading::GBuffer::TranslateToTarget(CommandAllocator &allocator) {
   allocator.TransitionResources({
-
       {Albedo.operator Axodox::Graphics::D3D12::ResourceArgument(),
        ResourceStates::PixelShaderResource, ResourceStates::RenderTarget},
       {Normal.operator Axodox::Graphics::D3D12::ResourceArgument(),
@@ -157,7 +153,6 @@ std::array<XMVECTOR, 8> GetFrustumCorners(const XMMATRIX invViewProj,
                                           const Camera &cam,
                                           const f32 nearPlane,
                                           const f32 farPlane) {
-
   XMMATRIX invProj = XMMatrixInverse(
       nullptr, XMMatrixPerspectiveFovRH(cam.GetAngle(), cam.GetAspect(),
                                         nearPlane, farPlane));
@@ -211,7 +206,6 @@ void ShadowMapping::Data::Update(const Camera &cam, const LightData &light) {
   f32 closePlane = cam.GetZNear();
   const XMVECTOR lightP = XMLoadFloat4(&light.lightPos);
   for (auto &lod : lods) {
-
     std::array<XMVECTOR, 8> frustumCorners =
         GetFrustumCorners(cam.GetViewMatrix(), cam, closePlane, lod.farPlane);
 
@@ -254,7 +248,6 @@ void ShadowMapping::Data::Update(const Camera &cam, const LightData &light) {
       }
       lightProj =
           XMMatrixOrthographicOffCenterRH(minX, maxX, minY, maxY, minZ, maxZ);
-
     } else {
       lightPos = lightP;
       assert("IMPLEMENT THIS");
@@ -271,7 +264,6 @@ void ShadowMapping::Data::Update(const Camera &cam, const LightData &light) {
 
 ShadowMapping::Data::Data(const Camera &cam, f32 closestFrustumEnd,
                           f32 midFrustumEnd) {
-
   lods[0].farPlane = closestFrustumEnd;
   lods[1].farPlane = midFrustumEnd;
   lods[2].farPlane = cam.GetZFar();
@@ -282,7 +274,6 @@ WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
     std::vector<WaterGraphicRootDescription::OceanData> &vec, const Camera &cam,
     const XMMATRIX &mMatrix, const float &quadTreeDistanceThreshold,
     const std::optional<RuntimeResults *> &runtimeResults) {
-
   float2 fullSizeXZ = {DefaultsValues::App::oceanSize,
                        DefaultsValues::App::oceanSize};
 
@@ -300,7 +291,6 @@ WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
            cam.GetFrustum(), mMatrix, quadTreeDistanceThreshold);
 
   if (runtimeResults) {
-
     (*runtimeResults)->QuadTreeBuildTime += std::chrono::duration_cast<
         decltype((*runtimeResults)->QuadTreeBuildTime)>(
         std::chrono::high_resolution_clock::now() - start);
@@ -359,4 +349,42 @@ WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
     // how though?
   }
   return vec;
+}
+
+constexpr D3D12_DEPTH_STENCIL_DESC ShadowVolume::GetDepthStencilDesc() {
+  D3D12_DEPTH_STENCIL_DESC result{
+      .DepthEnable = true,                           // Depth testing enabled
+      .DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO, // Do not write to depth
+                                                     // buffer, why though?
+      .DepthFunc = D3D12_COMPARISON_FUNC_LESS,
+      .StencilEnable = true,
+      .StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK,
+      .StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK,
+      // Front-facing polygons
+      .FrontFace =
+          {
+              .StencilFailOp = D3D12_STENCIL_OP_KEEP,
+              .StencilDepthFailOp = D3D12_STENCIL_OP_KEEP,
+              .StencilPassOp =
+                  D3D12_STENCIL_OP_INCR, // Increment stencil on pass
+                                         // and wrap if necessary
+
+              .StencilFunc =
+                  D3D12_COMPARISON_FUNC_ALWAYS, // Always pass stencil test ?
+          },
+
+      // Back-facing polygons
+      .BackFace =
+          {
+              .StencilFailOp = D3D12_STENCIL_OP_KEEP,
+              .StencilDepthFailOp = D3D12_STENCIL_OP_KEEP,
+              .StencilPassOp =
+                  D3D12_STENCIL_OP_DECR, // Decrement stencil on pass
+                                         // and wrap if necessary
+              .StencilFunc =
+                  D3D12_COMPARISON_FUNC_ALWAYS, // Always pass stencil test ?
+          },
+  };
+
+  return result;
 }
