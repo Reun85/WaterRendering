@@ -230,3 +230,16 @@ float3 OctahedronNormalDecode(float2 f)
     n.xy += n.xy >= 0.0 ? -t : t;
     return normalize(n);
 }
+
+
+struct SingleLightData
+{
+    float4 lightPos;
+    float4 lightColor;
+    float4 AmbientColor;
+};
+struct SceneLights
+{
+    SingleLightData lights[MAX_LIGHT_COUNT];
+    int lightCount;
+};

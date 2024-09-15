@@ -216,6 +216,7 @@ float4 main(input_t input) : SV_TARGET
     }
    
     
+    // TODO: Support point lights
     float3 lightDir = normalize(sunDir);
     float3 halfwayDir = normalize(lightDir + viewDir);
     float LdotH = DotClamped(lightDir, halfwayDir);

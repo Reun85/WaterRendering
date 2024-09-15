@@ -351,40 +351,49 @@ WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
   return vec;
 }
 
-constexpr D3D12_DEPTH_STENCIL_DESC ShadowVolume::GetDepthStencilDesc() {
-  D3D12_DEPTH_STENCIL_DESC result{
-      .DepthEnable = true,                           // Depth testing enabled
-      .DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO, // Do not write to depth
-                                                     // buffer, why though?
-      .DepthFunc = D3D12_COMPARISON_FUNC_LESS,
-      .StencilEnable = true,
-      .StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK,
-      .StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK,
-      // Front-facing polygons
-      .FrontFace =
-          {
-              .StencilFailOp = D3D12_STENCIL_OP_KEEP,
-              .StencilDepthFailOp = D3D12_STENCIL_OP_KEEP,
-              .StencilPassOp =
-                  D3D12_STENCIL_OP_INCR, // Increment stencil on pass
-                                         // and wrap if necessary
+BasicShader::BasicShader(PipelineStateProvider &pipelineProvider,
+                         GraphicsDevice &device, VertexShader *vs,
+                         PixelShader *ps)
+    : Signature(device),
+      pipeline(
+          pipelineProvider
+              .CreatePipelineStateAsync(GraphicsPipelineStateDefinition{
+                  .RootSignature = &Signature,
+                  .VertexShader = vs,
+                  .PixelShader = ps,
+                  .RasterizerState = RasterizerFlags::CullClockwise,
+                  .DepthStencilState = DepthStencilMode::WriteDepth,
+                  .InputLayout = VertexPositionNormalTexture::Layout,
+                  .RenderTargetFormats = std::initializer_list(
+                      std::to_address(
+                          DeferredShading::GBuffer::GetGBufferFormats()
+                              .begin()),
+                      std::to_address(
+                          DeferredShading::GBuffer::GetGBufferFormats().end())),
+                  .DepthStencilFormat = Format::D32_Float})
+              .get()) {}
 
-              .StencilFunc =
-                  D3D12_COMPARISON_FUNC_ALWAYS, // Always pass stencil test ?
-          },
+BasicShader
+BasicShader::WithDefaultShaders(PipelineStateProvider &pipelineProvider,
+                                GraphicsDevice &device) {
+  VertexShader vs(app_folder() / L"BasicVS.cso");
+  PixelShader ps(app_folder() / L"BasicPS.cso");
 
-      // Back-facing polygons
-      .BackFace =
-          {
-              .StencilFailOp = D3D12_STENCIL_OP_KEEP,
-              .StencilDepthFailOp = D3D12_STENCIL_OP_KEEP,
-              .StencilPassOp =
-                  D3D12_STENCIL_OP_DECR, // Decrement stencil on pass
-                                         // and wrap if necessary
-              .StencilFunc =
-                  D3D12_COMPARISON_FUNC_ALWAYS, // Always pass stencil test ?
-          },
-  };
+  return BasicShader(pipelineProvider, device, &vs, &ps);
+}
 
-  return result;
+void BasicShader::Pre(CommandAllocator &allocator) const {
+  pipeline.Apply(allocator);
+}
+
+void BasicShader::Run(CommandAllocator &allocator,
+                      DynamicBufferManager &buffermanager,
+                      const Inp &inp) const {
+  auto mask = Signature.Set(allocator, RootSignatureUsage::Graphics);
+  mask.camera = inp.camera;
+  mask.model = inp.modelTransform;
+  if (inp.texture)
+    mask.texture = *inp.texture;
+
+  inp.mesh.Draw(allocator);
 }
