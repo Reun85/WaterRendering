@@ -487,8 +487,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     CommandQueue directQueue{device};
     CommandQueue computeQueue{device /*, CommandKind::Compute*/};
     // CommandQueue &computeQueue = directQueue;
-    // CoreSwapChain swapChain{directQueue, window,
-    //                         SwapChainFlags::IsTearingAllowed};
+    //  CoreSwapChain swapChain{directQueue, window,
+    //                          SwapChainFlags::IsTearingAllowed};
     CoreSwapChain swapChain{directQueue, window, SwapChainFlags::Default};
 
     PipelineStateProvider pipelineStateProvider{device};
@@ -581,6 +581,13 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     SilhouetteDetector silhouetteDetector =
         SilhouetteDetector::WithDefaultShaders(pipelineStateProvider, device);
+
+    SilhouetteClearTask silhouetteClear =
+        SilhouetteClearTask::WithDefaultShaders(pipelineStateProvider, device);
+
+    SilhouetteDetectorTester silhouetteTester =
+        SilhouetteDetectorTester::WithDefaultShaders(pipelineStateProvider,
+                                                     device);
 
     WaterGraphicRootDescription::WaterPixelShaderData waterData;
     DeferredShading::DeferredShaderBuffers defData;
@@ -1000,14 +1007,24 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           {
             // Get shadow casting object silhouette
             {
-              silhouetteDetector.Pre(allocator);
-              SilhouetteDetector::Inp inp{
-                  .buffers = silhouetteDetectorBuffers,
-                  .lights = lightsConstantBuffer,
-                  .mesh = Box,
-              };
-              silhouetteDetector.Run(allocator, frameResource.DynamicBuffer,
-                                     inp);
+              {
+                silhouetteClear.Pre(allocator);
+                SilhouetteClearTask::Inp inp{
+                    .buffers = silhouetteDetectorBuffers,
+                };
+                silhouetteClear.Run(allocator, frameResource.DynamicBuffer,
+                                    inp);
+              }
+              {
+                silhouetteDetector.Pre(allocator);
+                SilhouetteDetector::Inp inp{
+                    .buffers = silhouetteDetectorBuffers,
+                    .lights = lightsConstantBuffer,
+                    .mesh = Box,
+                };
+                silhouetteDetector.Run(allocator, frameResource.DynamicBuffer,
+                                       inp);
+              }
             }
             // ...
           }
@@ -1021,7 +1038,33 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                 frameResource.DepthBuffer.DepthStencil());
 
             // Box
+            // outline
             {
+              allocator.TransitionResource(
+                  silhouetteDetectorBuffers.EdgeCountBuffer.get()->get(),
+                  ResourceStates::UnorderedAccess,
+                  ResourceStates::AllShaderResource);
+
+              silhouetteTester.Pre(allocator);
+              XMMATRIX boxModel = XMMatrixTranspose(
+                  XMMatrixTranslationFromVector(XMVECTOR{2, 5, 2, 0}));
+              SilhouetteDetectorTester::ModelConstants boxModelConstants{};
+              XMStoreFloat4x4(&boxModelConstants.mMatrix, boxModel);
+              SilhouetteDetectorTester::Inp inp{
+                  .camera = cameraConstantBuffer,
+                  .modelTransform =
+                      frameResource.DynamicBuffer.AddBuffer(boxModelConstants),
+                  .texture = std::nullopt,
+                  .mesh = Box,
+                  .buffers = silhouetteDetectorBuffers,
+              };
+              silhouetteTester.Run(allocator, frameResource.DynamicBuffer, inp);
+              allocator.TransitionResource(
+                  silhouetteDetectorBuffers.EdgeCountBuffer.get()->get(),
+                  ResourceStates::AllShaderResource,
+                  ResourceStates::UnorderedAccess);
+            }
+            /*{
               basicShader.Pre(allocator);
 
               XMMATRIX boxModel = XMMatrixTranspose(
@@ -1036,7 +1079,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                   .mesh = Box,
               };
               basicShader.Run(allocator, frameResource.DynamicBuffer, inp);
-            }
+            }*/
 
             // Water
             {
@@ -1239,8 +1282,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       }
 
       // Present frame
-      swapChain.Present();
       computeStage.wait();
+      swapChain.Present();
     }
     // Wait until everything is done before deleting context
 

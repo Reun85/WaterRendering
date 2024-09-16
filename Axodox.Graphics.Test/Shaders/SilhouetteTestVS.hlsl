@@ -1,5 +1,18 @@
-StructuredBuffer<float3> Vertices : register(t0);
-StructuredBuffer<uint2> Edges : register(t1);
+struct Vertex
+{
+    float3 position : POSITION;
+    float3 normal : NORMAL;
+    float2 textureCoord : TEXCOORD;
+};
+struct Edge
+{
+    uint2 vertices;
+    int2 faces;
+};
+
+
+StructuredBuffer<Vertex> Vertices : register(t0);
+StructuredBuffer<Edge> Edges : register(t1);
 
 
 #include "common.hlsli"
@@ -23,12 +36,14 @@ VSOutput main(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID)
     VSOutput output;
     
     // Each instance is an edge, and we draw 2 vertices per edge
-    uint edgeVertex = vertexID % 2;
-    uint2 edge = Edges[instanceID];
+    //uint edgeVertex = vertexID % 2;
+    ////uint2 edge = Edges[instanceID].vertices;
+    //uint2 edge = uint2(0, 1);
     
-    // Select the correct vertex of the edge
-    uint vertexIndex = (edgeVertex == 0) ? edge.x : edge.y;
-    float3 position = Vertices[vertexIndex];
+    //// Select the correct vertex of the edge
+    //uint vertexIndex = (edgeVertex == 0) ? edge.x : edge.y;
+    uint vertexIndex = vertexID % 3;
+    float3 position = Vertices[vertexIndex].position;
     
 
     float4 pos = mul(float4(position, 1), mMatrix);

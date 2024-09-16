@@ -1,5 +1,11 @@
 #include "common.hlsli"
 
+
+Texture2D<float4> texture : register(t3);
+
+SamplerState _sampler : register(s0);
+
+
 struct input_t
 {
     float4 position : SV_POSITION;

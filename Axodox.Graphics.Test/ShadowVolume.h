@@ -167,7 +167,7 @@ struct SilhouetteClearTask : ShaderJob {
   };
 
   struct Inp {
-    SilhouetteDetector::Buffers buffer;
+    SilhouetteDetector::Buffers &buffers;
   };
 
   RootSignature<ShaderMask> Signature;
@@ -193,12 +193,22 @@ struct SilhouetteDetectorTester : ShaderJob {
 
     RootDescriptorTable<1> Vertex;
     RootDescriptorTable<1> Edges;
+    RootDescriptorTable<1> texture;
+    RootDescriptor<RootDescriptorType::ConstantBuffer> camera;
+    RootDescriptor<RootDescriptorType::ConstantBuffer> model;
+
+    StaticSampler _textureSampler;
 
     explicit ShaderMask(const RootSignatureContext &context)
         : RootSignatureMask(context),
 
           Vertex(this, {DescriptorRangeType::ShaderResource, 0}),
-          Edges(this, {DescriptorRangeType::ShaderResource, 1})
+          Edges(this, {DescriptorRangeType::ShaderResource, 1}),
+          texture(this, {DescriptorRangeType::ShaderResource, {3}},
+                  ShaderVisibility::Pixel),
+          camera(this, {0}), model(this, {1}),
+          _textureSampler(this, {0}, Filter::Linear, TextureAddressMode::Wrap,
+                          ShaderVisibility::All)
 
     {
       Flags = RootSignatureFlags::None;
@@ -208,8 +218,17 @@ struct SilhouetteDetectorTester : ShaderJob {
   using Buffers = SilhouetteDetector::Buffers;
 
   struct Inp {
+    const GpuVirtualAddress &camera;
+    const GpuVirtualAddress &modelTransform;
+    const std::optional<GpuVirtualAddress> texture;
+    const ImmutableMesh &mesh;
     Buffers &buffers;
   };
+  struct ModelConstants {
+    XMFLOAT4X4 mMatrix;
+  };
+
+  winrt::com_ptr<ID3D12CommandSignature> indirectCommandSignature;
 
   RootSignature<ShaderMask> Signature;
   PipelineState pipeline;

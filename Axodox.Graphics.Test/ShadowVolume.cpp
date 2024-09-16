@@ -91,9 +91,9 @@ SilhouetteClearTask SilhouetteClearTask ::WithDefaultShaders(
 void SilhouetteClearTask::Run(CommandAllocator &allocator,
                               DynamicBufferManager &buffermanager,
                               const Inp &inp) const {
-  auto mask = Signature.Set(allocator, RootSignatureUsage::Graphics);
+  auto mask = Signature.Set(allocator, RootSignatureUsage::Compute);
   mask.buff =
-      inp.buffer.EdgeCountBuffer.get()->get().get()->GetGPUVirtualAddress();
+      inp.buffers.EdgeCountBuffer.get()->get().get()->GetGPUVirtualAddress();
   ;
   allocator.Dispatch(1, 1, 1);
 }
@@ -124,10 +124,9 @@ void SilhouetteDetector::Run(CommandAllocator &allocator,
   assert(inp.mesh.GetTopology() == D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
   u32 faceCount = inp.mesh.GetIndexCount() / 3;
 
-  auto mask = Signature.Set(allocator, RootSignatureUsage::Graphics);
+  auto mask = Signature.Set(allocator, RootSignatureUsage::Compute);
 
-  mask.Vertex =
-      inp.mesh.GetVertexBuffer().get()->get().get()->GetGPUVirtualAddress();
+  mask.Vertex = ;
   mask.Index =
       inp.mesh.GetIndexBuffer().get()->get().get()->GetGPUVirtualAddress();
   mask.EdgeCount =
@@ -177,7 +176,20 @@ SilhouetteDetectorTester::SilhouetteDetectorTester(
                       std::to_address(
                           DeferredShading::GBuffer::GetGBufferFormats().end())),
                   .DepthStencilFormat = Format::D32_Float})
-              .get()) {}
+              .get()) {
+  // Create command signature for ExecuteIndirect
+  D3D12_INDIRECT_ARGUMENT_DESC indirectArgDesc = {};
+  indirectArgDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
+
+  D3D12_COMMAND_SIGNATURE_DESC commandSignatureDesc = {};
+  commandSignatureDesc.ByteStride =
+      sizeof(SilhouetteDetector::Buffers::EdgeCountBufferType);
+  commandSignatureDesc.NumArgumentDescs = 1;
+  commandSignatureDesc.pArgumentDescs = &indirectArgDesc;
+
+  device->CreateCommandSignature(&commandSignatureDesc, Signature.get(),
+                                 IID_PPV_ARGS(&indirectCommandSignature));
+}
 
 SilhouetteDetectorTester SilhouetteDetectorTester::WithDefaultShaders(
     PipelineStateProvider &pipelineProvider, GraphicsDevice &device) {
@@ -194,4 +206,39 @@ void SilhouetteDetectorTester::Run(CommandAllocator &allocator,
 
   // Indirect rendering??
   // TODO: do this
+
+  mask.camera = inp.camera;
+  mask.model = inp.modelTransform;
+  if (inp.texture)
+    mask.texture = *inp.texture;
+  mask.Vertex =
+      inp.mesh.GetVertexBuffer().get()->get().get()->GetGPUVirtualAddress();
+
+  mask.Edges =
+      inp.buffers.EdgeBuffer.get()->get().get()->GetGPUVirtualAddress();
+
+  allocator->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+  // Set descriptor tables done automatically
+  /*
+  allocator->SetGraphicsRootDescriptorTable(0, vertexBufferSrvHandle);
+  allocator->SetGraphicsRootDescriptorTable(1, edgeBufferSrvHandle);
+ // Set constant buffer
+  allocator->SetGraphicsRootConstantBufferView(
+      2, worldViewProjectionBufferGPUAddress);
+
+  */
+
+  // Execute indirect draw
+  // allocator->ExecuteIndirect(indirectCommandSignature.get(),
+  //                           1, // Max command count
+  //                           inp.buffers.EdgeCountBuffer.get()->get().get(),
+  //                           0,       // Buffer offset
+  //                           nullptr, // Count buffer (optional)
+  //                           0        // Count buffer offset
+  //);
+
+  allocator->IASetVertexBuffers(0, 0, nullptr);
+  allocator->IASetIndexBuffer(nullptr);
+  allocator->DrawInstanced(3, 1, 0, 0);
 }
