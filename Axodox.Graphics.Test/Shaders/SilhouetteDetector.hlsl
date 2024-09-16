@@ -17,12 +17,23 @@ struct Edge
     int2 faces;
 };
 
+
+struct DrawIndexedIndirectArgs
+{
+    uint IndexCountPerInstance;
+    uint InstanceCount;
+    uint StartIndexLocation;
+    int BaseVertexLocation;
+    uint StartInstanceLocation;
+};
+
+
 // Vertex Buffer
 StructuredBuffer<Vertex> Vertices : register(t0);
 // Index Buffer
 StructuredBuffer<Face> Faces : register(t1);
 RWStructuredBuffer<Edge> Edges : register(u0);
-RWStructuredBuffer<uint> EdgeCounter : register(u1);
+RWStructuredBuffer<DrawIndexedIndirectArgs> EdgeCounter : register(u1);
 
 cbuffer Constants : register(b0)
 {
@@ -75,7 +86,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
             newEdge.faces = int2(DTid.x, -1); // Current face index and placeholder for adjacent face
             
             uint edgeIndex;
-            InterlockedAdd(EdgeCounter[0], 1, edgeIndex);
+            InterlockedAdd(EdgeCounter[0].InstanceCount, 1, edgeIndex);
             
             // Try to add the edge or update existing edge
             InterlockedCompareExchange(Edges[edgeIndex].faces.y, -1, DTid.x,

@@ -70,8 +70,9 @@ ShadowVolume::ShaderMask::GetDepthStencilDesc() {
   return result;
 }
 
-ZeroGpu4Bytes::ZeroGpu4Bytes(PipelineStateProvider &pipelineProvider,
-                             GraphicsDevice &device, ComputeShader *cs)
+SilhouetteClearTask::SilhouetteClearTask(
+    PipelineStateProvider &pipelineProvider, GraphicsDevice &device,
+    ComputeShader *cs)
     : Signature(device),
       pipeline(pipelineProvider
                    .CreatePipelineStateAsync(ComputePipelineStateDefinition{
@@ -80,20 +81,20 @@ ZeroGpu4Bytes::ZeroGpu4Bytes(PipelineStateProvider &pipelineProvider,
                    })
                    .get()) {}
 
-ZeroGpu4Bytes
-ZeroGpu4Bytes ::WithDefaultShaders(PipelineStateProvider &pipelineProvider,
-                                   GraphicsDevice &device) {
-  ComputeShader cs(app_folder() / L"ClearMemory.cso");
+SilhouetteClearTask SilhouetteClearTask ::WithDefaultShaders(
+    PipelineStateProvider &pipelineProvider, GraphicsDevice &device) {
+  ComputeShader cs(app_folder() / L"SilhouetteClear.cso");
 
-  return ZeroGpu4Bytes(pipelineProvider, device, &cs);
+  return SilhouetteClearTask(pipelineProvider, device, &cs);
 }
 
-void ZeroGpu4Bytes::Run(CommandAllocator &allocator,
-                        DynamicBufferManager &buffermanager,
-                        const Inp &inp) const {
+void SilhouetteClearTask::Run(CommandAllocator &allocator,
+                              DynamicBufferManager &buffermanager,
+                              const Inp &inp) const {
   auto mask = Signature.Set(allocator, RootSignatureUsage::Graphics);
-  mask.constants = buffermanager.AddBuffer(inp.UintCount);
-  mask.buff = inp.buffer;
+  mask.buff =
+      inp.buffer.EdgeCountBuffer.get()->get().get()->GetGPUVirtualAddress();
+  ;
   allocator.Dispatch(1, 1, 1);
 }
 

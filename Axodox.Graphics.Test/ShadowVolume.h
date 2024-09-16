@@ -95,7 +95,13 @@ struct SilhouetteDetector : ShaderJob {
       std::pair<u32, u32> vertices;
       std::pair<i32, i32> faces;
     };
-    using EdgeCountBufferType = u32;
+    struct EdgeCountBufferType {
+      u32 IndexCountPerInstance;
+      u32 InstanceCount;
+      u32 StartIndexLocation;
+      i32 BaseVertexLocation;
+      u32 StartInstanceLocation;
+    };
 
     BufferRef EdgeBuffer;
     BufferRef EdgeCountBuffer;
@@ -138,7 +144,7 @@ struct SilhouetteDetector : ShaderJob {
   ~SilhouetteDetector() override = default;
 };
 
-struct ZeroGpu4Bytes : ShaderJob {
+struct SilhouetteClearTask : ShaderJob {
   struct ShaderMask : public RootSignatureMask {
 
     struct Constants {
@@ -161,17 +167,16 @@ struct ZeroGpu4Bytes : ShaderJob {
   };
 
   struct Inp {
-    u32 UintCount;
-    GpuVirtualAddress buffer;
+    SilhouetteDetector::Buffers buffer;
   };
 
   RootSignature<ShaderMask> Signature;
   PipelineState pipeline;
 
-  ZeroGpu4Bytes(PipelineStateProvider &pipelineProvider, GraphicsDevice &device,
-                ComputeShader *cs);
+  SilhouetteClearTask(PipelineStateProvider &pipelineProvider,
+                      GraphicsDevice &device, ComputeShader *cs);
 
-  static ZeroGpu4Bytes
+  static SilhouetteClearTask
   WithDefaultShaders(PipelineStateProvider &pipelineProvider,
                      GraphicsDevice &device);
   void Pre(CommandAllocator &allocator) const override {
@@ -179,7 +184,7 @@ struct ZeroGpu4Bytes : ShaderJob {
   }
   void Run(CommandAllocator &allocator, DynamicBufferManager &buffermanager,
            const Inp &inp) const;
-  ~ZeroGpu4Bytes() override = default;
+  ~SilhouetteClearTask() override = default;
 };
 
 struct SilhouetteDetectorTester : ShaderJob {
