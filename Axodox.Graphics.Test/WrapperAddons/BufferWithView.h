@@ -9,7 +9,7 @@ struct BufferViewDefinitions {
 };
 class StructuredObjectViews {
 public:
-  StructuredObjectViews(ResourceAllocationContext &context, const Buffer *br,
+  StructuredObjectViews(ResourceAllocationContext &context, Buffer *const br,
                         const BufferViewDefinitions &def);
 
   ShaderResourceView *ShaderResource() const { return srv.get(); }
@@ -18,5 +18,6 @@ public:
 private:
   ShaderResourceViewRef srv;
   UnorderedAccessViewRef uav;
+  Infrastructure::event_subscription allocatedSubscription;
 };
 } // namespace Axodox::Graphics::D3D12

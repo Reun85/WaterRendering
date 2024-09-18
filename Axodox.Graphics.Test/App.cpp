@@ -1039,7 +1039,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
             // Box
             // outline
-            {
+            /*{
               allocator.TransitionResource(
                   silhouetteDetectorBuffers.EdgeCountBuffer.get()->get(),
                   ResourceStates::UnorderedAccess,
@@ -1063,7 +1063,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                   silhouetteDetectorBuffers.EdgeCountBuffer.get()->get(),
                   ResourceStates::AllShaderResource,
                   ResourceStates::UnorderedAccess);
-            }
+            }*/
             /*{
               basicShader.Pre(allocator);
 

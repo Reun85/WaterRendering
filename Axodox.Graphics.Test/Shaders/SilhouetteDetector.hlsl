@@ -2,7 +2,9 @@
 
 struct Vertex
 {
-    float3 position;
+    float3 position : POSITION;
+    snorm float4 normal : NORMAL;
+    unorm float2 texture : TEXCOORD;
 };
 
 // Index buffer

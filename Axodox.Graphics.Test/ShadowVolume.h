@@ -67,8 +67,8 @@ struct SilhouetteDetector : ShaderJob {
     RootDescriptor<RootDescriptorType::ShaderResource> Index;
 
     // Out
-    RootDescriptor<RootDescriptorType::UnorderedAccess> Edges;
-    RootDescriptor<RootDescriptorType::UnorderedAccess> EdgeCount;
+    RootDescriptorTable<1> Edges;
+    RootDescriptorTable<1> EdgeCount;
 
     RootDescriptor<RootDescriptorType::ConstantBuffer> lights;
     RootDescriptor<RootDescriptorType::ConstantBuffer> constants;
@@ -76,8 +76,10 @@ struct SilhouetteDetector : ShaderJob {
     explicit ShaderMask(const RootSignatureContext &context)
         : RootSignatureMask(context),
 
-          Vertex(this, {0}), Index(this, {1}), Edges(this, {0}),
-          EdgeCount(this, {1}), lights(this, {1}), constants(this, {0})
+          Vertex(this, {0}), Index(this, {1}),
+          Edges(this, {DescriptorRangeType::UnorderedAccess, {0}}),
+          EdgeCount(this, {DescriptorRangeType::UnorderedAccess, {1}}),
+          lights(this, {1}), constants(this, {0})
 
     {
       Flags = RootSignatureFlags::None;
@@ -143,20 +145,14 @@ struct SilhouetteDetector : ShaderJob {
 
 struct SilhouetteClearTask : ShaderJob {
   struct ShaderMask : public RootSignatureMask {
-    struct Constants {
-      u32 BytesTimes4;
-    };
 
-    RootDescriptor<RootDescriptorType::UnorderedAccess> buff;
-
-    RootDescriptor<RootDescriptorType::ConstantBuffer> constants;
+    // RootDescriptor<RootDescriptorType::UnorderedAccess> buff;
+    RootDescriptorTable<1> buff;
 
     explicit ShaderMask(const RootSignatureContext &context)
         : RootSignatureMask(context),
 
-          buff(this, {0}), constants(this, {0})
-
-    {
+          buff(this, {DescriptorRangeType::UnorderedAccess, {0}}) {
       Flags = RootSignatureFlags::None;
     }
   };

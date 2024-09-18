@@ -2,14 +2,20 @@
 #include "BufferWithView.h"
 
 Axodox::Graphics::D3D12::StructuredObjectViews::StructuredObjectViews(
-    ResourceAllocationContext &context, const Buffer *br,
+    ResourceAllocationContext &context, Buffer *const br,
     const BufferViewDefinitions &def) {
-  if (def.ShaderResource) {
-    srv = context.CommonDescriptorHeap->CreateDescriptor<ShaderResourceView>(
-        br, *def.ShaderResource);
-  }
-  if (def.UnorderedAccess) {
-    uav = context.CommonDescriptorHeap->CreateDescriptor<UnorderedAccessView>(
-        br, *def.UnorderedAccess);
-  }
+  allocatedSubscription = br->Allocated([this, def,
+                                         &context](Resource *resource) {
+    if (def.ShaderResource) {
+      const D3D12_SHADER_RESOURCE_VIEW_DESC &desc = *def.ShaderResource;
+
+      srv = context.CommonDescriptorHeap->CreateDescriptor<ShaderResourceView>(
+          resource->get(), &desc);
+    }
+    if (def.UnorderedAccess) {
+      const D3D12_UNORDERED_ACCESS_VIEW_DESC &desc = *def.UnorderedAccess;
+      uav = context.CommonDescriptorHeap->CreateDescriptor<UnorderedAccessView>(
+          resource->get(), &desc);
+    }
+  });
 }
