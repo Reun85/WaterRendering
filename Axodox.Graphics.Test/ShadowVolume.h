@@ -63,8 +63,8 @@ struct ShadowVolume : ShaderJob {
 struct SilhouetteDetector : ShaderJob {
   struct ShaderMask : public RootSignatureMask {
     // In
-    RootDescriptor<RootDescriptorType::ShaderResource> Vertex;
-    RootDescriptor<RootDescriptorType::ShaderResource> Index;
+    RootDescriptorTable<1> Vertex;
+    RootDescriptorTable<1> Index;
 
     // Out
     RootDescriptorTable<1> Edges;
@@ -76,7 +76,8 @@ struct SilhouetteDetector : ShaderJob {
     explicit ShaderMask(const RootSignatureContext &context)
         : RootSignatureMask(context),
 
-          Vertex(this, {0}), Index(this, {1}),
+          Vertex(this, {DescriptorRangeType::ShaderResource, {0}}),
+          Index(this, {DescriptorRangeType::ShaderResource, {1}}),
           Edges(this, {DescriptorRangeType::UnorderedAccess, {0}}),
           EdgeCount(this, {DescriptorRangeType::UnorderedAccess, {1}}),
           lights(this, {1}), constants(this, {0})
@@ -86,7 +87,18 @@ struct SilhouetteDetector : ShaderJob {
     }
   };
 
-  struct Buffers : ShaderBuffers {
+  struct MeshSpecificBuffers {
+
+    StructuredObjectViews Vertex;
+    StructuredObjectViews Index;
+
+    explicit MeshSpecificBuffers(ResourceAllocationContext &context,
+                                 const ImmutableMesh &mesh, u32 VertexByteSize,
+                                 u32 IndexByteSize);
+
+    ~MeshSpecificBuffers() = default;
+  };
+  struct Buffers {
     struct EdgeBufferType {
       std::pair<u32, u32> vertices;
       std::pair<i32, i32> faces;
@@ -103,17 +115,10 @@ struct SilhouetteDetector : ShaderJob {
     BufferRef EdgeCountBuffer;
     StructuredObjectViews Edge;
     StructuredObjectViews EdgeCount;
-    static const BufferViewDefinitions EdgeViewDefitions;
-    static const BufferViewDefinitions EdgeCountViewDefitions;
 
     explicit Buffers(ResourceAllocationContext &context, u32 MaxIndexCount);
 
-    void MakeCompatible(const RenderTargetView &finalTarget,
-                        ResourceAllocationContext &allocationContext) override {
-      // Nothing to do
-    }
-    void Clear(CommandAllocator &allocator) override {}
-    ~Buffers() override = default;
+    ~Buffers() = default;
   };
 
   struct Constants {
@@ -124,6 +129,7 @@ struct SilhouetteDetector : ShaderJob {
     Buffers &buffers;
     GpuVirtualAddress lights;
     ImmutableMesh &mesh;
+    MeshSpecificBuffers &meshBuffers;
   };
 
   RootSignature<ShaderMask> Signature;
@@ -146,7 +152,6 @@ struct SilhouetteDetector : ShaderJob {
 struct SilhouetteClearTask : ShaderJob {
   struct ShaderMask : public RootSignatureMask {
 
-    // RootDescriptor<RootDescriptorType::UnorderedAccess> buff;
     RootDescriptorTable<1> buff;
 
     explicit ShaderMask(const RootSignatureContext &context)

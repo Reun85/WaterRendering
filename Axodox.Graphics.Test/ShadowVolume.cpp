@@ -165,9 +165,8 @@ void SilhouetteDetector::Run(CommandAllocator &allocator,
 
   auto mask = Signature.Set(allocator, RootSignatureUsage::Compute);
 
-  mask.Vertex = inp.mesh.GetVertexBuffer().get()->get()->GetGPUVirtualAddress();
-  mask.Index =
-      inp.mesh.GetIndexBuffer().get()->get().get()->GetGPUVirtualAddress();
+  mask.Vertex = *inp.meshBuffers.Vertex.ShaderResource();
+  mask.Index = *inp.meshBuffers.Index.ShaderResource();
   mask.EdgeCount = *inp.buffers.EdgeCount.UnorderedAccess();
   mask.Edges = *inp.buffers.Edge.UnorderedAccess();
   mask.lights = inp.lights;
@@ -279,3 +278,34 @@ void SilhouetteDetectorTester::Run(CommandAllocator &allocator,
   allocator->IASetIndexBuffer(nullptr);
   allocator->DrawInstanced(3, 1, 0, 0);
 }
+
+SilhouetteDetector::MeshSpecificBuffers::MeshSpecificBuffers(
+    ResourceAllocationContext &context, const ImmutableMesh &mesh,
+    u32 VertexByteSize, u32 IndexByteSize)
+
+    : Vertex(context, &*mesh.GetVertexBuffer(),
+             BufferViewDefinitions{
+                 .ShaderResource =
+                     D3D12_SHADER_RESOURCE_VIEW_DESC{
+                         .Format = DXGI_FORMAT_UNKNOWN,
+                         .ViewDimension = D3D12_SRV_DIMENSION_BUFFER,
+                         .Shader4ComponentMapping =
+                             D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
+                         .Buffer = {.FirstElement = 0,
+                                    .NumElements = mesh.GetVertexCount(),
+                                    .StructureByteStride = VertexByteSize}},
+             }),
+      Index(context, &*mesh.GetIndexBuffer(),
+            BufferViewDefinitions{
+                .ShaderResource =
+                    D3D12_SHADER_RESOURCE_VIEW_DESC{
+                        .Format = DXGI_FORMAT_UNKNOWN,
+                        .ViewDimension = D3D12_SRV_DIMENSION_BUFFER,
+                        .Shader4ComponentMapping =
+                            D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
+                        .Buffer = {.FirstElement = 0,
+                                   .NumElements = mesh.GetIndexCount(),
+                                   .StructureByteStride = IndexByteSize}},
+            })
+
+{}

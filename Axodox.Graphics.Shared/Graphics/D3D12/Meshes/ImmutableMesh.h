@@ -14,6 +14,7 @@ public:
   const BufferRef &GetVertexBuffer() const { return _vertexBuffer; }
   const BufferRef &GetIndexBuffer() const { return _indexBuffer; }
   const uint32_t GetIndexCount() const { return _indexCount; }
+  const uint32_t GetVertexCount() const { return _vertexCount; }
 
   const D3D12_PRIMITIVE_TOPOLOGY &GetTopology() const { return _topology; }
 

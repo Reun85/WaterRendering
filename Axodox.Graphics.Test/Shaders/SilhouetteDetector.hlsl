@@ -58,7 +58,6 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
     Face face = Faces[DTid.x];
     
-    // Calculate face normal
     float3 v0 = Vertices[face.indices.x].position;
     float3 v1 = Vertices[face.indices.y].position;
     float3 v2 = Vertices[face.indices.z].position;
@@ -72,11 +71,10 @@ void main(uint3 DTid : SV_DispatchThreadID)
     float3 toLight = l.lightPos.w == 1 ? (3 * l.lightPos.xyz - v0 - v1 - v2) : l.lightPos.xyz;
     toLight = normalize(toLight);
     
-    // Check if face is front-facing relative to light
     bool isFrontFacing = dot(normal, toLight) > 0;
     
     // Process each edge of the triangle
-    for (int i = 0; i < 3; ++i)
+    for (int i = 0; i < 1; ++i)
     {
         uint startVertex = face.indices[i];
         uint endVertex = face.indices[(i + 1) % 3];
@@ -85,31 +83,12 @@ void main(uint3 DTid : SV_DispatchThreadID)
         {
             Edge newEdge;
             newEdge.vertices = uint2(startVertex, endVertex);
-            newEdge.faces = int2(DTid.x, -1); // Current face index and placeholder for adjacent face
-            
+            newEdge.faces = int2(DTid.x, -1);
+
             uint edgeIndex;
             InterlockedAdd(EdgeCounter[0].InstanceCount, 1, edgeIndex);
+            Edges[edgeIndex] = newEdge;
             
-            // Try to add the edge or update existing edge
-            InterlockedCompareExchange(Edges[edgeIndex].faces.y, -1, DTid.x,
-                                       Edges[edgeIndex].faces.y);
-            
-            // If this is a new edge, store it
-            if (Edges[edgeIndex].faces.y == -1)
-            {
-                Edges[edgeIndex] = newEdge;
-            }
-            else
-            {
-                // Check if this is a silhouette edge
-                int otherFace = Edges[edgeIndex].faces.y;
-                if ((isFrontFacing && otherFace < DTid.x) ||
-                    (!isFrontFacing && otherFace > DTid.x))
-                {
-                    // Mark as silhouette edge by setting MSB of faces.x
-                    Edges[edgeIndex].faces.x |= 0x80000000;
-                }
-            }
         }
     }
 }

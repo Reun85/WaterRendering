@@ -634,6 +634,10 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     //                              app_folder() / "Assets/skybox/skybox3.hdr",
     //                              2024};
 
+    SilhouetteDetector::MeshSpecificBuffers silhouetteDetectorMeshBuffers(
+        immutableAllocationContext, Box, sizeof(VertexPositionNormalTexture),
+        4);
+
     //  Acquire memory
     groupedResourceAllocator.Build();
 
@@ -1021,6 +1025,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                     .buffers = silhouetteDetectorBuffers,
                     .lights = lightsConstantBuffer,
                     .mesh = Box,
+                    .meshBuffers = silhouetteDetectorMeshBuffers,
                 };
                 silhouetteDetector.Run(allocator, frameResource.DynamicBuffer,
                                        inp);
