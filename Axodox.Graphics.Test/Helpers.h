@@ -323,7 +323,6 @@ struct ShaderBuffers {
 };
 
 struct ShaderJob {
-
   virtual void Pre(CommandAllocator &allocator) const = 0;
   virtual ~ShaderJob() = default;
 };

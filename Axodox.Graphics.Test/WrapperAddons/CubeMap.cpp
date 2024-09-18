@@ -31,22 +31,22 @@ FaceCoordinatesToWorldCoordinates(u32 i, u32 j, u32 width, CubeMapFace face) {
   switch (face) {
     using enum CubeMapFace;
   case NegX:
-    return {1.0, 1.0 - a, 1.0 - b};
+    return {1.0f, 1.0f - a, 1.0f - b};
     break;
   case NegZ:
-    return {1.0 - a, -1.0, 1.0 - b};
+    return {1.0f - a, -1.0f, 1.0f - b};
     break;
   case PosX:
-    return {-1.0, a - 1.0, 1.0 - b};
+    return {-1.0f, a - 1.0f, 1.0f - b};
     break;
   case PosZ:
-    return {a - 1.0, 1.0, 1.0 - b};
+    return {a - 1.0f, 1.0f, 1.0f - b};
     break;
   case PosY:
-    return {1.0 - b, a - 1.0, 1.0};
+    return {1.0f - b, a - 1.0f, 1.0f};
     break;
   case NegY:
-    return {b - 1.0, a - 1.0, -1.0};
+    return {b - 1.0f, a - 1.0f, -1.0f};
     break;
   }
 }

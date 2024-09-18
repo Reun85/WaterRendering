@@ -13,7 +13,6 @@ class Camera;
 
 struct ShadowVolume : ShaderJob {
   struct ShaderMask : RootSignatureMask {
-
     explicit ShaderMask(const RootSignatureContext &context)
         : RootSignatureMask(context) {
       Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
@@ -62,16 +61,14 @@ struct ShadowVolume : ShaderJob {
 };
 
 struct SilhouetteDetector : ShaderJob {
-
   struct ShaderMask : public RootSignatureMask {
-
     // In
-    RootDescriptorTable<1> Vertex;
-    RootDescriptorTable<1> Index;
+    RootDescriptor<RootDescriptorType::ShaderResource> Vertex;
+    RootDescriptor<RootDescriptorType::ShaderResource> Index;
 
     // Out
-    RootDescriptorTable<1> Edges;
-    RootDescriptorTable<1> EdgeCount;
+    RootDescriptor<RootDescriptorType::UnorderedAccess> Edges;
+    RootDescriptor<RootDescriptorType::UnorderedAccess> EdgeCount;
 
     RootDescriptor<RootDescriptorType::ConstantBuffer> lights;
     RootDescriptor<RootDescriptorType::ConstantBuffer> constants;
@@ -79,11 +76,8 @@ struct SilhouetteDetector : ShaderJob {
     explicit ShaderMask(const RootSignatureContext &context)
         : RootSignatureMask(context),
 
-          Vertex(this, {DescriptorRangeType::ShaderResource, 0}),
-          Index(this, {DescriptorRangeType::ShaderResource, 1}),
-          Edges(this, {DescriptorRangeType::UnorderedAccess, 0}),
-          EdgeCount(this, {DescriptorRangeType::UnorderedAccess, 1}),
-          lights(this, {1}), constants(this, {0})
+          Vertex(this, {0}), Index(this, {1}), Edges(this, {0}),
+          EdgeCount(this, {1}), lights(this, {1}), constants(this, {0})
 
     {
       Flags = RootSignatureFlags::None;
@@ -105,9 +99,12 @@ struct SilhouetteDetector : ShaderJob {
 
     BufferRef EdgeBuffer;
     BufferRef EdgeCountBuffer;
+    StructuredObjectViews Edge;
+    StructuredObjectViews EdgeCount;
+    static const BufferViewDefinitions EdgeViewDefitions;
+    static const BufferViewDefinitions EdgeCountViewDefitions;
 
-    explicit Buffers(const ResourceAllocationContext &context,
-                     u32 MaxIndexCount);
+    explicit Buffers(ResourceAllocationContext &context, u32 MaxIndexCount);
 
     void MakeCompatible(const RenderTargetView &finalTarget,
                         ResourceAllocationContext &allocationContext) override {
@@ -146,20 +143,18 @@ struct SilhouetteDetector : ShaderJob {
 
 struct SilhouetteClearTask : ShaderJob {
   struct ShaderMask : public RootSignatureMask {
-
     struct Constants {
       u32 BytesTimes4;
     };
 
-    RootDescriptorTable<1> buff;
+    RootDescriptor<RootDescriptorType::UnorderedAccess> buff;
 
     RootDescriptor<RootDescriptorType::ConstantBuffer> constants;
 
     explicit ShaderMask(const RootSignatureContext &context)
         : RootSignatureMask(context),
 
-          buff(this, {DescriptorRangeType::UnorderedAccess, 0}),
-          constants(this, {0})
+          buff(this, {0}), constants(this, {0})
 
     {
       Flags = RootSignatureFlags::None;
@@ -188,11 +183,9 @@ struct SilhouetteClearTask : ShaderJob {
 };
 
 struct SilhouetteDetectorTester : ShaderJob {
-
   struct ShaderMask : public RootSignatureMask {
-
-    RootDescriptorTable<1> Vertex;
-    RootDescriptorTable<1> Edges;
+    RootDescriptor<RootDescriptorType::ShaderResource> Vertex;
+    RootDescriptor<RootDescriptorType::ShaderResource> Edges;
     RootDescriptorTable<1> texture;
     RootDescriptor<RootDescriptorType::ConstantBuffer> camera;
     RootDescriptor<RootDescriptorType::ConstantBuffer> model;
@@ -202,8 +195,7 @@ struct SilhouetteDetectorTester : ShaderJob {
     explicit ShaderMask(const RootSignatureContext &context)
         : RootSignatureMask(context),
 
-          Vertex(this, {DescriptorRangeType::ShaderResource, 0}),
-          Edges(this, {DescriptorRangeType::ShaderResource, 1}),
+          Vertex(this, {0}), Edges(this, {1}),
           texture(this, {DescriptorRangeType::ShaderResource, {3}},
                   ShaderVisibility::Pixel),
           camera(this, {0}), model(this, {1}),

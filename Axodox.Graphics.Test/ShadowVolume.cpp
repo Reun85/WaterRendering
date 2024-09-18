@@ -21,13 +21,41 @@ using namespace Axodox::Threading;
 using namespace DirectX;
 using namespace DirectX::PackedVector;
 
-SilhouetteDetector::Buffers::Buffers(const ResourceAllocationContext &context,
+SilhouetteDetector::Buffers::Buffers(ResourceAllocationContext &context,
                                      u32 IndexCount)
     : EdgeBuffer(context.ResourceAllocator->CreateBuffer(BufferDefinition(
           IndexCount * sizeof(EdgeBufferType), BufferFlags::UnorderedAccess))),
       EdgeCountBuffer(context.ResourceAllocator->CreateBuffer(
           BufferDefinition(IndexCount * sizeof(EdgeCountBufferType),
-                           BufferFlags::UnorderedAccess)))
+                           BufferFlags::UnorderedAccess))),
+
+      Edge(
+          context, EdgeBuffer.get(),
+
+          BufferViewDefinitions{
+              .ShaderResource =
+                  D3D12_SHADER_RESOURCE_VIEW_DESC{
+                      .Format = DXGI_FORMAT_UNKNOWN,
+                      .ViewDimension = D3D12_SRV_DIMENSION_BUFFER,
+                      .Buffer = {.FirstElement = 0, .NumElements = IndexCount}},
+              .UnorderedAccess =
+                  D3D12_UNORDERED_ACCESS_VIEW_DESC{
+                      .Format = DXGI_FORMAT_UNKNOWN,
+                      .ViewDimension = D3D12_UAV_DIMENSION_BUFFER,
+                      .Buffer = {.FirstElement = 0,
+                                 .NumElements = IndexCount}}}),
+      EdgeCount(context, EdgeCountBuffer.get(),
+                BufferViewDefinitions{
+                    .ShaderResource =
+                        D3D12_SHADER_RESOURCE_VIEW_DESC{
+                            .Format = DXGI_FORMAT_UNKNOWN,
+                            .ViewDimension = D3D12_SRV_DIMENSION_BUFFER,
+                            .Buffer = {.FirstElement = 0, .NumElements = 1}},
+                    .UnorderedAccess =
+                        D3D12_UNORDERED_ACCESS_VIEW_DESC{
+                            .Format = DXGI_FORMAT_UNKNOWN,
+                            .ViewDimension = D3D12_UAV_DIMENSION_BUFFER,
+                            .Buffer = {.FirstElement = 0, .NumElements = 1}}})
 
 {}
 
@@ -94,7 +122,7 @@ void SilhouetteClearTask::Run(CommandAllocator &allocator,
   auto mask = Signature.Set(allocator, RootSignatureUsage::Compute);
   mask.buff =
       inp.buffers.EdgeCountBuffer.get()->get().get()->GetGPUVirtualAddress();
-  ;
+
   allocator.Dispatch(1, 1, 1);
 }
 
@@ -120,13 +148,12 @@ SilhouetteDetector::WithDefaultShaders(PipelineStateProvider &pipelineProvider,
 void SilhouetteDetector::Run(CommandAllocator &allocator,
                              DynamicBufferManager &buffermanager,
                              const Inp &inp) const {
-
   assert(inp.mesh.GetTopology() == D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
   u32 faceCount = inp.mesh.GetIndexCount() / 3;
 
   auto mask = Signature.Set(allocator, RootSignatureUsage::Compute);
 
-  mask.Vertex = ;
+  mask.Vertex = inp.mesh.GetVertexBuffer().get()->get()->GetGPUVirtualAddress();
   mask.Index =
       inp.mesh.GetIndexBuffer().get()->get().get()->GetGPUVirtualAddress();
   mask.EdgeCount =
