@@ -16,6 +16,14 @@ public:
   const uint32_t GetIndexCount() const { return _indexCount; }
   const uint32_t GetVertexCount() const { return _vertexCount; }
 
+  const std::optional<D3D12_VERTEX_BUFFER_VIEW> GetVertexBufferView() const {
+    return _vertexBufferView;
+  }
+
+  const std::optional<D3D12_INDEX_BUFFER_VIEW> GetIndexBufferView() const {
+    return _indexBufferView;
+  }
+
   const D3D12_PRIMITIVE_TOPOLOGY &GetTopology() const { return _topology; }
 
 private:

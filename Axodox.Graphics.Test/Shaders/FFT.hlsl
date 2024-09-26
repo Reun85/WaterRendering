@@ -6,7 +6,6 @@ RWTexture2D<float2> writebuff : register(u0);
 #define LOG2_N DISP_MAP_LOG2
 
 
-groupshared float2 pingpong[2][N];
 
 
 
@@ -23,7 +22,7 @@ output
 */
 
 
-// LocalGroupSize=N
+groupshared float2 pingpong[2][N];
 [numthreads(N, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3 GTid : SV_GroupID)
 {
@@ -32,7 +31,7 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3
 
 
     // Rearrange array for FFT
-    // We use f32 => 32
+    // We use f32 => 32 bits
 
     int nj = (reversebits(x) >> (32 - LOG2_N)) & (N - 1);
     pingpong[0][nj] = readbuff[int2(z, x)];

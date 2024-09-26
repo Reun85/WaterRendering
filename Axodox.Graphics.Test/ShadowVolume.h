@@ -93,9 +93,10 @@ struct SilhouetteDetector : ShaderJob {
     StructuredObjectViews Index;
 
     explicit MeshSpecificBuffers(ResourceAllocationContext &context,
+                                 const ImmutableMesh &mesh);
+    explicit MeshSpecificBuffers(ResourceAllocationContext &context,
                                  const ImmutableMesh &mesh, u32 VertexByteSize,
                                  u32 IndexByteSize);
-
     ~MeshSpecificBuffers() = default;
   };
   struct Buffers {

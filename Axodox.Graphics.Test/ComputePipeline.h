@@ -130,7 +130,7 @@ struct SimulationStage {
     CommandFenceMarker FrameDoneMarker;
     DynamicBufferManager DynamicBuffer;
 
-#define useDifferentFFTOutputBuffers true
+#define useDifferentFFTOutputBuffers false
     struct LODDataBuffers {
       MutableTextureWithState tildeh;
       MutableTextureWithState tildeD;

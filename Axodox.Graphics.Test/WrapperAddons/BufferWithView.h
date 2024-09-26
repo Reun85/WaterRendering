@@ -11,6 +11,10 @@ class StructuredObjectViews {
 public:
   StructuredObjectViews(ResourceAllocationContext &context, Buffer *const br,
                         const BufferViewDefinitions &def);
+  StructuredObjectViews(ResourceAllocationContext &context, Buffer *const br,
+                        std::function<BufferViewDefinitions(Resource *)> fn
+
+  );
 
   ShaderResourceView *ShaderResource() const { return srv.get(); }
   UnorderedAccessView *UnorderedAccess() const { return uav.get(); }

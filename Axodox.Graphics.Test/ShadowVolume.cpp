@@ -309,3 +309,46 @@ SilhouetteDetector::MeshSpecificBuffers::MeshSpecificBuffers(
             })
 
 {}
+
+SilhouetteDetector::MeshSpecificBuffers::MeshSpecificBuffers(
+    ResourceAllocationContext &context, const ImmutableMesh &mesh)
+
+    : Vertex(context, &*mesh.GetVertexBuffer(),
+             BufferViewDefinitions{
+                 .ShaderResource =
+                     D3D12_SHADER_RESOURCE_VIEW_DESC{
+                         .Format = DXGI_FORMAT_UNKNOWN,
+                         .ViewDimension = D3D12_SRV_DIMENSION_BUFFER,
+                         .Shader4ComponentMapping =
+                             D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
+                         .Buffer =
+                             {.FirstElement = 0,
+                              .NumElements = mesh.GetVertexCount(),
+                              .StructureByteStride =
+                                  // Length of the buffer divided by the count
+
+                              (u32)(mesh.GetVertexBuffer()
+                                        .get()
+                                        ->Definition()
+                                        .Length /
+                                    (u64)mesh.GetVertexCount())}},
+             }),
+      Index(context, &*mesh.GetIndexBuffer(),
+            BufferViewDefinitions{
+                .ShaderResource =
+                    D3D12_SHADER_RESOURCE_VIEW_DESC{
+                        .Format = DXGI_FORMAT_UNKNOWN,
+                        .ViewDimension = D3D12_SRV_DIMENSION_BUFFER,
+                        .Shader4ComponentMapping =
+                            D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
+                        .Buffer = {.FirstElement = 0,
+                                   .NumElements = mesh.GetIndexCount(),
+                                   .StructureByteStride =
+                                       (u32)(mesh.GetIndexBuffer()
+                                                 .get()
+                                                 ->Definition()
+                                                 .Length /
+                                             (u64)mesh.GetIndexCount())}},
+            })
+
+{}

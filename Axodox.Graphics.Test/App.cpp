@@ -485,8 +485,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     GraphicsDevice device{};
     CommandQueue directQueue{device};
-    CommandQueue computeQueue{device /*, CommandKind::Compute*/};
-    // CommandQueue &computeQueue = directQueue;
+    // CommandQueue computeQueue{device /*, CommandKind::Compute*/};
+    CommandQueue &computeQueue = directQueue;
     //  CoreSwapChain swapChain{directQueue, window,
     //                          SwapChainFlags::IsTearingAllowed};
     CoreSwapChain swapChain{directQueue, window, SwapChainFlags::Default};
@@ -634,11 +634,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     //                              app_folder() / "Assets/skybox/skybox3.hdr",
     //                              2024};
 
-    SilhouetteDetector::MeshSpecificBuffers silhouetteDetectorMeshBuffers(
-        immutableAllocationContext, Box, sizeof(VertexPositionNormalTexture),
-        4);
-
     //  Acquire memory
+    SilhouetteDetector::MeshSpecificBuffers silhouetteDetectorMeshBuffers(
+        immutableAllocationContext, Box);
     groupedResourceAllocator.Build();
 
     auto mutableAllocationContext = immutableAllocationContext;
@@ -651,7 +649,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         mutableAllocationContext, simData);
 
     SilhouetteDetector::Buffers silhouetteDetectorBuffers(
-        mutableAllocationContext, Box.GetIndexCount());
+        mutableAllocationContext, Box.GetIndexCount() * 4);
 
     array<FrameResources, 2> frameResources{
         FrameResources(mutableAllocationContext),
@@ -1063,13 +1061,14 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                   .mesh = Box,
                   .buffers = silhouetteDetectorBuffers,
               };
-              silhouetteTester.Run(allocator, frameResource.DynamicBuffer, inp);
-              allocator.TransitionResource(
+              silhouetteTester.Run(allocator, frameResource.DynamicBuffer,
+            inp); allocator.TransitionResource(
                   silhouetteDetectorBuffers.EdgeCountBuffer.get()->get(),
                   ResourceStates::AllShaderResource,
                   ResourceStates::UnorderedAccess);
             }*/
-            /*{
+            // Box
+            {
               basicShader.Pre(allocator);
 
               XMMATRIX boxModel = XMMatrixTranspose(
@@ -1084,7 +1083,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                   .mesh = Box,
               };
               basicShader.Run(allocator, frameResource.DynamicBuffer, inp);
-            }*/
+            }
 
             // Water
             {

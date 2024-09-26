@@ -36,7 +36,6 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3
         groupID = N_DIV_M - 1 - groupID;
         threadID = M - 1 - threadID;
     }
-
     
     int2 loc1 = groupID * M + threadID.xy;
     int2 loc2 = int2(N - 1 - loc1.x, N - 1 - loc1.y);
