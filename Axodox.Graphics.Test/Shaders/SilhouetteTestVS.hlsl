@@ -59,17 +59,27 @@ VSOutput main(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID)
     VSOutput output;
     
     // Each instance is an edge, and we draw 2 vertices per edge
-    uint edgeVertex = vertexID % 2;
-    uint2 edge = Edges[instanceID].vertices;
+    
+    float4 pos;
+    if (vertexID == 2)
+    {
+        pos = float4(0, 0, 0, 1);
+
+    }
+    else
+    {
+        uint edgeVertex = vertexID % 2;
+        uint2 edge = Edges[instanceID].vertices;
     //uint2 edge = uint2(0, 1);
     
     // Select the correct vertex of the edge
-    uint vertexIndex = (edgeVertex == 0) ? edge.x : edge.y;
-    Vertex v = FromRaw(Vertices[vertexIndex]);
-    float3 position = v.position;
+        uint vertexIndex = (edgeVertex == 0) ? edge.x : edge.y;
+        Vertex v = FromRaw(Vertices[vertexIndex]);
+        float3 position = v.position;
+        float4 pos = mul(float4(position, 1), mMatrix);
+    }
     
 
-    float4 pos = mul(float4(position, 1), mMatrix);
 
     float4 screenPosition = mul(pos, camConstants.vpMatrix);
     output.position = screenPosition;
