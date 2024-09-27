@@ -786,7 +786,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       frameResource.MakeCompatible(*renderTargetView, mutableAllocationContext);
 
       bool camChanged = cam.Update(deltaTime);
-      // shadowMapData.Update(cam, sunData.lights[0]);
 
       // Frame Begin
       {

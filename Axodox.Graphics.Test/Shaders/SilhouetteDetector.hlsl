@@ -1,12 +1,22 @@
 #include "common.hlsli"
 
+// 20 bytes
+struct VertexRaw
+{
+    // 4 bytes * 5
+    uint data[5];
+};
+
 struct Vertex
 {
     float3 position : POSITION;
-    // Due to compression these are useless data
-    uint2 normal : NORMAL;
-    half texCoord : TEXCOORD;
 };
+Vertex FromRaw(VertexRaw v)
+{
+    Vertex r;
+    r.position = float3(asfloat(v.data[0]), asfloat(v.data[1]), asfloat(v.data[2]));
+    return r;
+}
 
 
 // Index buffer
@@ -18,9 +28,12 @@ struct Face
 struct Edge
 {
     //float4 vert;
-    int2 vertices;
-    // faces.y == -1 means its empty
-    int2 faces;
+    uint2 vertices;
+    // -1 means its empty
+    int faceID;
+
+    // 0
+    int counted;
 };
 
 
@@ -35,7 +48,7 @@ struct DrawIndexedIndirectArgs
 
 
 // Vertex Buffer
-StructuredBuffer<Vertex> Vertices : register(t0);
+StructuredBuffer<VertexRaw> Vertices : register(t0);
 // Index Buffer
 StructuredBuffer<Face> Faces : register(t1);
 RWStructuredBuffer<Edge> Edges : register(u0);
@@ -64,6 +77,7 @@ groupshared Vertex s_Vertices[MAX_FACES_PER_GROUP * 3];
 groupshared Face s_Faces[MAX_FACES_PER_GROUP];
 groupshared uint s_EdgeCount;
 groupshared Edge s_Edges[MAX_FACES_PER_GROUP * 3];
+groupshared uint globalOffset;
 
 
 [numthreads(THREADS_PER_GROUP, 1, 1)]
@@ -83,15 +97,16 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3
         [unroll]
         for (uint j = 0; j < 3; ++j)
         {
-            s_Vertices[i * 3 + j] = Vertices[s_Faces[i].indices[j]];
+            s_Vertices[i * 3 + j] = FromRaw(Vertices[s_Faces[i].indices[j]]);
         }
     }
 
     
     // Set default state for s_Edges
-    for ( i = GTid.x; i < MAX_FACES_PER_GROUP * 3; i+= THREADS_PER_GROUP)
+    for (i = GTid.x; i < MAX_FACES_PER_GROUP * 3; i += THREADS_PER_GROUP)
     {
-        s_Edges[i].faces.y = -1;
+        s_Edges[i].faceID = -1;
+        s_Edges[i].counted = 0;
     }
     
     
@@ -131,26 +146,29 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3
                 bool inserted = false;
                 while (!inserted)
                 {
-                    int originalFace;
-                    InterlockedCompareExchange(s_Edges[edgeHash].faces.y, -1, faceIndex, originalFace);
+                    int original;
+                    InterlockedCompareExchange(s_Edges[edgeHash].faceID, (-1), faceIndex, original);
                     
-                    if (originalFace == -1)
+                    if (original == -1)
                     {
                         if (isFrontFacing)
                         {
-                            s_Edges[edgeHash].faces.x = faceIndex | SILHOUETTE_MARKER_MASK;
-                            s_Edges[edgeHash].vertices = int2(startVertex, endVertex);
-                            InterlockedAdd(s_EdgeCount, 1);
+                            InterlockedAdd(s_Edges[edgeHash].counted, 1, original);
+                            s_Edges[edgeHash].vertices = uint2(startVertex, endVertex);
+                            // In case another has already added this edge
+                            InterlockedAdd(s_EdgeCount, (original == 0) ? 1 : -1);
                         }
                         inserted = true;
                     }
-                    // if the hash bucket is occupied by another face
-                    else if (originalFace != faceIndex)
+                    // if the hash bucket is occupied 
+                    else if (original == faceIndex)
                     {
                         if (isFrontFacing)
                         {
                             // Its added multiple times, its not part of the silhouette
-                            s_Edges[edgeHash].faces.x &= (SILHOUETTE_MARKER_MASK - 1);
+                            InterlockedAdd(s_Edges[edgeHash].counted, 1, original);
+                            InterlockedAdd(s_EdgeCount, (original == 1) ? -1 : 0);
+
                         }
                         inserted = true;
                     }
@@ -165,9 +183,8 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3
     GroupMemoryBarrierWithGroupSync();
     
     // For testing
-    s_EdgeCount = MAX_FACES_PER_GROUP * 3;
+    //s_EdgeCount = MAX_FACES_PER_GROUP * 3;
     
-    uint globalOffset;
     if (GTid.x == 0)
     {
         InterlockedAdd(EdgeCounter[0].InstanceCount, s_EdgeCount, globalOffset);
@@ -176,15 +193,14 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3
     GroupMemoryBarrierWithGroupSync();
     
     // Output silhouette edges
-    for (i = GTid.x; i < MAX_FACES_PER_GROUP*3; i += THREADS_PER_GROUP)
+    for (i = GTid.x; i < MAX_FACES_PER_GROUP * 3; i += THREADS_PER_GROUP)
     {
-        if ((s_Edges[i].faces.y != -1) && (s_Edges[i].faces.x & SILHOUETTE_MARKER_MASK)!=0)
+        if (s_Edges[i].counted != 0)
         {
             uint idx;
             InterlockedAdd(s_EdgeCount, -1, idx);
-            uint outputIndex = globalOffset + idx;
+            uint outputIndex = globalOffset + idx - 1;
             Edges[outputIndex] = s_Edges[i];
-            Edges[outputIndex].faces.x &= (SILHOUETTE_MARKER_MASK - 1); // Clear silhouette flag
         }
     }
 }
