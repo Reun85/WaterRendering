@@ -16,13 +16,6 @@ Texture2D<float4> gradients3 : register(t22);
 
 SamplerState _sampler : register(s0);
 
-float LinearizeDepth(float depth, float near, float far)
-{
-    //return depth / far;
-   // return (depth - near) / (far - near);
-    return (2.0f * near) / (far + near - depth * (far - near));
-    return near / (far - depth * (far - near));
-}
 
 
 cbuffer DebugBuffer : register(b9)
@@ -139,12 +132,6 @@ float4 main(input_t input) : SV_TARGET
     if (has_flag(debugValues.flags, 12))
     {
         return _materialValuesinput;
-    }
-    
-    if (has_flag(debugValues.flags, 13))
-    {
-        float x = LinearizeDepth(depth, 0.01, 1000);
-        return float4(x, x, x, 1);
     }
 
     //if (matId > matIdEPS)

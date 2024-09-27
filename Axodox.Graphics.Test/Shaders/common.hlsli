@@ -1,4 +1,3 @@
-
 #include "constants.hlsli"
 #define PI		3.1415926535897932
 #define TWO_PI	6.2831853071795864
@@ -243,3 +242,5 @@ struct SceneLights
     SingleLightData lights[MAX_LIGHT_COUNT];
     int lightCount;
 };
+
+#define byte_sized_object uint8_t
