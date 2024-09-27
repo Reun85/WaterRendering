@@ -214,8 +214,9 @@ SilhouetteDetectorTester::SilhouetteDetectorTester(
                   .DepthStencilFormat = Format::D32_Float})
               .get()) {
   // Create command signature for ExecuteIndirect
+
   D3D12_INDIRECT_ARGUMENT_DESC indirectArgDesc = {};
-  indirectArgDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
+  indirectArgDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
 
   D3D12_COMMAND_SIGNATURE_DESC commandSignatureDesc = {};
   commandSignatureDesc.ByteStride =
@@ -223,8 +224,9 @@ SilhouetteDetectorTester::SilhouetteDetectorTester(
   commandSignatureDesc.NumArgumentDescs = 1;
   commandSignatureDesc.pArgumentDescs = &indirectArgDesc;
 
-  device->CreateCommandSignature(&commandSignatureDesc, Signature.get(),
-                                 IID_PPV_ARGS(&indirectCommandSignature));
+  hresult res = device->CreateCommandSignature(
+      &commandSignatureDesc, nullptr, IID_PPV_ARGS(&indirectCommandSignature));
+  check_hresult(res);
 }
 
 SilhouetteDetectorTester SilhouetteDetectorTester::WithDefaultShaders(
@@ -247,13 +249,9 @@ void SilhouetteDetectorTester::Run(CommandAllocator &allocator,
   mask.model = inp.modelTransform;
   if (inp.texture)
     mask.texture = *inp.texture;
-  mask.Vertex =
-      inp.mesh.GetVertexBuffer().get()->get().get()->GetGPUVirtualAddress();
 
-  mask.Edges =
-      inp.buffers.EdgeBuffer.get()->get().get()->GetGPUVirtualAddress();
-
-  allocator->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+  mask.Vertex = *inp.meshBuffers.Vertex.ShaderResource();
+  mask.Edges = *inp.buffers.Edge.ShaderResource();
 
   // Set descriptor tables done automatically
   /*
@@ -265,18 +263,17 @@ void SilhouetteDetectorTester::Run(CommandAllocator &allocator,
 
   */
 
+  allocator->IASetPrimitiveTopology(mask.Topology);
+  ID3D12Resource *indirectCommandBuffer =
+      inp.buffers.EdgeCountBuffer.get()->get().get();
   // Execute indirect draw
-  // allocator->ExecuteIndirect(indirectCommandSignature.get(),
-  //                           1, // Max command count
-  //                           inp.buffers.EdgeCountBuffer.get()->get().get(),
-  //                           0,       // Buffer offset
-  //                           nullptr, // Count buffer (optional)
-  //                           0        // Count buffer offset
-  //);
-
-  allocator->IASetVertexBuffers(0, 0, nullptr);
-  allocator->IASetIndexBuffer(nullptr);
-  allocator->DrawInstanced(3, 1, 0, 0);
+  allocator->ExecuteIndirect(indirectCommandSignature.get(),
+                             1, // Max command count
+                             indirectCommandBuffer,
+                             0,       // Buffer offset
+                             nullptr, // Count buffer (optional)
+                             0        // Count buffer offset
+  );
 }
 
 SilhouetteDetector::MeshSpecificBuffers::MeshSpecificBuffers(

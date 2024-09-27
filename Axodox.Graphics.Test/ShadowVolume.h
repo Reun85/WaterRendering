@@ -186,8 +186,11 @@ struct SilhouetteClearTask : ShaderJob {
 
 struct SilhouetteDetectorTester : ShaderJob {
   struct ShaderMask : public RootSignatureMask {
-    RootDescriptor<RootDescriptorType::ShaderResource> Vertex;
-    RootDescriptor<RootDescriptorType::ShaderResource> Edges;
+    static constexpr D3D_PRIMITIVE_TOPOLOGY Topology =
+        D3D_PRIMITIVE_TOPOLOGY_LINELIST;
+
+    RootDescriptorTable<1> Vertex;
+    RootDescriptorTable<1> Edges;
     RootDescriptorTable<1> texture;
     RootDescriptor<RootDescriptorType::ConstantBuffer> camera;
     RootDescriptor<RootDescriptorType::ConstantBuffer> model;
@@ -197,7 +200,8 @@ struct SilhouetteDetectorTester : ShaderJob {
     explicit ShaderMask(const RootSignatureContext &context)
         : RootSignatureMask(context),
 
-          Vertex(this, {0}), Edges(this, {1}),
+          Vertex(this, {DescriptorRangeType::ShaderResource, {0}}),
+          Edges(this, {DescriptorRangeType::ShaderResource, {1}}),
           texture(this, {DescriptorRangeType::ShaderResource, {3}},
                   ShaderVisibility::Pixel),
           camera(this, {0}), model(this, {1}),
@@ -217,6 +221,7 @@ struct SilhouetteDetectorTester : ShaderJob {
     const std::optional<GpuVirtualAddress> texture;
     const ImmutableMesh &mesh;
     Buffers &buffers;
+    SilhouetteDetector::MeshSpecificBuffers &meshBuffers;
   };
   struct ModelConstants {
     XMFLOAT4X4 mMatrix;

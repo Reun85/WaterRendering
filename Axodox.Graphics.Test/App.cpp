@@ -1041,11 +1041,11 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
             // Box
             // outline
-            /*{
+            {
               allocator.TransitionResource(
                   silhouetteDetectorBuffers.EdgeCountBuffer.get()->get(),
                   ResourceStates::UnorderedAccess,
-                  ResourceStates::AllShaderResource);
+                  ResourceStates::IndirectArgument);
 
               silhouetteTester.Pre(allocator);
               XMMATRIX boxModel = XMMatrixTranspose(
@@ -1059,15 +1059,16 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                   .texture = std::nullopt,
                   .mesh = Box,
                   .buffers = silhouetteDetectorBuffers,
+                  .meshBuffers = silhouetteDetectorMeshBuffers,
               };
-              silhouetteTester.Run(allocator, frameResource.DynamicBuffer,
-            inp); allocator.TransitionResource(
+              silhouetteTester.Run(allocator, frameResource.DynamicBuffer, inp);
+              allocator.TransitionResource(
                   silhouetteDetectorBuffers.EdgeCountBuffer.get()->get(),
-                  ResourceStates::AllShaderResource,
+                  ResourceStates::IndirectArgument,
                   ResourceStates::UnorderedAccess);
-            }*/
+            }
             // Box
-            {
+            /*{
               basicShader.Pre(allocator);
 
               XMMATRIX boxModel = XMMatrixTranspose(
@@ -1082,7 +1083,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                   .mesh = Box,
               };
               basicShader.Run(allocator, frameResource.DynamicBuffer, inp);
-            }
+            }*/
 
             // Water
             {
