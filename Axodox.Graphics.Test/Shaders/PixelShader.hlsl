@@ -102,7 +102,7 @@ output_t main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
     if (has_flag(debugValues.flags, 2))
     {
         foam =
-    lerp(0.0f, saturate(Jacobian), pow(depth, foamDepthFalloff));
+    lerp(0.0f, Jacobian, pow(depth, foamDepthFalloff));
     }
 
     normal = lerp(normal, float3(0, 1, 0), pow(depth, NormalDepthAttenuation));

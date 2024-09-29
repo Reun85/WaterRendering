@@ -244,7 +244,7 @@ float4 main(input_t input) : SV_TARGET
 
     
     float D = D_GGX(NdotH, Roughness);
-    float F = SchlickFresnel(0.02, NdotV);
+    float F = SchlickFresnel(0.03, NdotV);
 				
 
 

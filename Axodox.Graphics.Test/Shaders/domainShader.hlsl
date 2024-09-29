@@ -66,7 +66,9 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
 
     float HighestMult = GetMultiplier(0, HighestMax, viewDistanceSqr);
     float MediumMult = GetMultiplier(HighestMax, MediumMax, viewDistanceSqr);
-    float LowestMult = GetMultiplier(MediumMax, LowestMax, viewDistanceSqr);
+    // Multiplied by (1-HighestMult), essentially turning it off if the highestresolution waves are used, 
+    // and will gradually merge between them when the highests are no longer used and the lowest are used
+    float LowestMult = GetMultiplier(MediumMax, LowestMax, viewDistanceSqr) * (1 - HighestMult);
 
     float highestaccountedfor = 0;
 

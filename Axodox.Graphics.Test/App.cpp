@@ -81,7 +81,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     XMFLOAT3 foamColor = XMFLOAT3(1, 1, 1);
 
     std::array<bool, 31 - 0 + 1> DebugBits{false, false, true,
-                                           true,  true,  false};
+                                           true,  true,  true};
 
     bool enableSSR = false;
     const static constexpr std::initializer_list<
@@ -390,7 +390,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       ImGui::ColorEdit3("Surface Color", &waterData.AlbedoColor.x);
       ImGui::SliderFloat("Roughness", &waterData.Roughness, 0.0f, 1.0f);
 
-      ImGui::ColorEdit3("Tip Color", &waterData._TipColor.x);
+      ImGui::ColorEdit3("Tip Color", &defData._TipColor.x);
       ImGui::SliderFloat("Normal Depth Attenuation",
                          &waterData.NormalDepthAttenuation, 0, 2);
       ImGui::SliderFloat("Foam Roughness Modifier",
