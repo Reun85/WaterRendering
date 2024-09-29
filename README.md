@@ -10,7 +10,7 @@ The project uses Visual Studio 2022 as a build tool. The required Visual studio 
 - Game development with C++ (for DirectX sdk)
 - Windows app development with C++ (for Windows SDK and WinRT)
 
-The project only supports Windows 11.
+The project only supports Windows 11 and requires a dedicated GPU capable of DX12.
 
 The startup project should be Axodox.Graphics.Test
 
