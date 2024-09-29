@@ -5,10 +5,10 @@ The simulation is heavily based on the paper "Simulating Ocean Water" by Jerry T
 
 ## Building
 
-The project uses Visual Studio 2022 as a build manager. The required Visual studio features are:
-- Desktop development with C++ (c++20 is used)
-- Game development with C++ (DirectX sdk)
-- Windows app development with C++ (Windows SDK)
+The project uses Visual Studio 2022 as a build tool. The required Visual studio features are:
+- Desktop development with C++ (for c++20)
+- Game development with C++ (for DirectX sdk)
+- Windows app development with C++ (for Windows SDK and WinRT)
 
 The project only supports Windows 11.
 
