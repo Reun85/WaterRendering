@@ -2,7 +2,6 @@
 #include "../pch.h"
 
 namespace Axodox::Graphics::D3D12 {
-
 struct TextureViewDefinitions {
   std::optional<D3D12_SHADER_RESOURCE_VIEW_DESC> ShaderResource = std::nullopt;
   std::optional<D3D12_RENDER_TARGET_VIEW_DESC> RenderTarget = std::nullopt;

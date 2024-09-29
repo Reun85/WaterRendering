@@ -234,7 +234,7 @@ struct PixelLighting {
     data.lightCount = 1;
     data.lights[0].lightPos = XMFLOAT4(1.f, 0.109f, 0.964f, 0.f);
     data.lights[0].lightColor =
-        XMFLOAT4(234.f / 255.f, 204.f / 255.f, 118.f / 255.f, 0.446f);
+        XMFLOAT4(231.f / 255.f, 207.f / 255.f, 137.f / 255.f, 0.446f);
 
     data.lights[0].AmbientColor =
         XMFLOAT4(15.f / 255.f, 14.f / 255.f, 5.f / 255.f, .185f);
@@ -309,3 +309,20 @@ inline std::string GetLocalFolder() {
   auto path = std::string(localFolderWstr.begin(), localFolderWstr.end());
   return path;
 }
+
+struct ShaderBuffers {
+  // Allocates necessary buffers if they are not yet allocated. May use the
+  // finalTarget size to determine the sizes of the buffers
+  virtual void MakeCompatible(const RenderTargetView &finalTarget,
+                              ResourceAllocationContext &allocationContext) = 0;
+
+  // Get ready for next frame
+  virtual void Clear(CommandAllocator &allocator) = 0;
+
+  virtual ~ShaderBuffers() = default;
+};
+
+struct ShaderJob {
+  virtual void Pre(CommandAllocator &allocator) const = 0;
+  virtual ~ShaderJob() = default;
+};

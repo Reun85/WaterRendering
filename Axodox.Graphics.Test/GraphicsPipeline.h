@@ -11,18 +11,6 @@ using namespace Axodox::Storage;
 using namespace DirectX::PackedVector;
 class Camera;
 
-struct TextureBuffers {
-  // Allocates necessary buffers if they are not yet allocated. May use the
-  // finalTarget size to determine the sizes of the buffers
-  virtual void MakeCompatible(const RenderTargetView &finalTarget,
-                              ResourceAllocationContext &allocationContext) = 0;
-
-  // Get ready for next frame
-  virtual void Clear(CommandAllocator &allocator) = 0;
-
-  virtual ~TextureBuffers() = default;
-};
-
 struct WaterGraphicRootDescription : public RootSignatureMask {
   struct ModelConstants {
     XMFLOAT4X4 mMatrix;
@@ -154,7 +142,7 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
 };
 
 struct DeferredShading : public RootSignatureMask {
-  struct GBuffer : TextureBuffers {
+  struct GBuffer : ShaderBuffers {
     MutableTexture Albedo;
     MutableTexture Normal;
     MutableTexture MaterialValues;
@@ -168,9 +156,13 @@ struct DeferredShading : public RootSignatureMask {
     }
 
     //
-    constexpr static std::array<Format, NumberOfBuffers> GetGBufferFormats() {
+    static const std::array<Format, NumberOfBuffers> &GetGBufferFormats() {
       using enum Axodox::Graphics::D3D12::Format;
-      return {B8G8R8A8_UNorm, R16G16B16A16_Float, R16G16B16A16_Float};
+      // Returns a static reference, so that we can turn this into a initializer
+      // list easily
+      const static std::array<Format, NumberOfBuffers> formats = {
+          {B8G8R8A8_UNorm, R16G16B16A16_Float, R16G16B16A16_Float}};
+      return formats;
     };
 
     std::array<MutableTexture *, NumberOfBuffers> GetBuffers() {
@@ -244,7 +236,7 @@ struct DeferredShading : public RootSignatureMask {
 struct ShadowMapping : public RootSignatureMask {
   constexpr static size_t LODCOUNT = 3;
 
-  struct Textures : TextureBuffers {
+  struct Textures : ShaderBuffers {
     MutableTextureWithViews DepthBuffer;
 
     explicit Textures(const ResourceAllocationContext &context,
@@ -333,31 +325,6 @@ struct ShadowMapping : public RootSignatureMask {
   }
 };
 
-struct ShadowVolume : RootSignatureMask {
-  struct Textures : TextureBuffers {
-    MutableTextureWithViews StencilBuffer;
-
-    explicit Textures(const ResourceAllocationContext &context);
-
-    void MakeCompatible(const RenderTargetView &finalTarget,
-                        ResourceAllocationContext &allocationContext) override {
-      // No need to allocate
-    }
-    void Clear(CommandAllocator &allocator) override;
-    void TranslateToTarget(CommandAllocator &allocator);
-    void TranslateToView(
-        CommandAllocator &allocator,
-        const ResourceStates &newState = ResourceStates::AllShaderResource);
-    ~Textures() override = default;
-  };
-
-  explicit ShadowVolume(const RootSignatureContext &context)
-      : RootSignatureMask(context) {
-    Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
-  }
-  constexpr static D3D12_DEPTH_STENCIL_DESC GetDepthStencilDesc();
-};
-
 struct SSRPostProcessing : public RootSignatureMask {
   RootDescriptor<RootDescriptorType::ConstantBuffer> CameraBuffer;
   RootDescriptorTable<1> InpColor;
@@ -377,7 +344,52 @@ struct SSRPostProcessing : public RootSignatureMask {
   }
 };
 
-struct FrameResources : TextureBuffers {
+struct BasicShaderMask : RootSignatureMask {
+  RootDescriptorTable<1> texture;
+  RootDescriptor<RootDescriptorType::ConstantBuffer> camera;
+  RootDescriptor<RootDescriptorType::ConstantBuffer> model;
+
+  StaticSampler _textureSampler;
+
+  struct ModelConstants {
+    XMFLOAT4X4 mMatrix;
+  };
+
+  explicit BasicShaderMask(const RootSignatureContext &context)
+      : RootSignatureMask(context),
+        texture(this, {DescriptorRangeType::ShaderResource, {0}},
+                ShaderVisibility::Pixel),
+        camera(this, {0}), model(this, {1}),
+        _textureSampler(this, {0}, Filter::Linear, TextureAddressMode::Wrap,
+                        ShaderVisibility::All) {
+    Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
+  }
+};
+
+struct BasicShader : ShaderJob {
+  struct Inp {
+    const GpuVirtualAddress &camera;
+    const GpuVirtualAddress &modelTransform;
+    const std::optional<GpuVirtualAddress> texture;
+    const ImmutableMesh &mesh;
+  };
+
+  using ShaderMask = BasicShaderMask;
+  RootSignature<ShaderMask> Signature;
+  PipelineState pipeline;
+
+  BasicShader(PipelineStateProvider &pipelineProvider, GraphicsDevice &device,
+              VertexShader *vs, PixelShader *ps);
+
+  static BasicShader WithDefaultShaders(PipelineStateProvider &pipelineProvider,
+                                        GraphicsDevice &device);
+  void Pre(CommandAllocator &allocator) const override;
+  void Run(CommandAllocator &allocator, DynamicBufferManager &buffermanager,
+           const Inp &inp) const;
+  ~BasicShader() override = default;
+};
+
+struct FrameResources : ShaderBuffers {
   CommandAllocator Allocator;
   CommandFence Fence;
   CommandFenceMarker Marker;

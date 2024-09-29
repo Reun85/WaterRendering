@@ -68,8 +68,8 @@ SimulationData SimulationData::Default() {
                          {
                              .displacementLambda = float3(0.48f, 0.5, 0.48f),
                              .patchSize = 21.f,
-                             .foamExponentialDecay = 0.3f,
-                             .Amplitude = 0.01e-0f,
+                             .foamExponentialDecay = 0.1f,
+                             .Amplitude = 0.4e-3f,
                              .WindForce = 3,
                              .foamMinValue = 0.4f,
                              .foamBias = 0.2f,
@@ -84,8 +84,8 @@ SimulationData SimulationData::Default() {
                          {
                              .displacementLambda = float3(0.48f, 0.5, 0.48f),
                              .patchSize = 91.f,
-                             .foamExponentialDecay = 0.3f,
-                             .Amplitude = 0.35e-3f,
+                             .foamExponentialDecay = 0.1f,
+                             .Amplitude = 0.15e-3f,
                              .WindForce = 3,
                              .foamMinValue = 0.4f,
                              .foamBias = 0.2f,
@@ -99,8 +99,8 @@ SimulationData SimulationData::Default() {
                      .Lowest = {
                          .displacementLambda = float3(0.48f, 0.5, 0.48f),
                          .patchSize = 383,
-                         .foamExponentialDecay = 0.3f,
-                         .Amplitude = 0.00003,
+                         .foamExponentialDecay = 0.1f,
+                         .Amplitude = 0.1e-4f,
                          .WindForce = 6,
                          .foamMinValue = 0.4f,
                          .foamBias = 0.2f,

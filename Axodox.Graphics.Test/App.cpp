@@ -9,6 +9,7 @@
 #include "ComputePipeline.h"
 #include "GraphicsPipeline.h"
 #include "SkyboxPipeline.hpp"
+#include "ShadowVolume.h"
 
 using namespace std;
 using namespace winrt;
@@ -80,7 +81,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     XMFLOAT3 foamColor = XMFLOAT3(1, 1, 1);
 
     std::array<bool, 31 - 0 + 1> DebugBits{false, false, true,
-                                           true,  true,  false};
+                                           true,  true,  true};
 
     bool enableSSR = false;
     const static constexpr std::initializer_list<
@@ -389,7 +390,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       ImGui::ColorEdit3("Surface Color", &waterData.AlbedoColor.x);
       ImGui::SliderFloat("Roughness", &waterData.Roughness, 0.0f, 1.0f);
 
-      ImGui::ColorEdit3("Tip Color", &waterData._TipColor.x);
+      ImGui::ColorEdit3("Tip Color", &defData._TipColor.x);
       ImGui::SliderFloat("Normal Depth Attenuation",
                          &waterData.NormalDepthAttenuation, 0, 2);
       ImGui::SliderFloat("Foam Roughness Modifier",
@@ -484,7 +485,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     GraphicsDevice device{};
     CommandQueue directQueue{device};
-    CommandQueue computeQueue{device /*, CommandKind::Compute*/};
+    CommandQueue computeQueue{device, /* CommandKind::Compute*/};
+    // CommandQueue &computeQueue = directQueue;
     CoreSwapChain swapChain{directQueue, window,
                             SwapChainFlags::IsTearingAllowed};
     // CoreSwapChain swapChain{directQueue, window, SwapChainFlags::Default};
@@ -563,28 +565,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             .CreatePipelineStateAsync(deferredShadingPipelineStateDefinition)
             .get();
 
-    RootSignature<ShadowVolume> shadowVolumeRootSignature{device};
-    GeometryShader shadowVolumeGeometryShader{app_folder() /
-                                              L"ShadowVolGS.cso"};
-    PixelShader shadowVolumePixelShader{app_folder() / L"ShadowVolPS.cso"};
-
-    /*GraphicsPipelineStateDefinition shadowVolumePipelineStateDefinition{
-        .RootSignature = &shadowVolumeRootSignature,
-        .VertexShader = &simpleVertexShader,
-        .DomainShader = &domainShader,
-        .HullShader = &hullShader,
-        .GeometryShader = &shadowVolumeGeometryShader,
-        .PixelShader = &shadowVolumePixelShader,
-        .RasterizerState = debugValues.rasterizerFlags,
-        .DepthStencilState = DepthStencilMode::WriteDepth,
-        .InputLayout = VertexPosition::Layout,
-        .TopologyType = PrimitiveTopologyType::Patch,
-        .DepthStencilFormat = Format::D24_UNorm_S8_UInt};
-    Axodox::Graphics::D3D12::PipelineState shadowVolumePipelineState =
-        pipelineStateProvider
-            .CreatePipelineStateAsync(shadowVolumePipelineStateDefinition)
-            .get();*/
-
     RootSignature<SSRPostProcessing> postProcessingRootSignature{device};
     ComputeShader postProcessingComputeShader{app_folder() /
                                               L"SSRPostProcessingShader.cso"};
@@ -595,6 +575,19 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         pipelineStateProvider
             .CreatePipelineStateAsync(postProcessingStateDefinition)
             .get();
+
+    BasicShader basicShader =
+        BasicShader::WithDefaultShaders(pipelineStateProvider, device);
+
+    SilhouetteDetector silhouetteDetector =
+        SilhouetteDetector::WithDefaultShaders(pipelineStateProvider, device);
+
+    SilhouetteClearTask silhouetteClear =
+        SilhouetteClearTask::WithDefaultShaders(pipelineStateProvider, device);
+
+    SilhouetteDetectorTester silhouetteTester =
+        SilhouetteDetectorTester::WithDefaultShaders(pipelineStateProvider,
+                                                     device);
 
     WaterGraphicRootDescription::WaterPixelShaderData waterData;
     DeferredShading::DeferredShaderBuffers defData;
@@ -628,6 +621,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     ImmutableMesh deferredShadingPlane{immutableAllocationContext,
                                        CreateBackwardsPlane(2, XMUINT2(2, 2))};
     ImmutableMesh skyboxMesh{immutableAllocationContext, CreateCube(2)};
+    ImmutableMesh Box{immutableAllocationContext, CreateCube(2)};
 
     const CubeMapPaths paths = {.PosX = app_folder() / "Assets/skybox/px.png",
                                 .NegX = app_folder() / "Assets/skybox/nx.png",
@@ -641,6 +635,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     //                              2024};
 
     //  Acquire memory
+    SilhouetteDetector::MeshSpecificBuffers silhouetteDetectorMeshBuffers(
+        immutableAllocationContext, Box);
     groupedResourceAllocator.Build();
 
     auto mutableAllocationContext = immutableAllocationContext;
@@ -651,6 +647,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         mutableAllocationContext, simData);
     SimulationStage::MutableGpuSources simulationMutableSources(
         mutableAllocationContext, simData);
+
+    SilhouetteDetector::Buffers silhouetteDetectorBuffers(
+        mutableAllocationContext, Box.GetIndexCount() * 4);
 
     array<FrameResources, 2> frameResources{
         FrameResources(mutableAllocationContext),
@@ -787,7 +786,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       frameResource.MakeCompatible(*renderTargetView, mutableAllocationContext);
 
       bool camChanged = cam.Update(deltaTime);
-      // shadowMapData.Update(cam, sunData.lights[0]);
 
       // Frame Begin
       {
@@ -904,7 +902,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         // Global data
         GpuVirtualAddress cameraConstantBuffer;
         GpuVirtualAddress debugConstantBuffer;
-        GpuVirtualAddress sunDataBuffer;
+        GpuVirtualAddress lightsConstantBuffer;
         GpuVirtualAddress timeDataBuffer;
 
         {
@@ -928,7 +926,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
               frameResource.DynamicBuffer.AddBuffer(cameraConstants);
           debugConstantBuffer =
               frameResource.DynamicBuffer.AddBuffer(debugBufferContent);
-          sunDataBuffer = frameResource.DynamicBuffer.AddBuffer(sunData);
+          lightsConstantBuffer = frameResource.DynamicBuffer.AddBuffer(sunData);
           timeDataBuffer = frameResource.DynamicBuffer.AddBuffer(timeConstants);
         }
 
@@ -1008,47 +1006,118 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
           // Shadow Map pass
           {
+            // Get shadow casting object silhouette
+            {
+              {
+                silhouetteClear.Pre(allocator);
+                SilhouetteClearTask::Inp inp{
+                    .buffers = silhouetteDetectorBuffers,
+                };
+                silhouetteClear.Run(allocator, frameResource.DynamicBuffer,
+                                    inp);
+              }
+              {
+                silhouetteDetector.Pre(allocator);
+                SilhouetteDetector::Inp inp{
+                    .buffers = silhouetteDetectorBuffers,
+                    .lights = lightsConstantBuffer,
+                    .mesh = Box,
+                    .meshBuffers = silhouetteDetectorMeshBuffers,
+                };
+                silhouetteDetector.Run(allocator, frameResource.DynamicBuffer,
+                                       inp);
+              }
+            }
             // ...
           }
 
           // GBuffer Pass
           {
-            waterPipelineState.Apply(allocator);
-
             auto gBufferViews = frameResource.GBuffer.GetGBufferViews();
             allocator.SetRenderTargets(
                 std::initializer_list(std::to_address(gBufferViews.begin()),
                                       std::to_address(gBufferViews.end())),
                 frameResource.DepthBuffer.DepthStencil());
 
-            const auto &oceanQuadData = oceanDataFuture.get();
-            for (auto &curr : oceanQuadData) {
-              if (curr.N == 0)
-                continue;
-              auto mask = waterRootSignature.Set(allocator,
-                                                 RootSignatureUsage::Graphics);
+            // Box
+            // outline
+            {
+              allocator.TransitionResource(
+                  silhouetteDetectorBuffers.EdgeCountBuffer.get()->get(),
+                  ResourceStates::UnorderedAccess,
+                  ResourceStates::IndirectArgument);
 
-              if (usedTextureAddress)
-                mask.texture = *usedTextureAddress;
+              silhouetteTester.Pre(allocator);
+              XMMATRIX boxModel = XMMatrixTranspose(
+                  XMMatrixTranslationFromVector(XMVECTOR{2, 5, 2, 0}));
+              SilhouetteDetectorTester::ModelConstants boxModelConstants{};
+              XMStoreFloat4x4(&boxModelConstants.mMatrix, boxModel);
+              SilhouetteDetectorTester::Inp inp{
+                  .camera = cameraConstantBuffer,
+                  .modelTransform =
+                      frameResource.DynamicBuffer.AddBuffer(boxModelConstants),
+                  .texture = std::nullopt,
+                  .mesh = Box,
+                  .buffers = silhouetteDetectorBuffers,
+                  .meshBuffers = silhouetteDetectorMeshBuffers,
+              };
+              silhouetteTester.Run(allocator, frameResource.DynamicBuffer, inp);
+              allocator.TransitionResource(
+                  silhouetteDetectorBuffers.EdgeCountBuffer.get()->get(),
+                  ResourceStates::IndirectArgument,
+                  ResourceStates::UnorderedAccess);
+            }
+            // Box
+            /*{
+              basicShader.Pre(allocator);
 
-              mask.heightMapHighest = displacementMapAddressHighest;
-              mask.gradientsHighest = gradientsAddressHighest;
-              mask.heightMapMedium = displacementMapAddressMedium;
-              mask.gradientsMedium = gradientsAddressMedium;
-              mask.heightMapLowest = displacementMapAddressLowest;
-              mask.gradientsLowest = gradientsAddressLowest;
+              XMMATRIX boxModel = XMMatrixTranspose(
+                  XMMatrixTranslationFromVector(XMVECTOR{2, 5, 2, 0}));
+              BasicShader::ShaderMask::ModelConstants boxModelConstants{};
+              XMStoreFloat4x4(&boxModelConstants.mMatrix, boxModel);
+              BasicShader::Inp inp{
+                  .camera = cameraConstantBuffer,
+                  .modelTransform =
+                      frameResource.DynamicBuffer.AddBuffer(boxModelConstants),
+                  .texture = std::nullopt,
+                  .mesh = Box,
+              };
+              basicShader.Run(allocator, frameResource.DynamicBuffer, inp);
+            }*/
 
-              mask.waterPBRBuffer = waterDataBuffer;
+            // Water
+            {
+              waterPipelineState.Apply(allocator);
 
-              mask.hullBuffer =
-                  frameResource.DynamicBuffer.AddBuffer(curr.hullConstants);
-              mask.vertexBuffer =
-                  frameResource.DynamicBuffer.AddBuffer(curr.vertexConstants);
-              mask.debugBuffer = debugConstantBuffer;
-              mask.cameraBuffer = cameraConstantBuffer;
-              mask.modelBuffer = modelBuffer;
+              const auto &oceanQuadData = oceanDataFuture.get();
+              for (auto &curr : oceanQuadData) {
+                if (curr.N == 0)
+                  continue;
+                auto mask = waterRootSignature.Set(
+                    allocator, RootSignatureUsage::Graphics);
 
-              planeMesh.Draw(allocator, curr.N);
+                if (usedTextureAddress)
+                  mask.texture = *usedTextureAddress;
+
+                mask.heightMapHighest = displacementMapAddressHighest;
+                mask.gradientsHighest = gradientsAddressHighest;
+                mask.heightMapMedium = displacementMapAddressMedium;
+                mask.gradientsMedium = gradientsAddressMedium;
+                mask.heightMapLowest = displacementMapAddressLowest;
+                mask.gradientsLowest = gradientsAddressLowest;
+
+                mask.waterPBRBuffer = waterDataBuffer;
+
+                mask.hullBuffer =
+                    frameResource.DynamicBuffer.AddBuffer(curr.hullConstants);
+                mask.vertexBuffer =
+                    frameResource.DynamicBuffer.AddBuffer(curr.vertexConstants);
+                mask.debugBuffer = debugConstantBuffer;
+                mask.cameraBuffer = cameraConstantBuffer;
+                mask.modelBuffer = modelBuffer;
+
+                planeMesh.Draw(allocator, curr.N);
+              }
             }
             // skybox
             {
@@ -1058,7 +1127,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                                                   RootSignatureUsage::Graphics);
 
               mask.skybox = skyboxTexture;
-              mask.lightingBuffer = sunDataBuffer;
+              mask.lightingBuffer = lightsConstantBuffer;
 
               mask.cameraBuffer = cameraConstantBuffer;
 
@@ -1094,7 +1163,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                     allocator);
 
             // Buffers
-            mask.lightingBuffer = sunDataBuffer;
+            mask.lightingBuffer = lightsConstantBuffer;
             mask.cameraBuffer = cameraConstantBuffer;
             mask.debugBuffer = debugConstantBuffer;
 
@@ -1217,8 +1286,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       }
 
       // Present frame
-      swapChain.Present();
       computeStage.wait();
+      swapChain.Present();
     }
     // Wait until everything is done before deleting context
 

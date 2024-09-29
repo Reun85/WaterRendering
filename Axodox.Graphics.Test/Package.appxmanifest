@@ -3,7 +3,7 @@
   <Identity
     Name="29f6a70b-da62-48dd-8e70-718664f9a428"
     Publisher="CN=gugig"
-    Version="1.0.2.0" />
+    Version="1.0.3.0" />
   <mp:PhoneIdentity PhoneProductId="29f6a70b-da62-48dd-8e70-718664f9a428" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
   <Properties>
     <DisplayName>Axodox.Graphics.Test</DisplayName>
