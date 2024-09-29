@@ -77,7 +77,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     XMFLOAT4 pixelMult = XMFLOAT4(1, 1, 1, 1);
     XMUINT4 swizzleorder = XMUINT4(0, 1, 2, 3);
-    XMFLOAT4 blendDistances = XMFLOAT4(40.f, 150, 1000, 5000);
+    XMFLOAT4 blendDistances = XMFLOAT4(150.f, 300, 1000, 5000);
     XMFLOAT3 foamColor = XMFLOAT3(1, 1, 1);
 
     std::array<bool, 31 - 0 + 1> DebugBits{false, false, true,
@@ -111,7 +111,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       // I am sorry, I am lazy
       return {DebugBits[3], DebugBits[4], DebugBits[5]};
     }
-    RasterizerFlags rasterizerFlags = RasterizerFlags::CullNone;
+    RasterizerFlags rasterizerFlags = RasterizerFlags::CullClockwise;
     void DrawImGui(NeedToDo &out, bool exclusiveWindow = true) {
       bool cont = true;
       if (exclusiveWindow)

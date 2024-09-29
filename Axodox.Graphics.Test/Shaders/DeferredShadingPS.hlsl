@@ -2,7 +2,6 @@
 #include "common.hlsli"
 Texture2D<float4> _albedo : register(t0);
 Texture2D<float4> _normal : register(t1);
-Texture2D<float4> _position : register(t2);
 Texture2D<float4> _materialValues : register(t3);
 Texture2D<float1> _depthTex : register(t4);
 TextureCube<float4> _skybox : register(t5);
@@ -119,11 +118,11 @@ float4 main(input_t input) : SV_TARGET
     }
     if (has_flag(debugValues.flags, 9))
     {
-        return _normalinput;
+        return float4(normal, 1);
     }
     if (has_flag(debugValues.flags, 10))
     {
-        return -_normalinput;
+        return float4(-normal, 1);
     }
     if (has_flag(debugValues.flags, 11))
     {
@@ -134,69 +133,11 @@ float4 main(input_t input) : SV_TARGET
         return _materialValuesinput;
     }
 
-    //if (matId > matIdEPS)
-    //{
-    //    if (matId < 1 + matIdEPS)
-    //    {
-    //        const float HighestMax = sqr(debugValues.blendDistances.r);
-    //        const float MediumMax = sqr(debugValues.blendDistances.g);
-    //        const float LowestMax = sqr(debugValues.blendDistances.b);
-
-    //        float HighestMult = GetMultiplier(0, HighestMax, viewDistanceSqr);
-    //        float MediumMult = GetMultiplier(HighestMax, MediumMax, viewDistanceSqr);
-    //        float LowestMult = GetMultiplier(MediumMax, LowestMax, viewDistanceSqr);
-
-    //        float highestaccountedfor = 0;
-    //        float2 planeCoord = _normalinput.rg;
-
     
-    //        float4 grad = float4(0, 0, 0, 0);
-
-    //// Use displacement
-    //        if (has_flag(debugValues.flags, 0))
-    //        {
-    //            if (has_flag(debugValues.flags, 3) && HighestMult > 0)
-    //            {
-    //                highestaccountedfor = HighestMax;
-    //                float2 texCoord = GetTextureCoordFromPlaneCoordAndPatch(planeCoord, debugValues.patchSizes.r);
-    //                return float4(texCoord, 0, 1);
-    //                grad += gradients1.SampleLevel(_sampler, texCoord, 0) * HighestMult;
-    //            }
-    //            if (has_flag(debugValues.flags, 4) && MediumMult > 0)
-    //            {
-    //                highestaccountedfor = MediumMax;
-    //                float2 texCoord = GetTextureCoordFromPlaneCoordAndPatch(planeCoord, debugValues.patchSizes.g);
-    //                grad += gradients2.SampleLevel(_sampler, texCoord, 0) * MediumMult;
-    //            }
-    //            if (has_flag(debugValues.flags, 5) && LowestMult > 0)
-    //            {
-        
-    //                highestaccountedfor = LowestMax;
-    //                float2 texCoord = GetTextureCoordFromPlaneCoordAndPatch(planeCoord, debugValues.patchSizes.b);
-    //                grad += gradients3.SampleLevel(_sampler, texCoord, 0) * LowestMult;
-    //            }
-    //        }
-    //        else
-    //        {
-    //            grad = float4(0, 1, 0, 0);
-    //        }
-    //        if (viewDistanceSqr > highestaccountedfor)
-    //        {
-    //            grad = float4(0, 1, 0, 0);
-    //        }
-    //        normal.xyz = grad.xyz;
-    //        if (dot(normal, viewDir) < 0)
-    //        {
-    //            normal *= -1;
-    //        }
-        
-    //    }
-    //}
-
     
     
     normal = normalize(normal);
-    
+    // If displaying gradients
     if (has_flag(debugValues.flags, 7))
     {
         return float4(normal, 1);
@@ -209,7 +150,6 @@ float4 main(input_t input) : SV_TARGET
     float LdotH = DotClamped(lightDir, halfwayDir);
     float VdotH = DotClamped(viewDir, halfwayDir);
     float NdotV = DotClamped(viewDir, normal);
-				
     float NdotL = DotClamped(normal, lightDir);
     float NdotH = max(0.0001f, dot(normal, halfwayDir));
 				
@@ -221,22 +161,6 @@ float4 main(input_t input) : SV_TARGET
 
 
     
-    
-    
-    
-    
-
-    // Old code
-    //float D = Beckmann(NdotH, a);
-
-    //float eta = 1.33f;
-    //float R = ((eta - 1) * (eta - 1)) / ((eta + 1) * (eta + 1));
-    //float thetaV = acos(viewDir.y);
-
-    //float numerator = pow(1 - dot(normal, viewDir), 5 * exp(-2.69 * a));
-    //float F = R + (1 - R) * numerator / (1.0f + 22.7f * pow(a, 1.5f));
-    //F = saturate(F);
-
     float viewMask = SmithMaskingBeckmann(halfwayDir, viewDir, Roughness);
     float lightMask = SmithMaskingBeckmann(halfwayDir, lightDir, Roughness);
 				
@@ -248,9 +172,14 @@ float4 main(input_t input) : SV_TARGET
 				
 
 
-    float denom = 4.0 * NdotL * NdotV;
-    float3 specular = F * G * D / max(0.001f, denom);
 
+    float denom = 4.0 * NdotL * NdotV;
+    float3 specular;
+    if (dot(normal, lightDir) > 0)
+        specular = F * G * D / max(0.001f, denom);
+    else
+        specular = 0;
+    
     
     if (has_flag(debugValues.flags, 30))
     {
@@ -282,6 +211,13 @@ float4 main(input_t input) : SV_TARGET
             {
                 float3 K1 = k1 * scatterColor * rcp(1 + lightMask);
                 return float4(K1 * sunIrradiance, 1);
+            }
+            if (has_flag(debugValues.flags, 27))
+            {
+                
+                float x = dot(normal, lightDir);
+
+                return float4(x, x, x, 1);
             }
             if (has_flag(debugValues.flags, 28))
             {

@@ -68,7 +68,7 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
     float MediumMult = GetMultiplier(HighestMax, MediumMax, viewDistanceSqr);
     // Multiplied by (1-HighestMult), essentially turning it off if the highestresolution waves are used, 
     // and will gradually merge between them when the highests are no longer used and the lowest are used
-    float LowestMult = GetMultiplier(MediumMax, LowestMax, viewDistanceSqr) * (1 - HighestMult);
+    float LowestMult = GetMultiplier(MediumMax, LowestMax, viewDistanceSqr);
 
     float highestaccountedfor = 0;
 
@@ -78,28 +78,55 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
     if (has_flag(debugValues.flags, 0))
     {
         float4 disp = float4(0, 0, 0, 0);
+        //if (has_flag(debugvalues.flags, 3) && highestmult > 0)
+        //{
+        //    highestaccountedfor = highestmax;
+        //    float2 texcoord = gettexturecoordfromplanecoordandpatch(planecoord, debugvalues.patchsizes.r);
+        //    disp += _heightmap1.samplelevel(_sampler, texcoord, 0) * highestmult;
+        //    grad += gradients1.samplelevel(_sampler, texcoord, 0);
+        //}
+        //if (has_flag(debugvalues.flags, 4) && mediummult > 0)
+        //{
+        //    highestaccountedfor = mediummax;
+        //    float2 texcoord = gettexturecoordfromplanecoordandpatch(planecoord, debugvalues.patchsizes.g);
+        //    disp += _heightmap2.samplelevel(_sampler, texcoord, 0) * mediummult;
+        //    grad += gradients2.samplelevel(_sampler, texcoord, 0);
+        //}
+        //if (has_flag(debugvalues.flags, 5) && lowestmult > 0)
+        //{
+        
+        //    highestaccountedfor = lowestmax;
+        //    float2 texcoord = gettexturecoordfromplanecoordandpatch(planecoord, debugvalues.patchsizes.b);
+        //    disp += _heightmap3.samplelevel(_sampler, texcoord, 0) * lowestmult;
+        //    grad += gradients3.samplelevel(_sampler, texcoord, 0);
+        //}
+
         if (has_flag(debugValues.flags, 3) && HighestMult > 0)
         {
+        
             highestaccountedfor = HighestMax;
             float2 texCoord = GetTextureCoordFromPlaneCoordAndPatch(planeCoord, debugValues.patchSizes.r);
-            disp += _heightmap1.SampleLevel(_sampler, texCoord, 0) * HighestMult;
-            grad += gradients1.SampleLevel(_sampler, texCoord, 0) * HighestMult;
+            disp += _heightmap1.SampleLevel(_sampler, texCoord, 0);
+            grad += gradients1.SampleLevel(_sampler, texCoord, 0);
         }
         if (has_flag(debugValues.flags, 4) && MediumMult > 0)
         {
             highestaccountedfor = MediumMax;
             float2 texCoord = GetTextureCoordFromPlaneCoordAndPatch(planeCoord, debugValues.patchSizes.g);
-            disp += _heightmap2.SampleLevel(_sampler, texCoord, 0) * MediumMult;
-            grad += gradients2.SampleLevel(_sampler, texCoord, 0) * MediumMult;
+            disp += _heightmap2.SampleLevel(_sampler, texCoord, 0);
+            grad += gradients2.SampleLevel(_sampler, texCoord, 0);
         }
         if (has_flag(debugValues.flags, 5) && LowestMult > 0)
         {
         
             highestaccountedfor = LowestMax;
             float2 texCoord = GetTextureCoordFromPlaneCoordAndPatch(planeCoord, debugValues.patchSizes.b);
-            disp += _heightmap3.SampleLevel(_sampler, texCoord, 0) * LowestMult;
-            grad += gradients3.SampleLevel(_sampler, texCoord, 0) * LowestMult;
+            disp += _heightmap3.SampleLevel(_sampler, texCoord, 0);
+            grad += gradients3.SampleLevel(_sampler, texCoord, 0);
         }
+
+
+
         localPos += disp.xyz;
     }
     else

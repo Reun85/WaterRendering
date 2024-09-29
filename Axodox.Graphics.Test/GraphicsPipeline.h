@@ -190,7 +190,6 @@ struct DeferredShading : public RootSignatureMask {
 
   RootDescriptorTable<1> albedo;
   RootDescriptorTable<1> normal;
-  RootDescriptorTable<1> position;
   RootDescriptorTable<1> materialValues;
   RootDescriptorTable<1> geometryDepth;
   RootDescriptorTable<1> skybox;
@@ -210,7 +209,6 @@ struct DeferredShading : public RootSignatureMask {
       : RootSignatureMask(context),
         albedo(this, {DescriptorRangeType::ShaderResource, 0}),
         normal(this, {DescriptorRangeType::ShaderResource, 1}),
-        position(this, {DescriptorRangeType::ShaderResource, 2}),
         materialValues(this, {DescriptorRangeType::ShaderResource, 3}),
         geometryDepth(this, {DescriptorRangeType::ShaderResource, 4},
                       ShaderVisibility::Pixel),

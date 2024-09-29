@@ -80,10 +80,10 @@ output_t main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
         return output;
     }
 
-    if (dot(normal, viewDir) < 0)
-    {
-        normal *= -1;
-    }
+    //if (dot(normal, viewDir) < 0)
+    //{
+    //    normal *= -1;
+    //}
 
     float Jacobian = input.grad.w;
     if (has_flag(debugValues.flags, 25))
@@ -105,7 +105,7 @@ output_t main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
     lerp(0.0f, Jacobian, pow(depth, foamDepthFalloff));
     }
 
-    normal = lerp(normal, float3(0, 1, 0), pow(depth, NormalDepthAttenuation));
+    //normal = lerp(normal, float3(0, 1, 0), pow(depth, NormalDepthAttenuation));
 
 
 

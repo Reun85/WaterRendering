@@ -30,7 +30,7 @@ struct SimulationStage {
     float foamMult;
 
     explicit LODComputeBuffer(const SimulationData::PatchData &patchData)
-        : displacementLambda(patchData.displacementLambda.z,
+        : displacementLambda(patchData.displacementLambda.x,
                              patchData.displacementLambda.y,
                              patchData.displacementLambda.z, 1),
           patchSize(patchData.patchSize),

@@ -37,29 +37,29 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3
     int2 loc = (groupID * M + threadID.xy - 1) & (DISP_MAP_SIZE - 1);
     cache[threadID.x][threadID.y] = displacement[loc].xyz;
 
+    GroupMemoryBarrierWithGroupSync();
         // These threads only exist to read from texture
     if (threadID.x == 0 || threadID.y == 0 || threadID.x == M + 1 || threadID.y == M + 1)
     {
-        return;
     }
-    GroupMemoryBarrierWithGroupSync();
-
+    else
+    {
+        float3 disp_left = cache[threadID.x - 1][threadID.y];
+        float3 disp_right = cache[threadID.x + 1][threadID.y];
+        float3 disp_bottom = cache[threadID.x][threadID.y - 1];
+        float3 disp_top = cache[threadID.x][threadID.y + 1];
     
-    float3 disp_left = cache[threadID.x - 1][threadID.y];
-    float3 disp_right = cache[threadID.x + 1][threadID.y];
-    float3 disp_bottom = cache[threadID.x][threadID.y - 1];
-    float3 disp_top = cache[threadID.x][threadID.y + 1];
-    
-    float3 dv = disp_right - disp_left + float3(TILE_SIZE_X2, 0, 0);
-    float3 du = disp_top - disp_bottom + float3(0, 0, TILE_SIZE_X2);
-    float3 grad = cross(du, dv);
-    
-
-    float2 dDx = (dv.xz) * INV_TILE_SIZE / constants.displacementLambda.xz;
-    float2 dDy = (du.xz) * INV_TILE_SIZE / constants.displacementLambda.xz;
-
-    float J = dDx.x * dDy.y - dDx.y * dDy.x;
+        float3 dv = disp_right - disp_left + float3(TILE_SIZE_X2, 0, 0);
+        float3 du = disp_top - disp_bottom + float3(0, 0, TILE_SIZE_X2);
+        float3 grad = cross(du, dv);
 
 
-    gradients[loc] = float4(normalize(grad), J);
+        float2 dDx = (dv.xz) * INV_TILE_SIZE;
+        float2 dDy = (du.xz) * INV_TILE_SIZE;
+
+        float J = dDx.x * dDy.y - dDx.y * dDy.x;
+
+
+        gradients[loc] = float4(normalize(grad), J);
+    }
 }

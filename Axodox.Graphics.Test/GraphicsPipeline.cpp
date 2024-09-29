@@ -312,9 +312,10 @@ WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
           (std::chrono::high_resolution_clock::now() - start));
       (*runtimeResults)->drawnNodes++;
 
+      static float div = 1.f;
       {
-        curr->vertexConstants.instanceData[curr->N].scaling = {it->size.x,
-                                                               it->size.y};
+        curr->vertexConstants.instanceData[curr->N].scaling = {
+            it->size.x / div, it->size.y / div};
         curr->vertexConstants.instanceData[curr->N].offset = {it->center.x,
                                                               it->center.y};
       }
