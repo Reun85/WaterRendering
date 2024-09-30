@@ -184,7 +184,7 @@ struct DeferredShading : public RootSignatureMask {
   };
 
   struct DeferredShaderBuffers {
-    float3 _TipColor = float3(231.f, 231.f, 231.f) / 255.f;
+    float3 _TipColor = float3(173.f, 173.f, 173.f) / 255.f;
     float EnvMapMult = 1.f;
   };
 
