@@ -59,12 +59,6 @@ public:
     /// Have to change in common.hlsli as well
     CONST_QUALIFIER u32 N = ComputeShader::heightMapDimensions;
 
-    QUALIFIER f32 Depth = 100;
-
-    QUALIFIER f32 gravity = 9.81f;
-
-    QUALIFIER float2 WindDirection = float2(-0.4f, 0.9f);
-
     static_assert(isPowerOfTwo(N));
   };
 };

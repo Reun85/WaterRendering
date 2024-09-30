@@ -9,8 +9,8 @@
 struct NeedToDo;
 
 struct SimulationData {
-  const u32 N;
-  const u32 M;
+  u32 N;
+  u32 M;
   struct PatchData {
     float3 displacementLambda;
     f32 patchSize;
@@ -21,12 +21,13 @@ struct SimulationData {
     f32 foamMinValue;
     f32 foamBias;
     f32 foamMult;
-    const u32 &N;
-    const u32 &M;
-    const float2 &windDirection;
-    const f32 &gravity;
-    const f32 &Depth;
+    u32 N;
+    u32 M;
+    float2 windDirection;
+    f32 gravity;
+    f32 Depth;
     bool DrawImGui(std::string_view ID);
+    PatchData &operator=(const PatchData &other) = default;
   };
   float2 windDirection;
   f32 gravity;
@@ -35,10 +36,12 @@ struct SimulationData {
   PatchData Medium;
   PatchData Lowest;
   float quadTreeDistanceThreshold = QuadTree::Defaults::DistanceThreshold;
+  SimulationData &operator=(const SimulationData &other) = default;
 
 public:
   void DrawImGui(NeedToDo &out, bool exclusiveWindow = true);
   static SimulationData Default();
+  static std::vector<std::pair<std::string, SimulationData>> Presets();
 };
 
 namespace Inner {

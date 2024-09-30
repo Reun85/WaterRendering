@@ -25,7 +25,8 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3
 {
 
     const float PATCH_SIZE = constants.patchSize;
-    const float TILE_SIZE_X2 = PATCH_SIZE * 2.0f / float(DISP_MAP_SIZE);
+    // Why the div by 2?
+    const float TILE_SIZE_X2 = PATCH_SIZE * 2. / float(DISP_MAP_SIZE) / 2.;
     const float INV_TILE_SIZE = float(DISP_MAP_SIZE) / PATCH_SIZE;
     
     
