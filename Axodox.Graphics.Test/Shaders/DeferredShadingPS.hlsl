@@ -175,8 +175,9 @@ float4 main(input_t input) : SV_TARGET
 
     float denom = 4.0 * NdotL * NdotV;
     float3 specular;
-    if (dot(normal, lightDir) > 0)
-        specular = F * G * D / max(0.001f, denom);
+    float EPS = 0.00001f;
+    if (dot(normal, lightDir) > EPS)
+        specular = F * G * D / max(EPS, denom);
     else
         specular = 0;
     

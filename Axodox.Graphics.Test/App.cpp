@@ -84,6 +84,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                                            true,  true,  true};
 
     bool enableSSR = false;
+    bool lockQuadTree = false;
     const static constexpr std::initializer_list<
         std::pair<u8, std::optional<const char *>>>
         DebugBitsDesc = {{2, "Use Foam"},
@@ -124,6 +125,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
         ImGui::InputFloat4("Blend Distances", (float *)&blendDistances);
         ImGui::Checkbox("Enable SSR", &enableSSR);
+        ImGui::Checkbox("Lock QuadTree", &lockQuadTree);
         for (auto &[id, name] : DebugBitsDesc) {
           if (name)
             ImGui::Checkbox(*name, &DebugBits[id]);
@@ -802,9 +804,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       auto oceanDataFuture = threadpool_execute<
           std::vector<WaterGraphicRootDescription::OceanData>
               &>([&cpuBuffers, cam, simData, &runtimeResults, camChanged,
-                  oceanModelMatrix]()
+                  oceanModelMatrix, &debugValues]()
                      -> std::vector<WaterGraphicRootDescription::OceanData> & {
-        if (camChanged) {
+        if (camChanged && !debugValues.lockQuadTree) {
           cpuBuffers.oceanData.clear();
           return WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
               cpuBuffers.oceanData, cam, oceanModelMatrix,
