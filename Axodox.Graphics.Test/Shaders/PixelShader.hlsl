@@ -38,13 +38,13 @@ cbuffer PSProperties : register(b2)
 {
     float3 Albedo;
     float Roughness;
-    float3 _TipColor;
     float foamDepthFalloff;
     float foamRoughnessModifier;
     float NormalDepthAttenuation;
     float _HeightModifier;
     float _WavePeakScatterStrength;
     float _ScatterShadowStrength;
+    float _Fresnel;
 };
 
 
@@ -105,7 +105,7 @@ output_t main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
     lerp(0.0f, Jacobian, pow(depth, foamDepthFalloff));
     }
 
-    //normal = lerp(normal, float3(0, 1, 0), pow(depth, NormalDepthAttenuation));
+    normal = lerp(normal, float3(0, 1, 0), pow(depth, NormalDepthAttenuation));
 
 
 
@@ -120,7 +120,7 @@ output_t main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
     //low
     output.albedo = float4(albedo, saturate(foam));
     //high
-    output.normal = float4(OctahedronNormalEncode(normal), 0, 1);
+    output.normal = float4(OctahedronNormalEncode(normal), _Fresnel, 1);
     //low
     output.materialValues = float4(a, _HeightModifier * _WavePeakScatterStrength, _ScatterShadowStrength, 1);
     return output;

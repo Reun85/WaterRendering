@@ -95,6 +95,7 @@ float4 main(input_t input) : SV_TARGET
     float3 albedo = _albedoinput.rgb;
     float3 normal = OctahedronNormalDecode(_normalinput.rg);
     // The albedo.w channel is was stored in only 8bits, while the rest are 16bits!
+    const float FresnelFactor = _normalinput.z;
     float Roughness = _materialValuesinput.x;
     float matId = _materialValuesinput.w;
     const float matIdEPS = 0.001f;
@@ -167,19 +168,40 @@ float4 main(input_t input) : SV_TARGET
     float G = rcp(1 + viewMask + lightMask);
 
     
-    float D = D_GGX(NdotH, Roughness);
-    float F = SchlickFresnel(0.03, NdotV);
+    float D = Beckmann(NdotH, Roughness);
+    float F = SchlickFresnel(FresnelFactor, NdotV);
 				
 
 
+    if (has_flag(debugValues.flags, 20))
+    {
+        // F = 1;
+        D = 1;
+        G = 1;
+    }
+    if (has_flag(debugValues.flags, 21))
+    {
+        F = 1;
+        // D = 1;
+        G = 1;
+    }
+    if (has_flag(debugValues.flags, 22))
+    {
+        F = 1;
+        D = 1;
+        // G = 1;
+    }
 
     float denom = 4.0 * NdotL * NdotV;
+
     float3 specular;
-    float EPS = 0.00001f;
+    float EPS = 0.0002f;
     if (dot(normal, lightDir) > EPS)
+    //if (denom> EPS)
         specular = F * G * D / max(EPS, denom);
     else
         specular = 0;
+    specular =max(specular, 0);
     
     
     if (has_flag(debugValues.flags, 30))

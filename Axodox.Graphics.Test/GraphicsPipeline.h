@@ -77,13 +77,13 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
   struct WaterPixelShaderData {
     float3 AlbedoColor = float3(11.f, 53.f, 108.f) / 255.f;
     float Roughness = 0.150f;
-    float3 _TipColor = float3(231.f, 231.f, 231.f) / 255.f;
     float foamDepthFalloff = 0.245f;
     float foamRoughnessModifier = 5.0f;
     float NormalDepthAttenuation = 1;
     float _HeightModifier = 1.871f;
-    float _WavePeakScatterStrength = 4.629f;
-    float _ScatterShadowStrength = 4.067f;
+    float _WavePeakScatterStrength = 0.f;
+    float _ScatterShadowStrength = 0.7f;
+    float _Fresnel = 0.15f;
   };
 
   RootDescriptor<RootDescriptorType::ConstantBuffer> vertexBuffer;

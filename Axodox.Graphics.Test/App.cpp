@@ -99,6 +99,11 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                          {13, "Show depth"},
                          {24, "Normal overflow"},
                          {25, "Display Foam"},
+
+                         {20, "F"},
+                         {21, "D"},
+                         {22, "G"},
+
                          {26, std::nullopt},
                          {27, std::nullopt},
                          {28, std::nullopt},
@@ -401,6 +406,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                          0.0f, 10.0f);
       ImGui::SliderFloat("Height Modifier", &waterData._HeightModifier, 0.0f,
                          10.0f);
+      ImGui::SliderFloat("Fresnel", &waterData._Fresnel, 0.0f, 1.0f);
       ImGui::SliderFloat("Wave Peak Scatter Strength",
                          &waterData._WavePeakScatterStrength, 0.0f, 10.0f);
       ImGui::SliderFloat("Scatter Shadow Strength",
