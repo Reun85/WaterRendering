@@ -27,6 +27,7 @@ For rendering I use Deferred Shading with a PBR pipeline for the best possible l
 
 ## Future works
 
-Finish the shadow volume implementation.
-Move spektrum generation to the GPU.
-Simulate (i.e., approximate) buoyancy by fitting a plane to the surface.
+- Finish the shadow volume implementation.
+- Move spektrum generation to the GPU.
+- Simulate (i.e., approximate) buoyancy by fitting a plane to the surface.
+- (Remove dependencies on debug values, and methods.)
