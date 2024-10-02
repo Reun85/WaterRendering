@@ -91,7 +91,7 @@ public:
   struct Defaults {
     static constexpr Depth maxDepth = 40;
     static constexpr Depth minDepth = 0;
-    static constexpr float DistanceThreshold = 2e+3f;
+    static constexpr float DistanceThreshold = 2e+2f;
   };
 
   using value_type = Node;
