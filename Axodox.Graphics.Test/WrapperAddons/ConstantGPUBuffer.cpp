@@ -14,20 +14,21 @@ ConstantGPUBuffer::ConstantGPUBuffer(const ResourceAllocationContext &context,
       });
 }
 
-// void ConstantGPUBuffer::Update(DynamicBufferManager &buffManager,
-//                                CommandAllocator &allocator,
-//                                std::span<const uint8_t> buffer) {
-//     assert(bufferRef.get()->Definition().Length = buffer.size_bytes();
-//     GpuVirtualAddress tmpBuff = buffManager.AddBuffer(buffer);
-//     [&block,offset] = buffManager.GetBlockAndOffsetForAddress(tmpBuff);
-//     winrt::com_ptr<ID3D12Resource> res = bufferRef.get()->get();
-//     // Copy tmpBuff to res using allocator bytes: sizeof(T)
-//
-//   allocator.operator->()->CopyBufferRegion(
-//     res.get(),
-//     0,
-//    block.get()->(),
-//     offset,
-//     sizeof(T)
-//   );
-// }
+// This impl does not work, why?
+ //void ConstantGPUBuffer::Update(DynamicBufferManager &buffManager,
+ //                               CommandAllocator &allocator,
+ //                               std::span<const uint8_t> buffer) {
+ //    assert(bufferRef.get()->Definition().Length = buffer.size_bytes();
+ //    GpuVirtualAddress tmpBuff = buffManager.AddBuffer(buffer);
+ //    [&block,offset] = buffManager.GetBlockAndOffsetForAddress(tmpBuff);
+ //    winrt::com_ptr<ID3D12Resource> res = bufferRef.get()->get();
+ //    // Copy tmpBuff to res using allocator bytes: sizeof(T)
+
+ //  allocator.operator->()->CopyBufferRegion(
+ //    res.get(),
+ //    0,
+ //   block.get()->(),
+ //    offset,
+ //    sizeof(T)
+ //  );
+ //}

@@ -36,7 +36,7 @@ constexpr bool divides_within_eps(float a, float b, float epsilon) noexcept {
 struct DefaultsValues {
 public:
   struct Cam {
-    QUALIFIER float3 camStartPos = float3(-23, 10, 11);
+    QUALIFIER float3 camStartPos = float3(-23, 10, -11);
     QUALIFIER bool startFirstPerson = true;
   };
 

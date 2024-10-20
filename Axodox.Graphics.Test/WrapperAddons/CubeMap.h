@@ -19,6 +19,11 @@ struct CubeMapPaths {
   ~CubeMapPaths() noexcept {};
 };
 
+/// <summary>
+///  Represents a cubemap texture.
+/// Supports parsing a equirectangular HDR image to a cubemap texture. BE WARNED, IT IS SLOW. 
+/// You should use a pre-processed cubemap textures instead. but for testing purposes, it works great.
+/// </summary>
 class CubeMapTexture {
 public:
   CubeMapTexture(const ResourceAllocationContext &context,

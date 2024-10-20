@@ -123,11 +123,10 @@
     <ClInclude Include="SkyboxPipeline.hpp" />
     <ClInclude Include="Typedefs.h" />
     <ClInclude Include="Simulation.h" />
-    <ClInclude Include="WrapperAddons\BufferWithView.h" />
+    <ClInclude Include="WrapperAddons\StructuredObject.h" />
     <ClInclude Include="WrapperAddons\ConstantGPUBuffer.h" />
     <ClInclude Include="WrapperAddons\CubeMap.h" />
     <ClInclude Include="WrapperAddons\includes.h" />
-    <ClInclude Include="WrapperAddons\Model.h" />
     <ClInclude Include="WrapperAddons\MutableTextureWithViews.h" />
   </ItemGroup>
   <ItemGroup>
@@ -146,7 +145,7 @@
     <ClCompile Include="QuadTree.cpp" />
     <ClCompile Include="ShadowVolume.cpp" />
     <ClCompile Include="Simulation.cpp" />
-    <ClCompile Include="WrapperAddons\BufferWithView.cpp" />
+    <ClCompile Include="WrapperAddons\StructuredObject.cpp" />
     <ClCompile Include="WrapperAddons\ConstantGPUBuffer.cpp" />
     <ClCompile Include="WrapperAddons\CubeMap.cpp" />
     <ClCompile Include="WrapperAddons\MutableTextureWithViews.cpp" />

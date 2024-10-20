@@ -76,7 +76,7 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
 
   struct WaterPixelShaderData {
     float3 AlbedoColor = float3(11.f, 53.f, 108.f) / 255.f;
-    float Roughness = 0.150f;
+    float Roughness = 0.060f;
     float foamDepthFalloff = 0.245f;
     float foamRoughnessModifier = 5.0f;
     float NormalDepthAttenuation = 1;

@@ -8,7 +8,6 @@ void SimulationData::DrawImGui(NeedToDo &out, bool exclusiveWindow) {
     cont = ImGui::Begin("Simulation Data");
   }
   if (cont) {
-
     static const std::vector<std::pair<std::string, SimulationData>> presets =
         SimulationData::Presets();
 
@@ -20,7 +19,6 @@ void SimulationData::DrawImGui(NeedToDo &out, bool exclusiveWindow) {
       for (int i = 0; i < presets.size(); i++) {
         bool isSelected = selectedPreset == i;
         if (ImGui::Selectable(presets[i].first.c_str(), isSelected)) {
-
           selectedPreset = i;
           change = true;
           *this = presets[i].second;
@@ -74,7 +72,6 @@ bool SimulationData::PatchData::DrawImGui(std::string_view ID) {
 }
 
 static SimulationData Preset1() {
-
   const auto &N = DefaultsValues::Simulation::N;
   const auto &M = DefaultsValues::Simulation::N;
 
@@ -147,7 +144,7 @@ SimulationData OldPreset() {
                      .Highest =
                          {
                              .displacementLambda = float3(0.48f, 0.5, 0.48f),
-                             .patchSize = 21.f,
+                             .patchSize = 13.f,
                              .foamExponentialDecay = 0.1f,
                              .Amplitude = 0.4e-3f,
                              .WindForce = 3,
@@ -195,7 +192,6 @@ SimulationData OldPreset() {
   return res;
 }
 std::vector<std::pair<string, SimulationData>> SimulationData::Presets() {
-
   std::vector<std::pair<string, SimulationData>> res;
   res.emplace_back("Large", SimulationData::Default());
   res.emplace_back("Medium", Preset1());

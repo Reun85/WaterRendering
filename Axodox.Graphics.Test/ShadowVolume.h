@@ -87,19 +87,7 @@ struct SilhouetteDetector : ShaderJob {
     }
   };
 
-  struct MeshSpecificBuffers {
-
-    StructuredObjectViews Vertex;
-    StructuredObjectViews Index;
-
-    explicit MeshSpecificBuffers(ResourceAllocationContext &context,
-                                 const ImmutableMesh &mesh);
-    explicit MeshSpecificBuffers(ResourceAllocationContext &context,
-                                 const ImmutableMesh &mesh, u32 VertexByteSize,
-                                 u32 IndexByteSize);
-    ~MeshSpecificBuffers() = default;
-  };
-  struct Buffers {
+    struct Buffers {
     struct EdgeBufferType {
       std::pair<u32, u32> vertices;
       std::pair<i32, i32> faces;
