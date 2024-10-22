@@ -1,5 +1,4 @@
 #include "pch.h"
-#include "BufferWithView.h"
 #include "StructuredObject.h"
 
 Axodox::Graphics::D3D12::StructuredObjectViews::StructuredObjectViews(
