@@ -200,8 +200,9 @@ void QuadTree::BuildRecursively(const uint index, const float yCoordinate,
   dist *= dist;
 
   bool cont = dist / (node.size.x * node.size.y) < quadTreeDistanceThreshold;
-  // bool cont = dist / (std::max(node.size.x, node.size.y)) <
-  // quadTreeDistanceThreshold;
+  // float x = std::max(node.size.x, node.size.y);
+  // x *= x;
+  // bool cont = dist / x < quadTreeDistanceThreshold;
   //  bool cont = dist < quadTreeDistanceThreshold;
   if ((cont || depth < minDepth) &&
       IsInViewFrustum(node, yCoordinate, f, mMatrix)) {
