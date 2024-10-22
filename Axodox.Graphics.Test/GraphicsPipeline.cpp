@@ -68,19 +68,24 @@ void ShadowMapping::Textures::Clear(CommandAllocator &allocator) {
   DepthBuffer.DepthStencil()->Clear(allocator);
 }
 
-void ShadowMapping::Textures::TranslateToTarget(CommandAllocator &allocator) {
-  allocator.TransitionResources({
-      {DepthBuffer.operator Axodox::Graphics::D3D12::ResourceArgument(),
-       ResourceStates::PixelShaderResource, ResourceStates::DepthWrite},
-  });
+ResourceTransitor<1>
+ShadowMapping::Textures::TranslateToTarget(CommandAllocator &allocator) {
+  return ResourceTransitor<1>(
+      allocator,
+      {
+          {DepthBuffer.operator Axodox::Graphics::D3D12::ResourceArgument(),
+           ResourceStates::PixelShaderResource, ResourceStates::DepthWrite},
+      });
 }
-
-void ShadowMapping::Textures::TranslateToView(CommandAllocator &allocator,
-                                              const ResourceStates &newState) {
-  allocator.TransitionResources({
-      {DepthBuffer.operator Axodox::Graphics::D3D12::ResourceArgument(),
-       ResourceStates::DepthWrite, newState},
-  });
+ResourceTransitor<1>
+ShadowMapping::Textures::TranslateToView(CommandAllocator &allocator,
+                                         const ResourceStates &newState) {
+  return ResourceTransitor<1>(
+      allocator,
+      {
+          {DepthBuffer.operator Axodox::Graphics::D3D12::ResourceArgument(),
+           ResourceStates::DepthWrite, newState},
+      });
 }
 
 void DeferredShading::BindGBuffer(const GBuffer &buffers) {
@@ -127,26 +132,32 @@ void DeferredShading::GBuffer::Clear(CommandAllocator &allocator) {
   MaterialValues.RenderTarget()->Clear(allocator);
 }
 
-void DeferredShading::GBuffer::TranslateToTarget(CommandAllocator &allocator) {
-  allocator.TransitionResources({
-      {Albedo.operator Axodox::Graphics::D3D12::ResourceArgument(),
-       ResourceStates::PixelShaderResource, ResourceStates::RenderTarget},
-      {Normal.operator Axodox::Graphics::D3D12::ResourceArgument(),
-       ResourceStates::PixelShaderResource, ResourceStates::RenderTarget},
-      {MaterialValues.operator Axodox::Graphics::D3D12::ResourceArgument(),
-       ResourceStates::PixelShaderResource, ResourceStates::RenderTarget},
-  });
+ResourceTransitor<4>
+DeferredShading::GBuffer::TranslateToTarget(CommandAllocator &allocator) {
+  return ResourceTransitor<4>(
+      allocator,
+      {
+          {Albedo.operator Axodox::Graphics::D3D12::ResourceArgument(),
+           ResourceStates::PixelShaderResource, ResourceStates::RenderTarget},
+          {Normal.operator Axodox::Graphics::D3D12::ResourceArgument(),
+           ResourceStates::PixelShaderResource, ResourceStates::RenderTarget},
+          {MaterialValues.operator Axodox::Graphics::D3D12::ResourceArgument(),
+           ResourceStates::PixelShaderResource, ResourceStates::RenderTarget},
+      });
 }
 
-void DeferredShading::GBuffer::TranslateToView(CommandAllocator &allocator) {
-  allocator.TransitionResources({
-      {Albedo.operator Axodox::Graphics::D3D12::ResourceArgument(),
-       ResourceStates::RenderTarget, ResourceStates::PixelShaderResource},
-      {Normal.operator Axodox::Graphics::D3D12::ResourceArgument(),
-       ResourceStates::RenderTarget, ResourceStates::PixelShaderResource},
-      {MaterialValues.operator Axodox::Graphics::D3D12::ResourceArgument(),
-       ResourceStates::RenderTarget, ResourceStates::PixelShaderResource},
-  });
+ResourceTransitor<4>
+DeferredShading::GBuffer::TranslateToView(CommandAllocator &allocator) {
+  return ResourceTransitor<4>(
+      allocator,
+      {
+          {Albedo.operator Axodox::Graphics::D3D12::ResourceArgument(),
+           ResourceStates::RenderTarget, ResourceStates::PixelShaderResource},
+          {Normal.operator Axodox::Graphics::D3D12::ResourceArgument(),
+           ResourceStates::RenderTarget, ResourceStates::PixelShaderResource},
+          {MaterialValues.operator Axodox::Graphics::D3D12::ResourceArgument(),
+           ResourceStates::RenderTarget, ResourceStates::PixelShaderResource},
+      });
 }
 
 std::array<XMVECTOR, 8> GetFrustumCorners(const XMMATRIX invViewProj,

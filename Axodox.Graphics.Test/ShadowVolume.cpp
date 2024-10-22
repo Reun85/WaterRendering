@@ -111,7 +111,7 @@ ShadowVolume::ShaderMask::GetDepthStencilDesc() {
   return result;
 }
 
-SilhouetteClearTask::SilhouetteClearTask(
+ParallaxDraw::ParallaxDraw(
     PipelineStateProvider &pipelineProvider, GraphicsDevice &device,
     ComputeShader *cs)
     : Signature(device),
@@ -122,14 +122,14 @@ SilhouetteClearTask::SilhouetteClearTask(
                    })
                    .get()) {}
 
-SilhouetteClearTask SilhouetteClearTask ::WithDefaultShaders(
+ParallaxDraw ParallaxDraw ::WithDefaultShaders(
     PipelineStateProvider &pipelineProvider, GraphicsDevice &device) {
   ComputeShader cs(app_folder() / L"SilhouetteClear.cso");
 
-  return SilhouetteClearTask(pipelineProvider, device, &cs);
+  return ParallaxDraw(pipelineProvider, device, &cs);
 }
 
-void SilhouetteClearTask::Run(CommandAllocator &allocator,
+void ParallaxDraw::Run(CommandAllocator &allocator,
                               DynamicBufferManager &buffermanager,
                               const Inp &inp) const {
   auto mask = Signature.Set(allocator, RootSignatureUsage::Compute);

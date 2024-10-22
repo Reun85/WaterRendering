@@ -116,6 +116,7 @@
     <ClInclude Include="GraphicsPipeline.h" />
     <ClInclude Include="Helpers.h" />
     <ClInclude Include="oldstuff.h" />
+    <ClInclude Include="Parallax.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="QuadTree.h" />
     <ClInclude Include="Shaders\DebugValues.h" />
@@ -123,6 +124,7 @@
     <ClInclude Include="SkyboxPipeline.hpp" />
     <ClInclude Include="Typedefs.h" />
     <ClInclude Include="Simulation.h" />
+    <ClInclude Include="WrapperAddons\ResourceTransitor.h" />
     <ClInclude Include="WrapperAddons\StructuredObject.h" />
     <ClInclude Include="WrapperAddons\ConstantGPUBuffer.h" />
     <ClInclude Include="WrapperAddons\CubeMap.h" />

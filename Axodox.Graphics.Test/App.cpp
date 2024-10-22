@@ -493,8 +493,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     GraphicsDevice device{};
     CommandQueue directQueue{device};
-    CommandQueue computeQueue{device, /* CommandKind::Compute*/};
-    // CommandQueue &computeQueue = directQueue;
+    // CommandQueue computeQueue{device, /* CommandKind::Compute*/};
+    CommandQueue &computeQueue = directQueue;
     CoreSwapChain swapChain{directQueue, window,
                             SwapChainFlags::IsTearingAllowed};
     // CoreSwapChain swapChain{directQueue, window, SwapChainFlags::Default};
@@ -590,8 +590,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     SilhouetteDetector silhouetteDetector =
         SilhouetteDetector::WithDefaultShaders(pipelineStateProvider, device);
 
-    SilhouetteClearTask silhouetteClear =
-        SilhouetteClearTask::WithDefaultShaders(pipelineStateProvider, device);
+    ParallaxDraw silhouetteClear =
+        ParallaxDraw::WithDefaultShaders(pipelineStateProvider, device);
 
     SilhouetteDetectorTester silhouetteTester =
         SilhouetteDetectorTester::WithDefaultShaders(pipelineStateProvider,
@@ -643,7 +643,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     //                              2024};
 
     //  Acquire memory
-    SilhouetteDetector::MeshSpecificBuffers silhouetteDetectorMeshBuffers(
+    MeshSpecificBuffers silhouetteDetectorMeshBuffers(
         immutableAllocationContext, Box);
     groupedResourceAllocator.Build();
 
@@ -1018,7 +1018,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             {
               {
                 silhouetteClear.Pre(allocator);
-                SilhouetteClearTask::Inp inp{
+                ParallaxDraw::Inp inp{
                     .buffers = silhouetteDetectorBuffers,
                 };
                 silhouetteClear.Run(allocator, frameResource.DynamicBuffer,

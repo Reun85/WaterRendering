@@ -178,8 +178,8 @@ struct DeferredShading : public RootSignatureMask {
                         ResourceAllocationContext &allocationContext) override;
 
     void Clear(CommandAllocator &allocator) override;
-    void TranslateToTarget(CommandAllocator &allocator);
-    void TranslateToView(CommandAllocator &allocator);
+    ResourceTransitor<4> TranslateToTarget(CommandAllocator &allocator);
+    ResourceTransitor<4> TranslateToView(CommandAllocator &allocator);
     ~GBuffer() override = default;
   };
 
@@ -245,8 +245,8 @@ struct ShadowMapping : public RootSignatureMask {
       // No need to allocate
     }
     void Clear(CommandAllocator &allocator) override;
-    void TranslateToTarget(CommandAllocator &allocator);
-    void TranslateToView(
+    ResourceTransitor<1> TranslateToTarget(CommandAllocator &allocator);
+    ResourceTransitor<1> TranslateToView(
         CommandAllocator &allocator,
         const ResourceStates &newState = ResourceStates::AllShaderResource);
     ~Textures() override = default;
