@@ -60,7 +60,7 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
     static constexpr PixelShaderPBRData WaterData() {
       PixelShaderPBRData data = {};
       data.SurfaceColor = float3(0.109f, 0.340f, 0.589f);
-      data.Roughness = 0.285f;
+      data.Roughness = 0.185f;
       data.SubsurfaceScattering = 0.571f;
       data.Sheen = 0.163f;
       data.SheenTint = 0.366f;

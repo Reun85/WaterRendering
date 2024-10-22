@@ -3,4 +3,4 @@
 #include "CubeMap.h"
 #include "MutableTextureWithViews.h"
 #include "StructuredObject.h"
-#include "ResourceTransitions.h"
+#include "ResourceTransitor.h"
