@@ -18,12 +18,14 @@ struct ConeMapCreater : ShaderJob {
     // should change to float
     RootDescriptorTable<1> HeightMap;
 
+    RootDescriptor<RootDescriptorType::ConstantBuffer> ComputeConstants;
+
     // Out
     // Texture2D<float2>
     RootDescriptorTable<1> ConeMap;
 
     explicit ShaderMask(const RootSignatureContext &context)
-        : RootSignatureMask(context),
+        : RootSignatureMask(context), ComputeConstants(this, {9}),
           HeightMap(this, {DescriptorRangeType::ShaderResource, {0}}),
           ConeMap(this, {DescriptorRangeType::UnorderedAccess, {10}})
 
@@ -33,12 +35,33 @@ struct ConeMapCreater : ShaderJob {
   };
   struct Buffers {};
 
-  struct Inp {
+    MutableTextureWithViews ConeMap;
     // float2
     const UnorderedAccessView *const coneMap;
     // Currently float4
     const ShaderResourceView *const heightMap;
+    const GpuVirtualAddress &ComputeConstants;
     const u32 N;
+                        ResourceAllocationContext &allocationContext) override {
+      // No need to allocate
+    }
+    void Clear(CommandAllocator &allocator) override;
+    void TranslateToInp(CommandAllocator &allocator);
+    void TranslateToOutput(CommandAllocator &allocator);
+    ~Textures() override = default;
+  };
+  struct Buffers {
+
+    explicit Buffers(ResourceAllocationContext &context);
+
+    ~Buffers() = default;
+  };
+
+  struct Inp {
+    Textures textureBuffer;
+    Buffer buffers;
+    // impls ShaderResource();
+    MutableTexture *heightMap;
   };
 
   RootSignature<ShaderMask> Signature;

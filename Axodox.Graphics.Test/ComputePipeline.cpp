@@ -294,7 +294,8 @@ void SimulationStage::WaterSimulationComputeShader(
       fullSimPipeline.coneMapCreater.Run(
           computeAllocator, simResource.DynamicBuffer,
           {dat.buffers.coneMapBuffer.UnorderedAccess(computeAllocator),
-           dat.buffers.displacementMap.ShaderResource(computeAllocator), N});
+           dat.buffers.displacementMap.ShaderResource(computeAllocator),
+           dat.constantBuffer, N});
     }
   }
 }

@@ -18,13 +18,13 @@ ConeMapCreater::WithDefaultShaders(PipelineStateProvider &pipelineProvider,
   return ConeMapCreater(pipelineProvider, device, &cs);
 }
 
-void ConeMapCreater::Run(CommandAllocator &allocator,
-                         DynamicBufferManager &buffermanager,
+void ConeMapCreater::Run(CommandAllocator &allocator, DynamicBufferManager &_,
                          const Inp &inp) const {
   auto mask = Signature.Set(allocator, RootSignatureUsage::Compute);
 
   mask.ConeMap = *inp.coneMap;
   mask.HeightMap = *inp.heightMap;
+  mask.ComputeConstants = inp.ComputeConstants;
 
   const auto xGroupSize = 16;
   const auto yGroupSize = 16;

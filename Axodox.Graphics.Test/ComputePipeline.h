@@ -190,7 +190,7 @@ struct SimulationResources {
   LODDataBuffers HighestBuffer;
   LODDataBuffers MediumBuffer;
   LODDataBuffers LowestBuffer;
-  const std::array<const LODDataBuffers *const, 3> LODs = {
+  const std::array<LODDataBuffers *const, 3> LODs = {
       &HighestBuffer, &MediumBuffer, &LowestBuffer};
 
   explicit SimulationResources(const ResourceAllocationContext &context,

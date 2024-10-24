@@ -1262,11 +1262,18 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
             runtimeResults.DrawImGui(false);
             cam.DrawImGui(false);
-            ImGui::Image((void *)drawingSimResource.LODs[0]
-                             ->coneMapBuffer.ShaderResource(allocator)
-                             ->GpuHandle()
-                             .ptr,
-                         ImVec2(256, 256));
+            for (int i = 0; i < 3; ++i) {
+              ImGui::Text(std::format("{}", i).c_str());
+              ImGui::SameLine();
+              ImGui::Image(
+                  (void *)((*drawingSimResource.LODs[i]
+                                 ->coneMapBuffer.ShaderResource(allocator))
+                               .GpuHandle()
+                               .ptr),
+                  ImVec2(256, 256));
+              if (i != 2)
+                ImGui::SameLine();
+            }
           }
           ImGui::End();
           debugValues.DrawImGui(beforeNextFrame);
