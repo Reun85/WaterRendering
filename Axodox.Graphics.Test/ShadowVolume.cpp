@@ -111,9 +111,8 @@ ShadowVolume::ShaderMask::GetDepthStencilDesc() {
   return result;
 }
 
-ParallaxDraw::ParallaxDraw(
-    PipelineStateProvider &pipelineProvider, GraphicsDevice &device,
-    ComputeShader *cs)
+SilhouetteClear::SilhouetteClear(PipelineStateProvider &pipelineProvider,
+                                 GraphicsDevice &device, ComputeShader *cs)
     : Signature(device),
       pipeline(pipelineProvider
                    .CreatePipelineStateAsync(ComputePipelineStateDefinition{
@@ -122,16 +121,17 @@ ParallaxDraw::ParallaxDraw(
                    })
                    .get()) {}
 
-ParallaxDraw ParallaxDraw ::WithDefaultShaders(
-    PipelineStateProvider &pipelineProvider, GraphicsDevice &device) {
+SilhouetteClear
+SilhouetteClear ::WithDefaultShaders(PipelineStateProvider &pipelineProvider,
+                                     GraphicsDevice &device) {
   ComputeShader cs(app_folder() / L"SilhouetteClear.cso");
 
-  return ParallaxDraw(pipelineProvider, device, &cs);
+  return SilhouetteClear(pipelineProvider, device, &cs);
 }
 
-void ParallaxDraw::Run(CommandAllocator &allocator,
-                              DynamicBufferManager &buffermanager,
-                              const Inp &inp) const {
+void SilhouetteClear::Run(CommandAllocator &allocator,
+                          DynamicBufferManager &buffermanager,
+                          const Inp &inp) const {
   auto mask = Signature.Set(allocator, RootSignatureUsage::Compute);
   mask.buff = *inp.buffers.EdgeCount.UnorderedAccess();
 

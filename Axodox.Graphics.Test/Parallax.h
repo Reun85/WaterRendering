@@ -16,46 +16,29 @@ struct ConeMapCreater : ShaderJob {
     // In
     // Texture2D<float4>
     // should change to float
-    RootDescriptor<RootDescriptorType::ShaderResource> HeightMap;
+    RootDescriptorTable<1> HeightMap;
 
     // Out
     // Texture2D<float2>
-    RootDescriptor<RootDescriptorType::UnorderedAccess> ConeMap;
+    RootDescriptorTable<1> ConeMap;
 
     explicit ShaderMask(const RootSignatureContext &context)
-        : RootSignatureMask(context), HeightMap(this, {0}), ConeMap(this, {10})
+        : RootSignatureMask(context),
+          HeightMap(this, {DescriptorRangeType::ShaderResource, {0}}),
+          ConeMap(this, {DescriptorRangeType::UnorderedAccess, {10}})
 
     {
       Flags = RootSignatureFlags::None;
     }
   };
-
-  struct Textures : ShaderBuffers {
-    MutableTextureWithViews ConeMap;
-
-    explicit Textures(const ResourceAllocationContext &context);
-
-    void MakeCompatible(const RenderTargetView &finalTarget,
-                        ResourceAllocationContext &allocationContext) override {
-      // No need to allocate
-    }
-    void Clear(CommandAllocator &allocator) override;
-    void TranslateToInp(CommandAllocator &allocator);
-    void TranslateToOutput(CommandAllocator &allocator);
-    ~Textures() override = default;
-  };
-  struct Buffers {
-
-    explicit Buffers(ResourceAllocationContext &context);
-
-    ~Buffers() = default;
-  };
+  struct Buffers {};
 
   struct Inp {
-    Textures textureBuffer;
-    Buffer buffers;
-    // impls ShaderResource();
-    MutableTexture *heightMap;
+    // float2
+    const UnorderedAccessView *const coneMap;
+    // Currently float4
+    const ShaderResourceView *const heightMap;
+    const u32 N;
   };
 
   RootSignature<ShaderMask> Signature;
@@ -89,7 +72,7 @@ struct ParallaxDraw : ShaderJob {
   };
 
   struct Inp {
-    std::array<ConeMapCreater::Textures, 3> &textures;
+    std::array<const MutableTexture *const, 3> &coneMap;
   };
 
   RootSignature<ShaderMask> Signature;

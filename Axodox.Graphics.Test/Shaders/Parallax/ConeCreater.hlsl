@@ -1,11 +1,11 @@
 #include "../common.hlsli"
 Texture2D<float4> displacement : register(t0);
-Texture2D<float2> cone : register(t0);
+RWTexture2D<float2> cone : register(u10);
 
-cbuffer Test : register(b9)
-{
-    ComputeConstants constants;
-}
+//cbuffer Test : register(b9)
+//{
+//    ComputeConstants constants;
+//}
 
 
 #define N DISP_MAP_SIZE
@@ -25,10 +25,10 @@ groupshared float cache[M + K * 2][M + K * 2];
 [numthreads(M + K * 2, M + K * 2, 1)]
 void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3 GTid : SV_GroupID)
 {
-    const float PATCH_SIZE = constants.patchSize;
-    // Why the div by 2?
-    const float TILE_SIZE_X2 = PATCH_SIZE * 2. / float(DISP_MAP_SIZE) / 2.;
-    const float INV_TILE_SIZE = float(DISP_MAP_SIZE) / PATCH_SIZE;
+    //const float PATCH_SIZE = constants.patchSize;
+    //// Why the div by 2?
+    //const float TILE_SIZE_X2 = PATCH_SIZE * 2. / float(DISP_MAP_SIZE) / 2.;
+    //const float INV_TILE_SIZE = float(DISP_MAP_SIZE) / PATCH_SIZE;
 
     int2 groupID = GTid.xy;
     int2 threadID = LTid.xy;
