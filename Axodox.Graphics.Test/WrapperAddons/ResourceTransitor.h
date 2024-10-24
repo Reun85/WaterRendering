@@ -79,10 +79,10 @@ public:
   }
   void Invalidate() { n = 0; }
 
-  static template <u64 ArrN, u64 N2>
-  ResourceTransitor<N2 * ArrN>
+  template <u64 ArrN, u64 N2>
+  static ResourceTransitor<N2 * ArrN>
   Combine(const std::array<ResourceTransitor<N2>, ArrN> &inp) {
-    ResourceTransitor<N2 * ArrN> ret(all);
+    ResourceTransitor<N2 * ArrN> ret(allocator);
     for (auto &x : inp) {
 
       ret.Add(x);
@@ -92,7 +92,7 @@ public:
 
   template <u64 N2>
   ResourceTransitor<N2 + N> operator+(const ResourceTransitor &other) {
-    ResourceTransitor<N2 + N> ret(all);
+    ResourceTransitor<N2 + N> ret(allocator);
     ret.Add(*this);
     ret.Add(other);
   }
