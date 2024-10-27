@@ -87,7 +87,7 @@ struct SilhouetteDetector : ShaderJob {
     }
   };
 
-    struct Buffers {
+  struct Buffers {
     struct EdgeBufferType {
       std::pair<u32, u32> vertices;
       std::pair<i32, i32> faces;
@@ -138,7 +138,7 @@ struct SilhouetteDetector : ShaderJob {
   ~SilhouetteDetector() override = default;
 };
 
-struct ParallaxDraw : ShaderJob {
+struct SilhouetteClear : ShaderJob {
   struct ShaderMask : public RootSignatureMask {
 
     RootDescriptorTable<1> buff;
@@ -158,18 +158,18 @@ struct ParallaxDraw : ShaderJob {
   RootSignature<ShaderMask> Signature;
   PipelineState pipeline;
 
-  ParallaxDraw(PipelineStateProvider &pipelineProvider,
-                      GraphicsDevice &device, ComputeShader *cs);
+  SilhouetteClear(PipelineStateProvider &pipelineProvider,
+                  GraphicsDevice &device, ComputeShader *cs);
 
-  static ParallaxDraw
+  static SilhouetteClear
   WithDefaultShaders(PipelineStateProvider &pipelineProvider,
                      GraphicsDevice &device);
   void Pre(CommandAllocator &allocator) const override {
     pipeline.Apply(allocator);
   }
   void Run(CommandAllocator &allocator, DynamicBufferManager &buffermanager,
-           const Inp &inp) const;
-  ~ParallaxDraw() override = default;
+           const SilhouetteClear::Inp &inp) const;
+  ~SilhouetteClear() override = default;
 };
 
 struct SilhouetteDetectorTester : ShaderJob {

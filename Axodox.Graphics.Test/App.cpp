@@ -590,8 +590,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     SilhouetteDetector silhouetteDetector =
         SilhouetteDetector::WithDefaultShaders(pipelineStateProvider, device);
 
-    ParallaxDraw silhouetteClear =
-        ParallaxDraw::WithDefaultShaders(pipelineStateProvider, device);
+    SilhouetteClear silhouetteClear =
+        SilhouetteClear::WithDefaultShaders(pipelineStateProvider, device);
 
     SilhouetteDetectorTester silhouetteTester =
         SilhouetteDetectorTester::WithDefaultShaders(pipelineStateProvider,
@@ -1018,7 +1018,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             {
               {
                 silhouetteClear.Pre(allocator);
-                ParallaxDraw::Inp inp{
+                SilhouetteClear::Inp inp{
                     .buffers = silhouetteDetectorBuffers,
                 };
                 silhouetteClear.Run(allocator, frameResource.DynamicBuffer,
@@ -1262,6 +1262,18 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
             runtimeResults.DrawImGui(false);
             cam.DrawImGui(false);
+            for (int i = 0; i < 3; ++i) {
+              ImGui::Text(std::format("{}", i).c_str());
+              ImGui::SameLine();
+              ImGui::Image(
+                  (void *)((*drawingSimResource.LODs[i]
+                                 ->coneMapBuffer.ShaderResource(allocator))
+                               .GpuHandle()
+                               .ptr),
+                  ImVec2(256, 256));
+              if (i != 2)
+                ImGui::SameLine();
+            }
           }
           ImGui::End();
           debugValues.DrawImGui(beforeNextFrame);

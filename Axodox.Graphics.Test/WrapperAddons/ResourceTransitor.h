@@ -19,6 +19,11 @@ template <u64 N> class ResourceTransitor {
   u64 n = 0;
 
 public:
+  ResourceTransitor(CommandAllocator &all) : allocator(all) {}
+  ResourceTransitor(CommandAllocator &all, const ResourceTransitor &other) {
+    allocator = all;
+    Add(other);
+  }
   ResourceTransitor(CommandAllocator &all,
                     const std::array<ResourceTransition, N> &inp = {})
       : allocator(all) {
@@ -43,6 +48,7 @@ public:
         throw new std::runtime_error("ResourceTransitor: Too many transitions");
       arr[n++].x = tr;
     }
+    other.Invalidate();
   }
   ResourceTransitor &
   Add(const std::initializer_list<std::pair<ResourceStates, ResourceStates>>
@@ -69,8 +75,26 @@ public:
 
     allocator->ResourceBarrier(uint32_t(n), barriers.data());
 
-    // Invalidates the queue
-    n = 0;
+    Invalidate();
+  }
+  void Invalidate() { n = 0; }
+
+  template <u64 ArrN, u64 N2>
+  static ResourceTransitor<N2 * ArrN>
+  Combine(const std::array<ResourceTransitor<N2>, ArrN> &inp) {
+    ResourceTransitor<N2 * ArrN> ret(allocator);
+    for (auto &x : inp) {
+
+      ret.Add(x);
+    }
+    return ret;
+  }
+
+  template <u64 N2>
+  ResourceTransitor<N2 + N> operator+(const ResourceTransitor &other) {
+    ResourceTransitor<N2 + N> ret(allocator);
+    ret.Add(*this);
+    ret.Add(other);
   }
   ~ResourceTransitor() { Queue(); }
 };

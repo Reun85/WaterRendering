@@ -11,81 +11,37 @@ using namespace Axodox::Storage;
 using namespace DirectX::PackedVector;
 class Camera;
 
-struct ShadowVolume : ShaderJob {
-  struct ShaderMask : RootSignatureMask {
-    explicit ShaderMask(const RootSignatureContext &context)
-        : RootSignatureMask(context) {
-      Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
-    }
-    constexpr static D3D12_DEPTH_STENCIL_DESC GetDepthStencilDesc();
-  };
-
-  struct Textures : ShaderBuffers {
-    MutableTextureWithViews StencilBuffer;
-
-    explicit Textures(const ResourceAllocationContext &context);
-
-    void MakeCompatible(const RenderTargetView &finalTarget,
-                        ResourceAllocationContext &allocationContext) override {
-      // No need to allocate
-    }
-    void Clear(CommandAllocator &allocator) override;
-    void TranslateToTarget(CommandAllocator &allocator);
-    void TranslateToView(
-        CommandAllocator &allocator,
-        const ResourceStates &newState = ResourceStates::AllShaderResource);
-    ~Textures() override = default;
-  };
-
-  struct Inp {
-    Textures buffers;
-    GpuVirtualAddress camera;
-    ImmutableMesh &mesh;
-  };
-
-  RootSignature<ShaderMask> Signature;
-  PipelineState pipeline;
-
-  ShadowVolume(PipelineStateProvider &pipelineProvider, GraphicsDevice &device,
-               VertexShader *vs, GeometryShader *gs, PixelShader *ps);
-
-  static ShadowVolume
-  WithDefaultShaders(PipelineStateProvider &pipelineProvider,
-                     GraphicsDevice &device);
-  void Pre(CommandAllocator &allocator) const override {
-    pipeline.Apply(allocator);
-  }
-  void Run(CommandAllocator &allocator, DynamicBufferManager &buffermanager,
-           const Inp &inp) const;
-  ~ShadowVolume() override = default;
-};
-
 struct ConeMapCreater : ShaderJob {
   struct ShaderMask : public RootSignatureMask {
     // In
-      // Texture2D<float>
-    RootDescriptor<RootDescriptorType::ShaderResource> HeightMap;
+    // Texture2D<float4>
+    // should change to float
+    RootDescriptorTable<1> HeightMap;
+
+    RootDescriptor<RootDescriptorType::ConstantBuffer> ComputeConstants;
 
     // Out
     // Texture2D<float2>
-    RootDescriptor<RootDescriptorType::UnorderedAccess> ConeMap;
-
+    RootDescriptorTable<1> ConeMap;
 
     explicit ShaderMask(const RootSignatureContext &context)
-        : RootSignatureMask(context), HeightMap(this, {0}),
- ConeMap(this, {10})
+        : RootSignatureMask(context), ComputeConstants(this, {9}),
+          HeightMap(this, {DescriptorRangeType::ShaderResource, {0}}),
+          ConeMap(this, {DescriptorRangeType::UnorderedAccess, {10}})
 
     {
       Flags = RootSignatureFlags::None;
     }
   };
+  struct Buffers {};
 
-  struct Textures : ShaderBuffers {
     MutableTextureWithViews ConeMap;
-
-    explicit Textures(const ResourceAllocationContext &context);
-
-    void MakeCompatible(const RenderTargetView &finalTarget,
+    // float2
+    const UnorderedAccessView *const coneMap;
+    // Currently float4
+    const ShaderResourceView *const heightMap;
+    const GpuVirtualAddress &ComputeConstants;
+    const u32 N;
                         ResourceAllocationContext &allocationContext) override {
       // No need to allocate
     }
@@ -94,13 +50,12 @@ struct ConeMapCreater : ShaderJob {
     void TranslateToOutput(CommandAllocator &allocator);
     ~Textures() override = default;
   };
-    struct Buffers {
+  struct Buffers {
 
     explicit Buffers(ResourceAllocationContext &context);
 
     ~Buffers() = default;
   };
-
 
   struct Inp {
     Textures textureBuffer;
@@ -113,7 +68,7 @@ struct ConeMapCreater : ShaderJob {
   PipelineState pipeline;
 
   ConeMapCreater(PipelineStateProvider &pipelineProvider,
-                     GraphicsDevice &device, ComputeShader *cs);
+                 GraphicsDevice &device, ComputeShader *cs);
 
   static ConeMapCreater
   WithDefaultShaders(PipelineStateProvider &pipelineProvider,
@@ -140,14 +95,15 @@ struct ParallaxDraw : ShaderJob {
   };
 
   struct Inp {
-    std::array<ConeMapCreater::Textures,3> &textures;
+    std::array<const MutableTexture *const, 3> &coneMap;
   };
 
   RootSignature<ShaderMask> Signature;
   PipelineState pipeline;
 
-  ParallaxDraw(PipelineStateProvider &pipelineProvider,
-                      GraphicsDevice &device, ComputeShader *cs);
+  ParallaxDraw(PipelineStateProvider &pipelineProvider, GraphicsDevice &device,
+               VertexShader *vs, HullShader *hs, DomainShader *ds,
+               PixelShader *ps);
 
   static ParallaxDraw
   WithDefaultShaders(PipelineStateProvider &pipelineProvider,
