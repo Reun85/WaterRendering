@@ -99,6 +99,39 @@ constexpr u32 Indexing(const u32 i, const u32 j, [[maybe_unused]] const u32 _,
 };
 } // namespace Inner
 
+class Xorshift128 {
+public:
+  using result_type = uint32_t;
+
+  explicit Xorshift128(uint32_t seed = std::random_device{}()) {
+    // Seed the state with a non-zero seed
+    state[0] = seed;
+    state[1] = seed ^ 0x6C8E9CF570932BD5ULL;
+    state[2] = seed ^ 0xDEADBEEFDEADBEEFULL;
+    state[3] = seed ^ 0xBADDCAFEFEEDFACEULL;
+  }
+
+  static constexpr result_type min() { return 0; }
+  static constexpr result_type max() { return UINT32_MAX; }
+
+  uint32_t operator()() {
+    // Xorshift128 algorithm
+    uint32_t t = state[3];
+    t ^= t << 11;
+    t ^= t >> 8;
+    state[3] = state[2];
+    state[2] = state[1];
+    state[1] = state[0];
+    t ^= state[0];
+    t ^= state[0] >> 19;
+    state[0] = t;
+    return t;
+  }
+
+private:
+  std::array<uint32_t, 4> state;
+};
+
 template <typename Prec = float>
   requires std::is_floating_point_v<Prec>
 std::vector<std::complex<Prec>>
@@ -112,7 +145,7 @@ CalculateTildeh0(const SimulationData::PatchData &dat) {
   const auto &L = dat.patchSize;
 
   std::random_device rd;
-  std::mt19937 gen(rd());
+  Xorshift128 gen(rd());
   std::normal_distribution<Prec> dis(0, 1);
 
   const i32 Nx2 = N / 2;

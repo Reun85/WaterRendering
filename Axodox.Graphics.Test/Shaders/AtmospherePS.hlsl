@@ -44,7 +44,7 @@ output_t main(VS_OUTPUT input) : SV_TARGET
     if (length(
         sunPos - dir) < sunRadius)
     {
-        samp = float4(1, 0, 0, 1);
+        //samp = float4(1, 0, 0, 1);
     }
 
     output.albedo = samp;
