@@ -2,10 +2,10 @@
 Texture2D<float4> displacement : register(t0);
 RWTexture2D<float2> cone : register(u10);
 
-//cbuffer Test : register(b9)
-//{
-//    ComputeConstants constants;
-//}
+cbuffer Test : register(b9)
+{
+    ComputeConstants constants;
+}
 
 
 #define N DISP_MAP_SIZE
