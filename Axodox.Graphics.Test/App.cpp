@@ -48,6 +48,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   };
   struct RuntimeSettings {
     bool timeRunning = true;
+    bool showImgui = true;
     XMFLOAT4 clearColor = DefaultsValues::App::clearColor;
     bool quit = false;
     void DrawImGui([[maybe_unused]] NeedToDo &out,
@@ -318,9 +319,10 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   static void SetUpWindowInput(const CoreWindow &window,
                                RuntimeSettings &settings, Camera &cam) {
     bool &timerunning = settings.timeRunning;
+    bool &showImgui = settings.showImgui;
     bool &quit = settings.quit;
-    window.KeyDown([&cam, &quit, &timerunning](CoreWindow const &,
-                                               KeyEventArgs const &args) {
+    window.KeyDown([&cam, &quit, &timerunning,
+                    &showImgui](CoreWindow const &, KeyEventArgs const &args) {
       if (ImGui::GetIO().WantCaptureKeyboard)
         return;
       switch (args.VirtualKey()) {
@@ -329,6 +331,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         break;
       case Windows::System::VirtualKey::Space:
         timerunning = !timerunning;
+        break;
+      case Windows::System::VirtualKey::F1:
+        showImgui = !showImgui;
         break;
 
       default:
@@ -1242,7 +1247,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         auto CPURenderEnd = std::chrono::high_resolution_clock::now();
         runtimeResults.CPUTime = CPURenderEnd - frameStart;
         // ImGUI
-        {
+        if (settings.showImgui) {
           ImGui_ImplDX12_NewFrame();
           ImGui_ImplUwp_NewFrame();
           ImGui::NewFrame();
