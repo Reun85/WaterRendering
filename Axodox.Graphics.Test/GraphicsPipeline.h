@@ -76,7 +76,7 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
 
   struct WaterPixelShaderData {
     float3 AlbedoColor = float3(11.f, 53.f, 108.f) / 255.f;
-    float Roughness = 0.150f;
+    float Roughness = 0.060f;
     float foamDepthFalloff = 0.245f;
     float foamRoughnessModifier = 5.0f;
     float NormalDepthAttenuation = 1;
@@ -178,8 +178,8 @@ struct DeferredShading : public RootSignatureMask {
                         ResourceAllocationContext &allocationContext) override;
 
     void Clear(CommandAllocator &allocator) override;
-    void TranslateToTarget(CommandAllocator &allocator);
-    void TranslateToView(CommandAllocator &allocator);
+    ResourceTransitor<4> TranslateToTarget(CommandAllocator &allocator);
+    ResourceTransitor<4> TranslateToView(CommandAllocator &allocator);
     ~GBuffer() override = default;
   };
 
@@ -245,8 +245,8 @@ struct ShadowMapping : public RootSignatureMask {
       // No need to allocate
     }
     void Clear(CommandAllocator &allocator) override;
-    void TranslateToTarget(CommandAllocator &allocator);
-    void TranslateToView(
+    ResourceTransitor<1> TranslateToTarget(CommandAllocator &allocator);
+    ResourceTransitor<1> TranslateToView(
         CommandAllocator &allocator,
         const ResourceStates &newState = ResourceStates::AllShaderResource);
     ~Textures() override = default;

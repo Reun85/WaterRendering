@@ -176,6 +176,7 @@ float4 main(input_t input) : SV_TARGET
     if (has_flag(debugValues.flags, 20))
     {
         // F = 1;
+        F *=
         D = 1;
         G = 1;
     }
@@ -201,7 +202,7 @@ float4 main(input_t input) : SV_TARGET
         specular = F * G * D / max(EPS, denom);
     else
         specular = 0;
-    specular =max(specular, 0);
+    specular = max(specular, 0);
     
     
     if (has_flag(debugValues.flags, 30))

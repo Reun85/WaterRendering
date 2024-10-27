@@ -111,7 +111,7 @@ ShadowVolume::ShaderMask::GetDepthStencilDesc() {
   return result;
 }
 
-SilhouetteClearTask::SilhouetteClearTask(
+ParallaxDraw::ParallaxDraw(
     PipelineStateProvider &pipelineProvider, GraphicsDevice &device,
     ComputeShader *cs)
     : Signature(device),
@@ -122,14 +122,14 @@ SilhouetteClearTask::SilhouetteClearTask(
                    })
                    .get()) {}
 
-SilhouetteClearTask SilhouetteClearTask ::WithDefaultShaders(
+ParallaxDraw ParallaxDraw ::WithDefaultShaders(
     PipelineStateProvider &pipelineProvider, GraphicsDevice &device) {
   ComputeShader cs(app_folder() / L"SilhouetteClear.cso");
 
-  return SilhouetteClearTask(pipelineProvider, device, &cs);
+  return ParallaxDraw(pipelineProvider, device, &cs);
 }
 
-void SilhouetteClearTask::Run(CommandAllocator &allocator,
+void ParallaxDraw::Run(CommandAllocator &allocator,
                               DynamicBufferManager &buffermanager,
                               const Inp &inp) const {
   auto mask = Signature.Set(allocator, RootSignatureUsage::Compute);
@@ -275,77 +275,3 @@ void SilhouetteDetectorTester::Run(CommandAllocator &allocator,
                              0        // Count buffer offset
   );
 }
-
-SilhouetteDetector::MeshSpecificBuffers::MeshSpecificBuffers(
-    ResourceAllocationContext &context, const ImmutableMesh &mesh,
-    u32 VertexByteSize, u32 IndexByteSize)
-
-    : Vertex(context, &*mesh.GetVertexBuffer(),
-             BufferViewDefinitions{
-                 .ShaderResource =
-                     D3D12_SHADER_RESOURCE_VIEW_DESC{
-                         .Format = DXGI_FORMAT_UNKNOWN,
-                         .ViewDimension = D3D12_SRV_DIMENSION_BUFFER,
-                         .Shader4ComponentMapping =
-                             D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
-                         .Buffer = {.FirstElement = 0,
-                                    .NumElements = mesh.GetVertexCount(),
-                                    .StructureByteStride = VertexByteSize}},
-             }),
-      Index(context, &*mesh.GetIndexBuffer(),
-            BufferViewDefinitions{
-                .ShaderResource =
-                    D3D12_SHADER_RESOURCE_VIEW_DESC{
-                        .Format = DXGI_FORMAT_UNKNOWN,
-                        .ViewDimension = D3D12_SRV_DIMENSION_BUFFER,
-                        .Shader4ComponentMapping =
-                            D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
-                        .Buffer = {.FirstElement = 0,
-                                   .NumElements = mesh.GetIndexCount(),
-                                   .StructureByteStride = IndexByteSize}},
-            })
-
-{}
-
-SilhouetteDetector::MeshSpecificBuffers::MeshSpecificBuffers(
-    ResourceAllocationContext &context, const ImmutableMesh &mesh)
-
-    : Vertex(context, &*mesh.GetVertexBuffer(),
-             BufferViewDefinitions{
-                 .ShaderResource =
-                     D3D12_SHADER_RESOURCE_VIEW_DESC{
-                         .Format = DXGI_FORMAT_UNKNOWN,
-                         .ViewDimension = D3D12_SRV_DIMENSION_BUFFER,
-                         .Shader4ComponentMapping =
-                             D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
-                         .Buffer =
-                             {.FirstElement = 0,
-                              .NumElements = mesh.GetVertexCount(),
-                              .StructureByteStride =
-                                  // Length of the buffer divided by the count
-
-                              (u32)(mesh.GetVertexBuffer()
-                                        .get()
-                                        ->Definition()
-                                        .Length /
-                                    (u64)mesh.GetVertexCount())}},
-             }),
-      Index(context, &*mesh.GetIndexBuffer(),
-            BufferViewDefinitions{
-                .ShaderResource =
-                    D3D12_SHADER_RESOURCE_VIEW_DESC{
-                        .Format = DXGI_FORMAT_UNKNOWN,
-                        .ViewDimension = D3D12_SRV_DIMENSION_BUFFER,
-                        .Shader4ComponentMapping =
-                            D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
-                        .Buffer = {.FirstElement = 0,
-                                   .NumElements = mesh.GetIndexCount(),
-                                   .StructureByteStride =
-                                       (u32)(mesh.GetIndexBuffer()
-                                                 .get()
-                                                 ->Definition()
-                                                 .Length /
-                                             (u64)mesh.GetIndexCount())}},
-            })
-
-{}

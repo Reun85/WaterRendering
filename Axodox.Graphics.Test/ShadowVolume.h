@@ -87,19 +87,7 @@ struct SilhouetteDetector : ShaderJob {
     }
   };
 
-  struct MeshSpecificBuffers {
-
-    StructuredObjectViews Vertex;
-    StructuredObjectViews Index;
-
-    explicit MeshSpecificBuffers(ResourceAllocationContext &context,
-                                 const ImmutableMesh &mesh);
-    explicit MeshSpecificBuffers(ResourceAllocationContext &context,
-                                 const ImmutableMesh &mesh, u32 VertexByteSize,
-                                 u32 IndexByteSize);
-    ~MeshSpecificBuffers() = default;
-  };
-  struct Buffers {
+    struct Buffers {
     struct EdgeBufferType {
       std::pair<u32, u32> vertices;
       std::pair<i32, i32> faces;
@@ -150,7 +138,7 @@ struct SilhouetteDetector : ShaderJob {
   ~SilhouetteDetector() override = default;
 };
 
-struct SilhouetteClearTask : ShaderJob {
+struct ParallaxDraw : ShaderJob {
   struct ShaderMask : public RootSignatureMask {
 
     RootDescriptorTable<1> buff;
@@ -170,10 +158,10 @@ struct SilhouetteClearTask : ShaderJob {
   RootSignature<ShaderMask> Signature;
   PipelineState pipeline;
 
-  SilhouetteClearTask(PipelineStateProvider &pipelineProvider,
+  ParallaxDraw(PipelineStateProvider &pipelineProvider,
                       GraphicsDevice &device, ComputeShader *cs);
 
-  static SilhouetteClearTask
+  static ParallaxDraw
   WithDefaultShaders(PipelineStateProvider &pipelineProvider,
                      GraphicsDevice &device);
   void Pre(CommandAllocator &allocator) const override {
@@ -181,7 +169,7 @@ struct SilhouetteClearTask : ShaderJob {
   }
   void Run(CommandAllocator &allocator, DynamicBufferManager &buffermanager,
            const Inp &inp) const;
-  ~SilhouetteClearTask() override = default;
+  ~ParallaxDraw() override = default;
 };
 
 struct SilhouetteDetectorTester : ShaderJob {
@@ -221,7 +209,7 @@ struct SilhouetteDetectorTester : ShaderJob {
     const std::optional<GpuVirtualAddress> texture;
     const ImmutableMesh &mesh;
     Buffers &buffers;
-    SilhouetteDetector::MeshSpecificBuffers &meshBuffers;
+    MeshSpecificBuffers &meshBuffers;
   };
   struct ModelConstants {
     XMFLOAT4X4 mMatrix;

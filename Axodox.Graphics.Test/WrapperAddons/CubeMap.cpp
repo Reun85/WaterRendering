@@ -49,6 +49,7 @@ FaceCoordinatesToWorldCoordinates(u32 i, u32 j, u32 width, CubeMapFace face) {
     return {b - 1.0f, a - 1.0f, -1.0f};
     break;
   }
+  return {0, 0, 0};
 }
 
 // Lanczos kernel function
