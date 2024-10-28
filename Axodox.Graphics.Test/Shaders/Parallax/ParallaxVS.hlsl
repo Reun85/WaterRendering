@@ -9,13 +9,13 @@ cbuffer CameraBuffer : register(b0)
 };
 cbuffer ModelBuffer : register(b1)
 {
-    float2 scaling;
     float3 center;
+    int padding;
+    float2 scaling;
 };
 struct output_t
 {
     float4 Position : SV_POSITION;
-    float3 localPos : POSITION;
     float2 planeCoord : PLANECOORD;
 };
 
@@ -42,7 +42,6 @@ output_t main(uint vertexID : SV_VertexID)
 
     float4 screenPosition = mul(float4(position, 1), camConstants.vpMatrix);
     output.Position = screenPosition;
-    output.localPos = position.xyz;
     output.planeCoord = texCoord;
     return output;
 }

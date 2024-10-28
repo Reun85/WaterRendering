@@ -10,6 +10,7 @@
 #include "GraphicsPipeline.h"
 #include "SkyboxPipeline.hpp"
 #include "ShadowVolume.h"
+#include "Parallax.h"
 
 using namespace std;
 using namespace winrt;
@@ -87,6 +88,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     bool enableSSR = false;
     bool lockQuadTree = false;
     int maxConeStep = 10;
+    bool useParallax = true;
     const static constexpr std::initializer_list<
         std::pair<u8, std::optional<const char *>>>
         DebugBitsDesc = {{2, "Use Foam"},
@@ -133,6 +135,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         ImGui::InputFloat4("Blend Distances", (float *)&blendDistances);
         ImGui::Checkbox("Enable SSR", &enableSSR);
         ImGui::Checkbox("Lock QuadTree", &lockQuadTree);
+        ImGui::Checkbox("Use parallax", &useParallax);
         ImGui::InputInt("Max Cone Step", (int *)&maxConeStep);
         for (auto &[id, name] : DebugBitsDesc) {
           if (name)
@@ -596,15 +599,19 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     BasicShader basicShader =
         BasicShader::WithDefaultShaders(pipelineStateProvider, device);
 
-    SilhouetteDetector silhouetteDetector =
-        SilhouetteDetector::WithDefaultShaders(pipelineStateProvider, device);
+    // SilhouetteDetector silhouetteDetector =
+    //     SilhouetteDetector::WithDefaultShaders(pipelineStateProvider,
+    //     device);
 
-    SilhouetteClear silhouetteClear =
-        SilhouetteClear::WithDefaultShaders(pipelineStateProvider, device);
+    // SilhouetteClear silhouetteClear =
+    //     SilhouetteClear::WithDefaultShaders(pipelineStateProvider, device);
 
-    SilhouetteDetectorTester silhouetteTester =
-        SilhouetteDetectorTester::WithDefaultShaders(pipelineStateProvider,
-                                                     device);
+    // SilhouetteDetectorTester silhouetteTester =
+    //     SilhouetteDetectorTester::WithDefaultShaders(pipelineStateProvider,
+    //                                                  device);
+
+    ParallaxDraw parallaxDraw =
+        ParallaxDraw::WithDefaultShaders(pipelineStateProvider, device);
 
     WaterGraphicRootDescription::WaterPixelShaderData waterData;
     DeferredShading::DeferredShaderBuffers defData;
@@ -665,8 +672,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     SimulationStage::MutableGpuSources simulationMutableSources(
         mutableAllocationContext, simData);
 
-    SilhouetteDetector::Buffers silhouetteDetectorBuffers(
-        mutableAllocationContext, Box.GetIndexCount() * 4);
+    // SilhouetteDetector::Buffers silhouetteDetectorBuffers(
+    //     mutableAllocationContext, Box.GetIndexCount() * 4);
 
     array<FrameResources, 2> frameResources{
         FrameResources(mutableAllocationContext),
@@ -816,19 +823,24 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
       auto oceanModelMatrix =
           XMMatrixTranslationFromVector(XMVECTOR{0, -5, 0, 1});
-      auto oceanDataFuture = threadpool_execute<
-          std::vector<WaterGraphicRootDescription::OceanData>
-              &>([&cpuBuffers, cam, simData, &runtimeResults, camChanged,
-                  oceanModelMatrix, &debugValues]()
-                     -> std::vector<WaterGraphicRootDescription::OceanData> & {
-        if (camChanged && !debugValues.lockQuadTree) {
-          cpuBuffers.oceanData.clear();
-          return WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
-              cpuBuffers.oceanData, cam, oceanModelMatrix,
-              simData.quadTreeDistanceThreshold, &runtimeResults);
-        }
-        return cpuBuffers.oceanData;
-      });
+      std::future<std::vector<WaterGraphicRootDescription::OceanData> &>
+          oceanDataFuture;
+      if (!debugValues.useParallax) {
+        oceanDataFuture = threadpool_execute<
+            std::vector<WaterGraphicRootDescription::OceanData> &>(
+            [&cpuBuffers, cam, simData, &runtimeResults, camChanged,
+             oceanModelMatrix, &debugValues]()
+                -> std::vector<WaterGraphicRootDescription::OceanData> & {
+              if (camChanged && !debugValues.lockQuadTree) {
+                cpuBuffers.oceanData.clear();
+                return WaterGraphicRootDescription::
+                    CollectOceanQuadInfoWithQuadTree(
+                        cpuBuffers.oceanData, cam, oceanModelMatrix,
+                        simData.quadTreeDistanceThreshold, &runtimeResults);
+              }
+              return cpuBuffers.oceanData;
+            });
+      }
 
       // Compute shader stage
       // It has to return some value or threadpool execute fails?????
@@ -953,7 +965,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           const auto &modelMatrix = oceanModelMatrix;
 
           // Need to reset after drawing
-          std::optional<GpuVirtualAddress> usedTextureAddress;
+          std::optional<ShaderResourceView *> usedTextureAddress;
           std::optional<MutableTextureWithState *> usedTexture;
 
           // Start Draw pass
@@ -983,20 +995,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
             }
 
             if (usedTexture) {
-              usedTextureAddress = *(*usedTexture)->ShaderResource(allocator);
+              usedTextureAddress = (*usedTexture)->ShaderResource(allocator);
             }
           }
-
-          // Ocean Buffers
-          WaterGraphicRootDescription::ModelConstants modelConstants{};
-
-          XMStoreFloat4x4(&modelConstants.mMatrix,
-                          XMMatrixTranspose(modelMatrix));
-
-          // Upload absolute contants
-
-          GpuVirtualAddress modelBuffer =
-              frameResource.DynamicBuffer.AddBuffer(modelConstants);
 
           GpuVirtualAddress waterDataBuffer =
               frameResource.DynamicBuffer.AddBuffer(waterData);
@@ -1022,31 +1023,31 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                   allocator);
 
           // Shadow Map pass
-          {
-            // Get shadow casting object silhouette
-            {
-              {
-                silhouetteClear.Pre(allocator);
-                SilhouetteClear::Inp inp{
-                    .buffers = silhouetteDetectorBuffers,
-                };
-                silhouetteClear.Run(allocator, frameResource.DynamicBuffer,
-                                    inp);
-              }
-              {
-                silhouetteDetector.Pre(allocator);
-                SilhouetteDetector::Inp inp{
-                    .buffers = silhouetteDetectorBuffers,
-                    .lights = lightsConstantBuffer,
-                    .mesh = Box,
-                    .meshBuffers = silhouetteDetectorMeshBuffers,
-                };
-                silhouetteDetector.Run(allocator, frameResource.DynamicBuffer,
-                                       inp);
-              }
-            }
-            // ...
-          }
+          //{
+          //  // Get shadow casting object silhouette
+          //  {
+          //    {
+          //      silhouetteClear.Pre(allocator);
+          //      SilhouetteClear::Inp inp{
+          //          .buffers = silhouetteDetectorBuffers,
+          //      };
+          //      silhouetteClear.Run(allocator, frameResource.DynamicBuffer,
+          //                          inp);
+          //    }
+          //    {
+          //      silhouetteDetector.Pre(allocator);
+          //      SilhouetteDetector::Inp inp{
+          //          .buffers = silhouetteDetectorBuffers,
+          //          .lights = lightsConstantBuffer,
+          //          .mesh = Box,
+          //          .meshBuffers = silhouetteDetectorMeshBuffers,
+          //      };
+          //      silhouetteDetector.Run(allocator, frameResource.DynamicBuffer,
+          //                             inp);
+          //    }
+          //  }
+          //  // ...
+          //}
 
           // GBuffer Pass
           {
@@ -1058,32 +1059,32 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
             // Box
             // outline
-            {
-              allocator.TransitionResource(
-                  silhouetteDetectorBuffers.EdgeCountBuffer.get()->get(),
-                  ResourceStates::UnorderedAccess,
-                  ResourceStates::IndirectArgument);
+            //{
+            //  allocator.TransitionResource(
+            //      silhouetteDetectorBuffers.EdgeCountBuffer.get()->get(),
+            //      ResourceStates::UnorderedAccess,
+            //      ResourceStates::IndirectArgument);
 
-              silhouetteTester.Pre(allocator);
-              XMMATRIX boxModel = XMMatrixTranspose(
-                  XMMatrixTranslationFromVector(XMVECTOR{2, 5, 2, 0}));
-              SilhouetteDetectorTester::ModelConstants boxModelConstants{};
-              XMStoreFloat4x4(&boxModelConstants.mMatrix, boxModel);
-              SilhouetteDetectorTester::Inp inp{
-                  .camera = cameraConstantBuffer,
-                  .modelTransform =
-                      frameResource.DynamicBuffer.AddBuffer(boxModelConstants),
-                  .texture = std::nullopt,
-                  .mesh = Box,
-                  .buffers = silhouetteDetectorBuffers,
-                  .meshBuffers = silhouetteDetectorMeshBuffers,
-              };
-              silhouetteTester.Run(allocator, frameResource.DynamicBuffer, inp);
-              allocator.TransitionResource(
-                  silhouetteDetectorBuffers.EdgeCountBuffer.get()->get(),
-                  ResourceStates::IndirectArgument,
-                  ResourceStates::UnorderedAccess);
-            }
+            //  silhouetteTester.Pre(allocator);
+            //  XMMATRIX boxModel = XMMatrixTranspose(
+            //      XMMatrixTranslationFromVector(XMVECTOR{2, 5, 2, 0}));
+            //  SilhouetteDetectorTester::ModelConstants boxModelConstants{};
+            //  XMStoreFloat4x4(&boxModelConstants.mMatrix, boxModel);
+            //  SilhouetteDetectorTester::Inp inp{
+            //      .camera = cameraConstantBuffer,
+            //      .modelTransform =
+            //          frameResource.DynamicBuffer.AddBuffer(boxModelConstants),
+            //      .texture = std::nullopt,
+            //      .mesh = Box,
+            //      .buffers = silhouetteDetectorBuffers,
+            //      .meshBuffers = silhouetteDetectorMeshBuffers,
+            //  };
+            //  silhouetteTester.Run(allocator, frameResource.DynamicBuffer,
+            //  inp); allocator.TransitionResource(
+            //      silhouetteDetectorBuffers.EdgeCountBuffer.get()->get(),
+            //      ResourceStates::IndirectArgument,
+            //      ResourceStates::UnorderedAccess);
+            //}
             // Box
             /*{
               basicShader.Pre(allocator);
@@ -1104,36 +1105,86 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
             // Water
             {
-              waterPipelineState.Apply(allocator);
+              if (!debugValues.useParallax) {
 
-              const auto &oceanQuadData = oceanDataFuture.get();
-              for (auto &curr : oceanQuadData) {
-                if (curr.N == 0)
-                  continue;
-                auto mask = waterRootSignature.Set(
-                    allocator, RootSignatureUsage::Graphics);
+                // Ocean Buffers
+                WaterGraphicRootDescription::ModelConstants modelConstants{};
 
-                if (usedTextureAddress)
-                  mask.texture = *usedTextureAddress;
+                XMStoreFloat4x4(&modelConstants.mMatrix,
+                                XMMatrixTranspose(modelMatrix));
 
-                mask.heightMapHighest = displacementMapAddressHighest;
-                mask.gradientsHighest = gradientsAddressHighest;
-                mask.heightMapMedium = displacementMapAddressMedium;
-                mask.gradientsMedium = gradientsAddressMedium;
-                mask.heightMapLowest = displacementMapAddressLowest;
-                mask.gradientsLowest = gradientsAddressLowest;
+                GpuVirtualAddress modelBuffer =
+                    frameResource.DynamicBuffer.AddBuffer(modelConstants);
 
-                mask.waterPBRBuffer = waterDataBuffer;
+                waterPipelineState.Apply(allocator);
 
-                mask.hullBuffer =
-                    frameResource.DynamicBuffer.AddBuffer(curr.hullConstants);
-                mask.vertexBuffer =
-                    frameResource.DynamicBuffer.AddBuffer(curr.vertexConstants);
-                mask.debugBuffer = debugConstantBuffer;
-                mask.cameraBuffer = cameraConstantBuffer;
-                mask.modelBuffer = modelBuffer;
+                const auto &oceanQuadData = oceanDataFuture.get();
+                for (auto &curr : oceanQuadData) {
+                  if (curr.N == 0)
+                    continue;
+                  auto mask = waterRootSignature.Set(
+                      allocator, RootSignatureUsage::Graphics);
 
-                planeMesh.Draw(allocator, curr.N);
+                  if (usedTextureAddress)
+                    mask.texture = **usedTextureAddress;
+
+                  mask.heightMapHighest = displacementMapAddressHighest;
+                  mask.gradientsHighest = gradientsAddressHighest;
+                  mask.heightMapMedium = displacementMapAddressMedium;
+                  mask.gradientsMedium = gradientsAddressMedium;
+                  mask.heightMapLowest = displacementMapAddressLowest;
+                  mask.gradientsLowest = gradientsAddressLowest;
+
+                  mask.waterPBRBuffer = waterDataBuffer;
+
+                  mask.hullBuffer =
+                      frameResource.DynamicBuffer.AddBuffer(curr.hullConstants);
+                  mask.vertexBuffer = frameResource.DynamicBuffer.AddBuffer(
+                      curr.vertexConstants);
+                  mask.debugBuffer = debugConstantBuffer;
+                  mask.cameraBuffer = cameraConstantBuffer;
+                  mask.modelBuffer = modelBuffer;
+
+                  planeMesh.Draw(allocator, curr.N);
+                }
+              } else if (debugValues.useParallax) {
+
+                // Ocean Buffers
+                ParallaxDraw::ModelBuffers modelConstants{};
+
+                modelConstants.center = float3(0, 1, 0);
+                modelConstants.scale = float2(5, 5);
+
+                GpuVirtualAddress modelBuffer =
+                    frameResource.DynamicBuffer.AddBuffer(modelConstants);
+
+                parallaxDraw.Pre(allocator);
+
+                ParallaxDraw::Inp inp{
+                    .coneMaps = {drawingSimResource.LODs[0]
+                                     ->coneMapBuffer.ShaderResource(allocator),
+                                 drawingSimResource.LODs[1]
+                                     ->coneMapBuffer.ShaderResource(allocator),
+                                 drawingSimResource.LODs[2]
+                                     ->coneMapBuffer.ShaderResource(allocator)},
+                    .gradients =
+                        {
+                            drawingSimResource.LODs[0]
+                                ->gradients.ShaderResource(allocator),
+                            drawingSimResource.LODs[1]
+                                ->gradients.ShaderResource(allocator),
+                            drawingSimResource.LODs[2]
+                                ->gradients.ShaderResource(allocator),
+
+                        },
+                    .texture = usedTextureAddress,
+                    .modelBuffers = modelBuffer,
+                    .cameraBuffer = cameraConstantBuffer,
+                    .debugBuffers = debugConstantBuffer,
+                    .waterPBRBuffers = waterDataBuffer,
+
+                };
+                parallaxDraw.Run(allocator, inp);
               }
             }
             // skybox

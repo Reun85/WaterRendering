@@ -36,7 +36,7 @@ output_t main(input_t input)
     float4 screenPosition = mul(position, camConstants.vpMatrix);
     output.position = screenPosition;
     const float Fresnel = 0.05;
-    output.normal = float4(OctahedronNormalEncode(input.normal), Fresnel, 1);
+    output.normal = float3(OctahedronNormalEncode(input.normal), Fresnel);
     output.textureCoord = input.textureCoord;
     return output;
 }

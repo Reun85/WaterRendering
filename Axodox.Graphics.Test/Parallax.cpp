@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "Parallax.h"
 
+namespace SimulationStage {
 ConeMapCreater::ConeMapCreater(PipelineStateProvider &pipelineProvider,
                                GraphicsDevice &device, ComputeShader *cs)
     : Signature(device),
@@ -32,4 +33,46 @@ void ConeMapCreater::Run(CommandAllocator &allocator, DynamicBufferManager &_,
   const auto sizeY = inp.N;
   allocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
                      (sizeY + yGroupSize - 1) / yGroupSize, 1);
+}
+} // namespace SimulationStage
+
+ParallaxDraw::ParallaxDraw(PipelineStateProvider &pipelineProvider,
+                           GraphicsDevice &device, VertexShader *vs,
+                           PixelShader *ps)
+    : Signature(device),
+      pipeline(pipelineProvider
+                   .CreatePipelineStateAsync(GraphicsPipelineStateDefinition{
+                       .RootSignature = &Signature,
+                       .VertexShader = vs,
+                       .PixelShader = ps,
+                   })
+                   .get()) {}
+
+ParallaxDraw
+ParallaxDraw::WithDefaultShaders(PipelineStateProvider &pipelineProvider,
+                                 GraphicsDevice &device) {
+  VertexShader vs(app_folder() / L"ParallaxVS.cso");
+  PixelShader ps(app_folder() / L"ParallaxPS.cso");
+  return ParallaxDraw(pipelineProvider, device, &vs, &ps);
+}
+
+void ParallaxDraw::Run(CommandAllocator &allocator, const Inp &inp) const {
+  auto mask = Signature.Set(allocator, RootSignatureUsage::Graphics);
+
+  if (inp.texture)
+    mask.texture = **inp.texture;
+  mask.coneMapHighest = *inp.coneMaps[0];
+  mask.coneMapMedium = *inp.coneMaps[1];
+  mask.coneMapLowest = *inp.coneMaps[2];
+  mask.gradientsHighest = *inp.gradients[0];
+  mask.gradientsMedium = *inp.gradients[1];
+  mask.gradientsLowest = *inp.gradients[2];
+
+  mask.waterPBRBuffer = inp.waterPBRBuffers;
+
+  mask.debugBuffer = inp.debugBuffers;
+  mask.cameraBuffer = inp.cameraBuffer;
+  mask.modelBuffer = inp.modelBuffers;
+
+  allocator->DrawInstanced(6, 1, 0u, 0u);
 }

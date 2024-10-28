@@ -1,5 +1,5 @@
 #include "../common.hlsli"
-Texture2D<float4> _texture : register(t0);
+Texture2D<float4> _texture : register(t9);
 SamplerState _sampler : register(s0);
 
 
@@ -14,16 +14,12 @@ cbuffer DebugBuffer : register(b9)
     DebugValues debugValues;
 }
 
-
-
-
-struct input_t
+cbuffer ModelBuffer : register(b1)
 {
-    float4 Screen : SV_POSITION;
-    float3 localPos : POSITION;
-    float2 planeCoord : PLANECOORD;
-    float4 grad : GRADIENTS;
+    float3 center;
+    float2 scaling;
 };
+
 
 struct output_t
 {
@@ -53,28 +49,61 @@ cbuffer PSProperties : register(b2)
 
 
 
-output_t calculate(float4 grad, float4 Screen, float3 localPos)
+output_t calculate(float4 grad, float4 Screen, float3 localPos, float2 planeCoord)
 {
 
     output_t output;
     
 	
-           
+    if (has_flag(debugValues.flags, 6))
+    {
+        float2 texCoord = GetTextureCoordFromPlaneCoordAndPatch(planeCoord, debugValues.patchSizes.r);
+        float4 text = _texture.Sample(_sampler, texCoord) * float4(debugValues.pixelMult.
+        xyz, 1);
+      
+        output.albedo = text;
+        return output;
+    }
+        
     float3 normal = normalize(grad.xyz);
     
     const float3 viewVec = camConstants.cameraPos - localPos;
     float3 viewDir = normalize(viewVec);
 
+    if (has_flag(debugValues.flags, 24))
+    {
+        output.albedo =
+         float4(0, 1, 0, 1);
+        if (dot(normal, viewDir) < 0)
+            output.albedo = float4(1, 0, 0, 1);
+        
+        return output;
+    }
+
+    //if (dot(normal, viewDir) < 0)
+    //{
+    //    normal *= -1;
+    //}
+
     float Jacobian = grad.w;
-       
+    if (has_flag(debugValues.flags, 25))
+    {
+        output.albedo =
+         float4(Jacobian, Jacobian, Jacobian, 1);
+        return output;
+    }
+    
     float depth = Screen.z / Screen.w;
 
 				
 
 				
     float foam = 0;
-    foam =
+    if (has_flag(debugValues.flags, 2))
+    {
+        foam =
     lerp(0.0f, Jacobian, pow(depth, foamDepthFalloff));
+    }
 
     normal = lerp(normal, float3(0, 1, 0), pow(depth, NormalDepthAttenuation));
 
@@ -95,7 +124,6 @@ output_t calculate(float4 grad, float4 Screen, float3 localPos)
     //low
     output.materialValues = float4(a, _HeightModifier * _WavePeakScatterStrength, _ScatterShadowStrength, 1);
     return output;
-    
 }
 
 
@@ -106,25 +134,10 @@ Texture2D<float4> gradients1 : register(t3);
 Texture2D<float4> gradients2 : register(t4);
 Texture2D<float4> gradients3 : register(t5);
 
-struct DS_OUTPUT
+struct input_t
 {
     float4 Position : SV_POSITION;
-    float3 localPos : POSITION;
-    float2 TexCoord : PLANECOORD;
-    float4 grad : GRADIENTS;
-};
-
-struct HS_OUTPUT_PATCH
-{
-    float3 localPos : POSITION;
-    float2 TexCoord : PLANECOORD;
-};
-
-
-struct HS_CONSTANT_DATA_OUTPUT
-{
-    float edges[4] : SV_TessFactor;
-    float inside[2] : SV_InsideTessFactor;
+    float2 planeCoord : PLANECOORD;
 };
 
 
@@ -135,21 +148,35 @@ struct ConeMapData
 };
 
 
-float3 localPos = input.localPos;
-float2 planeCoord = input.planeCoord;
-const float3 viewPos = camConstants.cameraPos;
 
 
 ConeMapData readConeMap(
-    float2 uv,
+    float2 uv
 )
 {
-    float2 t1 = _coneMap1.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.r), 0);
-    float2 t2 = _coneMap2.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.g), 0);
-    float2 t3 = _coneMap3.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.b), 0);
     ConeMapData r;
-    r.height = t1.x + t2.x + t3.x;
-    r.slope = min(t1.y, min(t2.y, t3.y));
+    r.height = 0;
+    r.slope = 999999;
+    if (has_flag(debugValues.flags, 3))
+    {
+        
+        float2 t = _coneMap1.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.r), 0);
+        r.height += t.x;
+        r.slope = min(r.slope, t.y);
+    }
+    if (has_flag(debugValues.flags, 4))
+    {
+        float2 t = _coneMap2.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.g), 0);
+        r.height += t.x;
+        r.slope = min(r.slope, t.y);
+    }
+    if (has_flag(debugValues.flags, 5))
+    {
+        float2 t = _coneMap3.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.b), 0);
+        r.height += t.x;
+        r.slope = min(r.slope, t.y);
+    }
+
 
     return r;
 }
@@ -163,8 +190,13 @@ float4 readGrad(float2 uv)
     return t1 + t2 + t3;
 }
 
+struct coneSteppingResult
+{
+    float2 planeCoord;
+    float height;
+};
 
-float parallaxConeStepping(float2 uv, float3 localPos, float3 viewPos, float coneStepScale, int maxSteps)
+coneSteppingResult parallaxConeStepping(float2 uv, float3 localPos, float3 viewPos, float coneStepScale, int maxSteps)
 {
     float3 viewDir = normalize(viewPos - localPos);
     float height = 0.0;
@@ -194,7 +226,10 @@ float parallaxConeStepping(float2 uv, float3 localPos, float3 viewPos, float con
         currentUV += deltaUV;
     }
 
-    return currentUV;
+    coneSteppingResult res;
+    res.planeCoord = currentUV;
+    res.height = height;
+    return res;
 }
 
 
@@ -204,18 +239,22 @@ output_t main(input_t input) : SV_TARGET
     const bool apply_disp = true;
     output_t output;
     
-    float3 localPos = input.localPos;
     float2 planeCoord = input.planeCoord;
     const float3 viewPos = camConstants.cameraPos;
+    float3 localPos = float3(planeCoord.x, 0, planeCoord.y) + center;
 
+    output_t outp;
 
-    planeCoord = parallaxConeStepping(planeCoord, localPos, viewPos, debugValues.patchSizes.r, debugValues.maxConeSteps);
-
+    outp.albedo = float4(1, 1, 1, 1);
+    return outp;
     
+    
+    coneSteppingResult ret = parallaxConeStepping(planeCoord, localPos, viewPos, float(DISP_MAP_SIZE) / debugValues.patchSizes.r, debugValues.maxConeStep);
+    planeCoord = ret.planeCoord;
+    
+    localPos = float3(planeCoord.x, ret.height, planeCoord.y) + center;
     float4 grad = readGrad(planeCoord);
     
-    
-    
-    return calculate(grad, input.Screen, localPos);
+    return calculate(grad, input.Position, localPos, planeCoord);
 }
 
