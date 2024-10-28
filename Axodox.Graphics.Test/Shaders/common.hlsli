@@ -16,6 +16,7 @@ struct DebugValues
     float4 pixelMult;
     float4 blendDistances;
     uint4 swizzleOrder;
+    float4 foamInfo;
     float3 patchSizes;
     // 0: use displacement
     // 2: use foam
@@ -32,6 +33,8 @@ struct DebugValues
     // 13: DS show depth
     // Bits [24,31] are reversed for debug reasons
     uint flags;
+    float EnvMapMult;
+    int maxConeStep;
 
 };
 

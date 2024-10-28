@@ -86,6 +86,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     bool enableSSR = false;
     bool lockQuadTree = false;
+    int maxConeStep = 10;
     const static constexpr std::initializer_list<
         std::pair<u8, std::optional<const char *>>>
         DebugBitsDesc = {{2, "Use Foam"},
@@ -132,6 +133,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         ImGui::InputFloat4("Blend Distances", (float *)&blendDistances);
         ImGui::Checkbox("Enable SSR", &enableSSR);
         ImGui::Checkbox("Lock QuadTree", &lockQuadTree);
+        ImGui::InputInt("Max Cone Step", (int *)&maxConeStep);
         for (auto &[id, name] : DebugBitsDesc) {
           if (name)
             ImGui::Checkbox(*name, &DebugBits[id]);
@@ -243,6 +245,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     XMFLOAT4 pixelMult;
     XMFLOAT4 blendDistances;
     XMUINT4 swizzleOrder;
+    XMFLOAT4 foamInfo;
     XMFLOAT3 patchSizes;
     // 0: use displacement
     // 1: use normal
@@ -253,8 +256,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     // 6: display texture instead of shader
     // 7: transform texture values from [-1,1] to [0,1]
     uint flags = 0; // Its here because padding
-    XMFLOAT4 foamInfo;
     float EnvMapMult;
+    int maxConeStep;
   };
   static void set_flag(uint &flag, uint flagIndex, bool flagValue = true) {
     if (flagValue) {
@@ -273,6 +276,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     res.patchSizes =
         XMFLOAT3(simData.Highest.patchSize, simData.Medium.patchSize,
                  simData.Lowest.patchSize);
+    res.maxConeStep = deb.maxConeStep;
 
     for (int i = 0; i < deb.DebugBits.size(); i++) {
       set_flag(res.flags, i, deb.DebugBits[i]);
