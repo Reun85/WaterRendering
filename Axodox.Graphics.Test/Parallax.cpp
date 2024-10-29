@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Parallax.h"
+#include "GraphicsPipeline.h"
 
 namespace SimulationStage {
 ConeMapCreater::ConeMapCreater(PipelineStateProvider &pipelineProvider,
@@ -40,13 +41,23 @@ ParallaxDraw::ParallaxDraw(PipelineStateProvider &pipelineProvider,
                            GraphicsDevice &device, VertexShader *vs,
                            PixelShader *ps)
     : Signature(device),
-      pipeline(pipelineProvider
-                   .CreatePipelineStateAsync(GraphicsPipelineStateDefinition{
-                       .RootSignature = &Signature,
-                       .VertexShader = vs,
-                       .PixelShader = ps,
-                   })
-                   .get()) {}
+      pipeline(
+          pipelineProvider
+              .CreatePipelineStateAsync(GraphicsPipelineStateDefinition{
+                  .RootSignature = &Signature,
+                  .VertexShader = vs,
+                  .PixelShader = ps,
+                  .RasterizerState = RasterizerFlags::CullClockwise,
+                  .DepthStencilState = DepthStencilMode::WriteDepth,
+                  .InputLayout = VertexPositionNormalTexture::Layout,
+                  .RenderTargetFormats = std::initializer_list(
+                      std::to_address(
+                          DeferredShading::GBuffer::GetGBufferFormats()
+                              .begin()),
+                      std::to_address(
+                          DeferredShading::GBuffer::GetGBufferFormats().end())),
+                  .DepthStencilFormat = Format::D32_Float})
+              .get()) {}
 
 ParallaxDraw
 ParallaxDraw::WithDefaultShaders(PipelineStateProvider &pipelineProvider,
@@ -74,5 +85,5 @@ void ParallaxDraw::Run(CommandAllocator &allocator, const Inp &inp) const {
   mask.cameraBuffer = inp.cameraBuffer;
   mask.modelBuffer = inp.modelBuffers;
 
-  allocator->DrawInstanced(6, 1, 0u, 0u);
+  inp.mesh.Draw(allocator);
 }

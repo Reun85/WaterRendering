@@ -242,19 +242,14 @@ output_t main(input_t input) : SV_TARGET
     float2 planeCoord = input.planeCoord;
     const float3 viewPos = camConstants.cameraPos;
     float3 localPos = float3(planeCoord.x, 0, planeCoord.y) + center;
-
-    output_t outp;
-
-    outp.albedo = float4(1, 1, 1, 1);
-    return outp;
     
     
-    coneSteppingResult ret = parallaxConeStepping(planeCoord, localPos, viewPos, float(DISP_MAP_SIZE) / debugValues.patchSizes.r, debugValues.maxConeStep);
+    coneSteppingResult ret = parallaxConeStepping(planeCoord, localPos, viewPos, float(DISP_MAP_SIZE) / debugValues.patchSizes.r, 1 * debugValues.maxConeStep);
     planeCoord = ret.planeCoord;
     
     localPos = float3(planeCoord.x, ret.height, planeCoord.y) + center;
     float4 grad = readGrad(planeCoord);
-    
+
     return calculate(grad, input.Position, localPos, planeCoord);
 }
 

@@ -276,6 +276,10 @@ float4 main(input_t input) : SV_TARGET
         }
 
     }
+    else if (matId < 0)
+    {
+        return _albedoinput;
+    }
     else
     {
         output = albedo * sunIrradiance;

@@ -10,7 +10,6 @@ cbuffer CameraBuffer : register(b0)
 cbuffer ModelBuffer : register(b1)
 {
     float3 center;
-    int padding;
     float2 scaling;
 };
 struct output_t
@@ -19,23 +18,20 @@ struct output_t
     float2 planeCoord : PLANECOORD;
 };
 
-
-output_t main(uint vertexID : SV_VertexID)
+struct input_t
 {
-    float2 planeCoords[6] =
-    {
-        float2(-1, 1), // Top-left
-    float2(1, -1), // Bottom-right
-    float2(1, 1), // Top-right
+    float3 Position : POSITION;
+    float4 Normal : NORMAL;
+    float2 Texture : TEXCOORD;
 
-    float2(-1, 1), // Top-left (repeat to start new triangle)
-    float2(-1, -1), // Bottom-left
-    float2(1, -1) // Bottom-right
-    };
+};
+
+output_t main(input_t input)
+{
 
     output_t output;
 
-    float2 pos = planeCoords[vertexID] * scaling;
+    float2 pos = input.Position.yx * scaling;
     float2 texCoord = pos;
     
     float3 position = float3(pos.x, 0, pos.y) + center;

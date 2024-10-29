@@ -641,6 +641,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     SimulationData simData = SimulationData::Default();
 
     ImmutableMesh planeMesh{immutableAllocationContext, CreateQuadPatch()};
+    ImmutableMesh simplePlane{immutableAllocationContext,
+                              CreatePlane(2, XMUINT2(2, 2))};
 
     ImmutableMesh deferredShadingPlane{immutableAllocationContext,
                                        CreateBackwardsPlane(2, XMUINT2(2, 2))};
@@ -1153,7 +1155,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                 ParallaxDraw::ModelBuffers modelConstants{};
 
                 modelConstants.center = float3(0, 1, 0);
-                modelConstants.scale = float2(5, 5);
+                modelConstants.scale = float2(50, 50);
 
                 GpuVirtualAddress modelBuffer =
                     frameResource.DynamicBuffer.AddBuffer(modelConstants);
@@ -1182,6 +1184,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                     .cameraBuffer = cameraConstantBuffer,
                     .debugBuffers = debugConstantBuffer,
                     .waterPBRBuffers = waterDataBuffer,
+                    .mesh = simplePlane,
 
                 };
                 parallaxDraw.Run(allocator, inp);

@@ -105,12 +105,13 @@ struct ParallaxDraw : ShaderJob {
                           ShaderVisibility::Pixel),
           _textureSampler(this, {0}, Filter::Linear, TextureAddressMode::Wrap,
                           ShaderVisibility::All) {
-      Flags = RootSignatureFlags::None;
+      Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
     }
   };
 
   struct ModelBuffers {
     float3 center;
+    int padding = 0;
     float2 scale;
     GpuVirtualAddress Upload(DynamicBufferManager &bufferManager) {
       return bufferManager.AddBuffer(this);
@@ -125,6 +126,7 @@ struct ParallaxDraw : ShaderJob {
     GpuVirtualAddress cameraBuffer;
     GpuVirtualAddress debugBuffers;
     GpuVirtualAddress waterPBRBuffers;
+    ImmutableMesh &mesh;
   };
 
   RootSignature<ShaderMask> Signature;
