@@ -82,7 +82,7 @@ static SimulationData Preset1() {
                      .Depth = 100.f,
                      .Highest =
                          {
-                             .displacementLambda = float3(1.f, 0.9f, 1.0f),
+                             .displacementLambda = float3(0.f, 0.9f, 0.0f),
                              .patchSize = 5.f,
                              .foamExponentialDecay = 0.320f,
                              .Amplitude = 0.009f,
@@ -98,7 +98,7 @@ static SimulationData Preset1() {
                          },
                      .Medium =
                          {
-                             .displacementLambda = float3(1.0f, 1.3f, 1.0f),
+                             .displacementLambda = float3(0.0f, 1.3f, 0.0f),
                              .patchSize = 91.f,
                              .foamExponentialDecay = 0.17f,
                              .Amplitude = 0.00001f,
@@ -113,7 +113,7 @@ static SimulationData Preset1() {
                              .Depth = res.Depth,
                          },
                      .Lowest = {
-                         .displacementLambda = float3(0.7f, 0.7f, 0.7f),
+                         .displacementLambda = float3(0.0f, 0.7f, 0.0f),
                          .patchSize = 383,
                          .foamExponentialDecay = 0.023f,
                          .Amplitude = 0.00001f,
@@ -143,7 +143,7 @@ SimulationData OldPreset() {
                      .Depth = Depth,
                      .Highest =
                          {
-                             .displacementLambda = float3(0.48f, 0.5, 0.48f),
+                             .displacementLambda = float3(0.0f, 0.5, 0.0f),
                              .patchSize = 13.f,
                              .foamExponentialDecay = 0.1f,
                              .Amplitude = 0.4e-3f,
@@ -159,7 +159,7 @@ SimulationData OldPreset() {
                          },
                      .Medium =
                          {
-                             .displacementLambda = float3(0.48f, 0.5, 0.48f),
+                             .displacementLambda = float3(0.0f, 0.5, 0.0f),
                              .patchSize = 91.f,
                              .foamExponentialDecay = 0.1f,
                              .Amplitude = 0.15e-3f,
@@ -174,7 +174,7 @@ SimulationData OldPreset() {
                              .Depth = res.Depth,
                          },
                      .Lowest = {
-                         .displacementLambda = float3(0.48f, 0.5, 0.48f),
+                         .displacementLambda = float3(0.0f, 0.5, 0.0f),
                          .patchSize = 383,
                          .foamExponentialDecay = 0.1f,
                          .Amplitude = 0.1e-4f,
@@ -213,7 +213,7 @@ SimulationData SimulationData::Default() {
                      .Depth = Depth,
                      .Highest =
                          {
-                             .displacementLambda = float3(1.f, 0.9f, 1.0f),
+                             .displacementLambda = float3(0.f, 0.9f, 0.0f),
                              .patchSize = 5.f,
                              .foamExponentialDecay = 0.320f,
                              .Amplitude = 0.005f,
@@ -229,7 +229,7 @@ SimulationData SimulationData::Default() {
                          },
                      .Medium =
                          {
-                             .displacementLambda = float3(1.0f, 1.3f, 1.0f),
+                             .displacementLambda = float3(0.0f, 1.3f, 0.0f),
                              .patchSize = 91.f,
                              .foamExponentialDecay = 0.17f,
                              .Amplitude = 0.00003f,
@@ -244,7 +244,7 @@ SimulationData SimulationData::Default() {
                              .Depth = res.Depth,
                          },
                      .Lowest = {
-                         .displacementLambda = float3(1.0f, 1.0f, 1.0f),
+                         .displacementLambda = float3(0.0f, 1.0f, 0.0f),
                          .patchSize = 383,
                          .foamExponentialDecay = 0.023f,
                          .Amplitude = 0.000002f,
