@@ -206,8 +206,17 @@ float z, float sinB, float cosB, float cotA)
 {
     return z / (sinB * cotA - cosB);
 }
-float3 ParallaxConemarch(Ray ray, float t)
+// for planes with normal (0,1,0)
+// and centered around (0,0,0)
+float3 ParallaxConemarch(float3 viewPos, float3 localPos)
 {
+    Ray ray;
+    ray.p = viewPos;
+    ray.v = normalize(localPos - ray.p);
+    float t = (localPos - ray.p).x / ray.v.x;
+    
+    
+    
     const float map_height = 5.;
     float t_all = map_height / abs(ray.v.y);
     t -= t_all;
@@ -219,10 +228,10 @@ float3 ParallaxConemarch(Ray ray, float t)
         float2 dat = readConeMap(p.xz);
 
         float L = dat.y;
-        float z = dat.x - p.y;
-        if (z > .0)
+        float y = dat.x - p.y;
+        if (y < .0)
             break;
-        t += ray_coneapprox(abs(z), sinB, ray.v.y, L) + dt;
+        t += ray_coneapprox(abs(y), sinB, ray.v.y, L) + dt;
         p = ray.p + t * ray.v;
     }
     //vec2 tt = vec2(pt.t-dt,pt.t); //(x1,x2)
@@ -244,15 +253,15 @@ output_t main(input_t input) : SV_TARGET
     
     float2 planeCoord = input.planeCoord;
     const float3 viewPos = camConstants.cameraPos;
-    float3 localPos = float3(planeCoord.x, 0, planeCoord.y) + center;
+       
+    //output.albedo = float4(readConeMap(float3(planeCoord.x, 0, planeCoord.y).xz) / 10., 1, 1);
+    //output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
+    //output.materialValues = float4(0, 0, 0, 0);
+    //return output;
     
-    
-    Ray ray;
-    ray.p = viewPos;
-    ray.v = normalize(localPos - viewPos);
-    float t = (localPos - viewPos).x / ray.v.x;
-    localPos = ParallaxConemarch(ray, t);
-    planeCoord = (localPos - center).xz;
+    float3 localPos = ParallaxConemarch(viewPos - center, float3(planeCoord.x, 0, planeCoord.y));
+    planeCoord = localPos.xz;
+    localPos += center;
     
     float4 grad = readGrad(planeCoord);
 
