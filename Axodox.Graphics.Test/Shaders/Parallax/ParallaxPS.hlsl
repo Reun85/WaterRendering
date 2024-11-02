@@ -141,44 +141,38 @@ struct input_t
 };
 
 
-struct ConeMapData
-{
-    float height;
-    float slope;
-};
 
 
 
 
-ConeMapData readConeMap(
+float2 readConeMap(
     float2 uv
 )
 {
-    ConeMapData r;
-    r.height = 0;
-    r.slope = 999999;
+    float height = 0;
+    float slope = 999999;
     if (has_flag(debugValues.flags, 3))
     {
         
         float2 t = _coneMap1.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.r), 0);
-        r.height += t.x;
-        r.slope = min(r.slope, t.y);
+        height += t.x;
+        slope = min(slope, t.y);
     }
     if (has_flag(debugValues.flags, 4))
     {
         float2 t = _coneMap2.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.g), 0);
-        r.height += t.x;
-        r.slope = min(r.slope, t.y);
+        height += t.x;
+        slope = min(slope, t.y);
     }
     if (has_flag(debugValues.flags, 5))
     {
         float2 t = _coneMap3.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.b), 0);
-        r.height += t.x;
-        r.slope = min(r.slope, t.y);
+        height += t.x;
+        slope = min(slope, t.y);
     }
 
 
-    return r;
+    return float2(height, slope);
 }
 
 float4 readGrad(float2 uv)
@@ -191,122 +185,54 @@ float4 readGrad(float2 uv)
 }
 
 
-struct HMapIntersection
+
+
+
+
+
+struct Ray
 {
+    float3 p, v;
+};
+
+struct Intersection
+{
+
+    float t;
     float2 uv;
-    float t; // uv = (1-t)*u + t*u2
-    float last_t;
-    bool wasHit;
 };
-
-static const HMapIntersection INIT_INTERSECTION = { 0.0.xx, 0.0, 0.0, false };
-
-HMapIntersection findIntersection_bumpMapping(float2 u, float2 u2)
+float ray_coneapprox(
+float z, float sinB, float cosB, float cotA)
 {
-    HMapIntersection ret = INIT_INTERSECTION;
-    ret.uv = u2;
-    ret.t = 1;
-    ret.last_t = 1;
-    return ret;
+    return z / (sinB * cotA - cosB);
 }
-
-HMapIntersection findIntersection_parallaxMapping(float2 u, float2 u2)
+float3 ParallaxConemarch(Ray ray, float t)
 {
-    float t = 1 - getH(u2);
-    HMapIntersection ret = INIT_INTERSECTION;
-    ret.uv = (1 - t) * u + t * u2;
-    ret.t = t;
-    ret.last_t = t;
-    return ret;
-}
-
-// Adapted from "Cone Step Mapping: An Iterative Ray-Heightfield Intersection Algorithm" - Jonathan Dummer
-HMapIntersection findIntersection_coneStepMapping(float2 u, float2 u2)
-{
-    float3 ds = float3(u2 - u, 1);
-    ds = normalize(ds);
-    float w = 1 / HMres.x;
-    float iz = sqrt(1.0 - ds.z * ds.z); // = length(ds.xy)
-    float sc = 0;
-    ConeMapData tmp = readConeMap(u);
-    float2 t = float2(tmp.height, tmp.slope);
-    int stepCount = 0;
-    float zTimesSc = 0.0;
-
-    float2 dirSign = float2(ds.x < 0 ? -1 : 1, ds.y < 0 ? -1 : 1) * 0.5 / HMres.xy;
-
-    
-    while (1.0 - ds.z * sc > t.x && stepCount < debugValues.maxConeStep)
+    const float map_height = 5.;
+    float t_all = map_height / abs(ray.v.y);
+    t -= t_all;
+    float dt = t_all / float(debugValues.maxConeStep);
+    float3 p = ray.p + t * ray.v;
+    float sinB = sqrt(1. - ray.v.y * ray.v.y);
+    for (int i = 0; i < debugValues.maxConeStep; ++i)
     {
-        zTimesSc = ds.z * sc;
-#if CONSERVATIVE_STEP
-        const float2 p = u + ds.xy * sc;
-        const float2 cellCenter = (floor(p*HMres.xy - .5) + 1) / HMres.xy;
-        const float2 wall = cellCenter + dirSign;
-        const float2 stepToCellBorder = (wall - p) / ds.xy;
-        w = min(stepToCellBorder.x, stepToCellBorder.y) + 1e-5;
-#endif
-        sc += relax * max(w, (1.0 - zTimesSc - t.x) * t.y / (t.y * ds.z + iz));
-        tmp = readConeMap(u);
-        t = float2(tmp.height, tmp.slope);
-        ++stepCount;
-    }
-    
-    HMapIntersection ret = INIT_INTERSECTION;
-    ret.last_t = zTimesSc;
-    ret.wasHit = (stepCount < debugValues.maxConeStep);
-    float tt = ds.z * sc;
-    ret.uv = (1 - tt) * u + tt * u2;
-    ret.t = tt;
-    return ret;
-}
+        float2 dat = readConeMap(p.xz);
 
-
-
-
-
-
-
-struct coneSteppingResult
-{
-    float2 planeCoord;
-    float height;
-};
-
-coneSteppingResult parallaxConeStepping(float2 uv, float3 localPos, float3 viewPos, float coneStepScale, int maxSteps)
-{
-    float3 viewDir = normalize(viewPos - localPos);
-    float height = 0.0;
-
-    // Step variables
-    float stepSize = 1.0 / maxSteps;
-    float2 deltaUV = viewDir.xy * coneStepScale * stepSize;
-    float2 currentUV = uv;
-
-    // Perform cone stepping
-    for (int i = 0; i < maxSteps; ++i)
-    {
-        // Read the cone map data at the current UV
-        ConeMapData coneData = readConeMap(currentUV);
-
-        // Calculate expected height at this step based on cone slope
-        float expectedHeight = height + coneData.slope;
-
-        // If the view depth exceeds the height at the current UV, we break out of the loop
-        if (viewDir.z * height > expectedHeight)
-        {
+        float L = dat.y;
+        float z = dat.x - p.y;
+        if (z > .0)
             break;
-        }
-
-        // Accumulate height and advance UV
-        height += coneData.height * stepSize;
-        currentUV += deltaUV;
+        t += ray_coneapprox(abs(z), sinB, ray.v.y, L) + dt;
+        p = ray.p + t * ray.v;
     }
-
-    coneSteppingResult res;
-    res.planeCoord = currentUV;
-    res.height = height;
-    return res;
+    //vec2 tt = vec2(pt.t-dt,pt.t); //(x1,x2)
+    //vec2 ff = vec2(f(ray,tt.x,p),f(ray,tt.y,p)); //f(x1),f(x2)
+    //for (int i=0; i<2; ++i)
+    //{
+    //    tt = vec2(tt.y,tt.y - ff.y*(tt.y-tt.x)/(ff.y-ff.x));
+    //    ff = vec2(ff.y,f(ray,tt.x,p));
+    //}
+    return p;
 }
 
 
@@ -321,10 +247,13 @@ output_t main(input_t input) : SV_TARGET
     float3 localPos = float3(planeCoord.x, 0, planeCoord.y) + center;
     
     
-    coneSteppingResult ret = parallaxConeStepping(planeCoord, localPos, viewPos, float(DISP_MAP_SIZE) / debugValues.patchSizes.r, 1 * debugValues.maxConeStep);
-    planeCoord = ret.planeCoord;
+    Ray ray;
+    ray.p = viewPos;
+    ray.v = normalize(localPos - viewPos);
+    float t = (localPos - viewPos).x / ray.v.x;
+    localPos = ParallaxConemarch(ray, t);
+    planeCoord = (localPos - center).xz;
     
-    localPos = float3(planeCoord.x, ret.height, planeCoord.y) + center;
     float4 grad = readGrad(planeCoord);
 
     return calculate(grad, input.Position, localPos, planeCoord);

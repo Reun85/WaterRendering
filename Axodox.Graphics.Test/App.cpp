@@ -729,6 +729,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     auto resolution = swapChain.Resolution();
     cam.SetAspect(float(resolution.x) / float(resolution.y));
 
+    bool first_loop = false;
     loopStartTime = std::chrono::high_resolution_clock::now();
     while (!settings.quit) {
       // Process user input
@@ -827,7 +828,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           XMMatrixTranslationFromVector(XMVECTOR{0, -5, 0, 1});
       std::future<std::vector<WaterGraphicRootDescription::OceanData> &>
           oceanDataFuture;
-      if (!debugValues.useParallax) {
+      if (!debugValues.useParallax || first_loop) {
         oceanDataFuture = threadpool_execute<
             std::vector<WaterGraphicRootDescription::OceanData> &>(
             [&cpuBuffers, cam, simData, &runtimeResults, camChanged,
@@ -1372,6 +1373,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       // Present frame
       computeStage.wait();
       swapChain.Present();
+      first_loop = false;
     }
     // Wait until everything is done before deleting context
 
