@@ -190,6 +190,83 @@ float4 readGrad(float2 uv)
     return t1 + t2 + t3;
 }
 
+
+struct HMapIntersection
+{
+    float2 uv;
+    float t; // uv = (1-t)*u + t*u2
+    float last_t;
+    bool wasHit;
+};
+
+static const HMapIntersection INIT_INTERSECTION = { 0.0.xx, 0.0, 0.0, false };
+
+HMapIntersection findIntersection_bumpMapping(float2 u, float2 u2)
+{
+    HMapIntersection ret = INIT_INTERSECTION;
+    ret.uv = u2;
+    ret.t = 1;
+    ret.last_t = 1;
+    return ret;
+}
+
+HMapIntersection findIntersection_parallaxMapping(float2 u, float2 u2)
+{
+    float t = 1 - getH(u2);
+    HMapIntersection ret = INIT_INTERSECTION;
+    ret.uv = (1 - t) * u + t * u2;
+    ret.t = t;
+    ret.last_t = t;
+    return ret;
+}
+
+// Adapted from "Cone Step Mapping: An Iterative Ray-Heightfield Intersection Algorithm" - Jonathan Dummer
+HMapIntersection findIntersection_coneStepMapping(float2 u, float2 u2)
+{
+    float3 ds = float3(u2 - u, 1);
+    ds = normalize(ds);
+    float w = 1 / HMres.x;
+    float iz = sqrt(1.0 - ds.z * ds.z); // = length(ds.xy)
+    float sc = 0;
+    ConeMapData tmp = readConeMap(u);
+    float2 t = float2(tmp.height, tmp.slope);
+    int stepCount = 0;
+    float zTimesSc = 0.0;
+
+    float2 dirSign = float2(ds.x < 0 ? -1 : 1, ds.y < 0 ? -1 : 1) * 0.5 / HMres.xy;
+
+    
+    while (1.0 - ds.z * sc > t.x && stepCount < debugValues.maxConeStep)
+    {
+        zTimesSc = ds.z * sc;
+#if CONSERVATIVE_STEP
+        const float2 p = u + ds.xy * sc;
+        const float2 cellCenter = (floor(p*HMres.xy - .5) + 1) / HMres.xy;
+        const float2 wall = cellCenter + dirSign;
+        const float2 stepToCellBorder = (wall - p) / ds.xy;
+        w = min(stepToCellBorder.x, stepToCellBorder.y) + 1e-5;
+#endif
+        sc += relax * max(w, (1.0 - zTimesSc - t.x) * t.y / (t.y * ds.z + iz));
+        tmp = readConeMap(u);
+        t = float2(tmp.height, tmp.slope);
+        ++stepCount;
+    }
+    
+    HMapIntersection ret = INIT_INTERSECTION;
+    ret.last_t = zTimesSc;
+    ret.wasHit = (stepCount < debugValues.maxConeStep);
+    float tt = ds.z * sc;
+    ret.uv = (1 - tt) * u + tt * u2;
+    ret.t = tt;
+    return ret;
+}
+
+
+
+
+
+
+
 struct coneSteppingResult
 {
     float2 planeCoord;
@@ -207,7 +284,7 @@ coneSteppingResult parallaxConeStepping(float2 uv, float3 localPos, float3 viewP
     float2 currentUV = uv;
 
     // Perform cone stepping
-    for (int i = 0; i < maxSteps; i++)
+    for (int i = 0; i < maxSteps; ++i)
     {
         // Read the cone map data at the current UV
         ConeMapData coneData = readConeMap(currentUV);

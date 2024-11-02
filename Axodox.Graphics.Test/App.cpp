@@ -1155,7 +1155,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                 ParallaxDraw::ModelBuffers modelConstants{};
 
                 modelConstants.center = float3(0, 1, 0);
-                modelConstants.scale = float2(50, 50);
+                modelConstants.scale = float2(DefaultsValues::App::oceanSize,
+                                              DefaultsValues::App::oceanSize);
 
                 GpuVirtualAddress modelBuffer =
                     frameResource.DynamicBuffer.AddBuffer(modelConstants);
