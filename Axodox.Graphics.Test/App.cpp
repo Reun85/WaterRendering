@@ -83,7 +83,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     XMFLOAT3 foamColor = XMFLOAT3(1, 1, 1);
 
     std::array<bool, 31 - 0 + 1> DebugBits{false, false, true,
-                                           true,  true,  true};
+                                           true,  false, false};
 
     bool enableSSR = false;
     bool lockQuadTree = false;
@@ -507,9 +507,10 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     CommandQueue directQueue{device};
     // CommandQueue computeQueue{device, /* CommandKind::Compute*/};
     CommandQueue &computeQueue = directQueue;
-    CoreSwapChain swapChain{directQueue, window,
-                            SwapChainFlags::IsTearingAllowed};
-    // CoreSwapChain swapChain{directQueue, window, SwapChainFlags::Default};
+    // CoreSwapChain swapChain{directQueue, window,
+    //  SwapChainFlags::IsTearingAllowed
+    //};
+    CoreSwapChain swapChain{directQueue, window, SwapChainFlags::Default};
 
     PipelineStateProvider pipelineStateProvider{device};
 
@@ -1155,7 +1156,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                 // Ocean Buffers
                 ParallaxDraw::ModelBuffers modelConstants{};
 
-                modelConstants.center = float3(0, 1, 0);
+                modelConstants.center = float3(0, -5, 0);
                 modelConstants.scale = float2(DefaultsValues::App::oceanSize,
                                               DefaultsValues::App::oceanSize);
 

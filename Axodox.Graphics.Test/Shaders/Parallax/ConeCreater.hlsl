@@ -12,7 +12,7 @@ cbuffer Test : register(b9)
 #define LOG2_M 4
 #define M (1<<LOG2_M)
 // must be odd
-#define BOXSIZE 7
+#define BOXSIZE 17
 #define MHalf (M>>1)
 #define LOG2_N_DIV_M (DISP_MAP_LOG2-LOG2_M)
 #define N_DIV_M (1 << LOG2_N_DIV_M)
@@ -26,10 +26,7 @@ groupshared float cache[M + K * 2][M + K * 2];
 [numthreads(M + K * 2, M + K * 2, 1)]
 void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3 GTid : SV_GroupID)
 {
-    const float PATCH_SIZE = constants.patchSize;
-    // Why the div by 2?
-    const float TILE_SIZE = PATCH_SIZE / float(DISP_MAP_SIZE) / 2.;
-
+   
     int2 groupID = GTid.xy;
     int2 threadID = LTid.xy;
 
@@ -80,8 +77,12 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3
             }
         }
     }
-    //ta = ta * N;
+    //ta = ta * DISP_MAP_SIZE;
     // or is it
+    const float PATCH_SIZE = constants.patchSize;
+       // Why the div by 2?
+    const float TILE_SIZE = PATCH_SIZE / float(DISP_MAP_SIZE) / 2.;
+
     ta = ta * TILE_SIZE;
     // ?
 

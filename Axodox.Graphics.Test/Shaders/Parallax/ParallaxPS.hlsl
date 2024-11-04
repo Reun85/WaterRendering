@@ -154,19 +154,19 @@ float2 readConeMap(
     if (has_flag(debugValues.flags, 3))
     {
         
-        float2 t = _coneMap1.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.r), 0);
+        float2 t = _coneMap1.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.x), 0);
         height += t.x;
         slope = min(slope, t.y);
     }
     if (has_flag(debugValues.flags, 4))
     {
-        float2 t = _coneMap2.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.g), 0);
+        float2 t = _coneMap2.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.y), 0);
         height += t.x;
         slope = min(slope, t.y);
     }
     if (has_flag(debugValues.flags, 5))
     {
-        float2 t = _coneMap3.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.b), 0);
+        float2 t = _coneMap3.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.z), 0);
         height += t.x;
         slope = min(slope, t.y);
     }
@@ -181,7 +181,7 @@ float4 readGrad(float2 uv)
     float4 t2 = gradients2.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.g), 0);
     float4 t3 = gradients3.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.b), 0);
 
-    return t1 + t2 + t3;
+    return normalize(t1 + t2 + t3);
 }
 
 
@@ -202,45 +202,66 @@ struct Intersection
     float2 uv;
 };
 float ray_coneapprox(
-float z, float sinB, float cosB, float cotA)
+float y, float sinB, float cosB, float cotA)
 {
-    return z / (sinB * cotA - cosB);
+    return cotA * y / (sinB - cosB * cotA);
 }
+
+float dcell(float p, float v, float size)
+{
+    float x = floor(p * size + 0.5) + 0.5 * sign(v);
+    float vr = 1. / v;
+    float sizer = 1. / size;
+    return (x) * vr * sizer - p * vr;
+}
+// assume rectangular image
+float dcell(float2 p, float2 v, float size)
+{
+    return min(dcell(p.x, v.x, size), dcell(p.y, v.y, size));
+}
+//https://github.com/Bundas102/robust-cone-map/tree/master
 // for planes with normal (0,1,0)
 // and centered around (0,0,0)
 float3 ParallaxConemarch(float3 viewPos, float3 localPos)
 {
     Ray ray;
     ray.p = viewPos;
-    ray.v = normalize(localPos - ray.p);
-    float t = (localPos - ray.p).x / ray.v.x;
+    ray.v = localPos - ray.p;
+    float t = length(ray.v);
+    ray.v /= t;
     
     
-    
-    const float map_height = 5.;
-    float t_all = map_height / abs(ray.v.y);
-    t -= t_all;
-    float dt = t_all / float(debugValues.maxConeStep);
-    float3 p = ray.p + t * ray.v;
+    const uint maxSteps =
+    1000;
+    //debugValues.maxConeStep;
+    const float map_height = 1.;
+    float t_all = map_height / abs(ray.v.y) * debugValues.patchSizes.r;
+    //t += t_all;
+    float dt; // = t_all / float(maxSteps);
+    float3 p = localPos;
     float sinB = sqrt(1. - ray.v.y * ray.v.y);
-    for (int i = 0; i < debugValues.maxConeStep; ++i)
+    int i = 0;
+    for (i = 0; i < maxSteps; ++i)
     {
         float2 dat = readConeMap(p.xz);
 
         float L = dat.y;
         float y = dat.x - p.y;
-        if (y < .0)
+        if (y < 0.0)
             break;
-        t += ray_coneapprox(abs(y), sinB, ray.v.y, L) + dt;
+        dt = max(
+         ray_coneapprox(y, sinB, ray.v.y, L) * debugValues.patchSizes.r,
+
+        // ensure we atleast reach a new data holding texel.
+        dcell(p.xz, ray.v.xz, DISP_MAP_SIZE) * debugValues.patchSizes.r
+
+        );
+
+        t = t - dt;
         p = ray.p + t * ray.v;
+
     }
-    //vec2 tt = vec2(pt.t-dt,pt.t); //(x1,x2)
-    //vec2 ff = vec2(f(ray,tt.x,p),f(ray,tt.y,p)); //f(x1),f(x2)
-    //for (int i=0; i<2; ++i)
-    //{
-    //    tt = vec2(tt.y,tt.y - ff.y*(tt.y-tt.x)/(ff.y-ff.x));
-    //    ff = vec2(ff.y,f(ray,tt.x,p));
-    //}
+    //return float3(i, i, i) / maxSteps;
     return p;
 }
 
@@ -249,17 +270,20 @@ float3 ParallaxConemarch(float3 viewPos, float3 localPos)
 output_t main(input_t input) : SV_TARGET
 {
     const bool apply_disp = true;
-    output_t output;
     
     float2 planeCoord = input.planeCoord;
     const float3 viewPos = camConstants.cameraPos;
        
+    //output_t output;
     //output.albedo = float4(readConeMap(float3(planeCoord.x, 0, planeCoord.y).xz) / 10., 1, 1);
+        
+    float3 localPos = ParallaxConemarch(viewPos - center, float3(planeCoord.x, 0, planeCoord.y));
+    //output_t output;
+    //localPos = float3(1, 1, 1);
+    //output.albedo = float4(localPos, 1);
     //output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
     //output.materialValues = float4(0, 0, 0, 0);
     //return output;
-    
-    float3 localPos = ParallaxConemarch(viewPos - center, float3(planeCoord.x, 0, planeCoord.y));
     planeCoord = localPos.xz;
     localPos += center;
     

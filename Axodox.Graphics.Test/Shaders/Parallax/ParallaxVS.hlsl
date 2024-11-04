@@ -31,10 +31,9 @@ output_t main(input_t input)
 
     output_t output;
 
-    float2 pos = input.Position.yx * scaling;
-    float2 texCoord = pos;
+    float2 texCoord = input.Position.yx * scaling;
     
-    float3 position = float3(pos.x, 0, pos.y) + center;
+    float3 position = float3(texCoord.x, 0, texCoord.y) + center;
 
     float4 screenPosition = mul(float4(position, 1), camConstants.vpMatrix);
     output.Position = screenPosition;
