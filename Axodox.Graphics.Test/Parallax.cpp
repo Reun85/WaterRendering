@@ -87,3 +87,31 @@ void ParallaxDraw::Run(CommandAllocator &allocator, const Inp &inp) const {
 
   inp.mesh.Draw(allocator);
 }
+
+MixMaxCompute::MixMaxCompute(PipelineStateProvider &pipelineProvider,
+                             GraphicsDevice &device, ComputeShader *cs)
+
+    : Signature(device),
+      pipeline(pipelineProvider
+                   .CreatePipelineStateAsync(ComputePipelineStateDefinition{
+                       .RootSignature = &Signature,
+                       .ComputeShader = cs,
+                   })
+                   .get()) {}
+
+MixMaxCompute
+MixMaxCompute::WithDefaultShaders(PipelineStateProvider &pipelineProvider,
+                                  GraphicsDevice &device) {
+  ComputeShader cs(app_folder() / L"MixMax.cso");
+  return MixMaxCompute(pipelineProvider, device, &cs);
+}
+
+void MixMaxCompute::Run(CommandAllocator &allocator,
+                        DynamicBufferManager &buffermanager,
+                        const Inp &inp) const {
+  for (u32 i = 0; i < inp.mipLevels; ++i) {
+    auto mask = Signature.Set(allocator, RootSignatureUsage::Compute);
+    assert("not yet implemented");
+    allocator.Dispatch((inp.Extent >> i) / 16, (inp.Extent >> i) / 16, 1);
+  }
+}

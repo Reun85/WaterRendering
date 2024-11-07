@@ -44,11 +44,6 @@ cbuffer PSProperties : register(b2)
 };
 
 
-
-
-
-
-
 output_t calculate(float4 grad, float4 Screen, float3 localPos, float2 planeCoord)
 {
 
@@ -145,34 +140,47 @@ struct input_t
 
 
 
-float2 readConeMap(
+float3 readConeMap(
     float2 uv
 )
 {
     float height = 0;
     float slope = 999999;
+    float mult = 0;
     if (has_flag(debugValues.flags, 3))
     {
         
         float2 t = _coneMap1.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.x), 0);
         height += t.x;
-        slope = min(slope, t.y);
+        if (slope > t.y)
+        {
+            slope = t.y;
+            mult = debugValues.patchSizes.x;
+        }
     }
     if (has_flag(debugValues.flags, 4))
     {
         float2 t = _coneMap2.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.y), 0);
         height += t.x;
-        slope = min(slope, t.y);
+        if (slope > t.y)
+        {
+            slope = t.y;
+            mult = debugValues.patchSizes.y;
+        }
     }
     if (has_flag(debugValues.flags, 5))
     {
         float2 t = _coneMap3.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.z), 0);
         height += t.x;
-        slope = min(slope, t.y);
+        if (slope > t.y)
+        {
+            slope = t.y;
+            mult = debugValues.patchSizes.z;
+        }
     }
 
 
-    return float2(height, slope);
+    return float3(height, slope, mult);
 }
 
 float4 readGrad(float2 uv)
@@ -190,21 +198,10 @@ float4 readGrad(float2 uv)
 
 
 
-struct Ray
+float ConeApprox(
+float y, float sinB, float cosB, float tanA)
 {
-    float3 p, v;
-};
-
-struct Intersection
-{
-
-    float t;
-    float2 uv;
-};
-float ray_coneapprox(
-float y, float sinB, float cosB, float cotA)
-{
-    return cotA * y / (sinB - cosB * cotA);
+    return tanA * y / (sinB - cosB * tanA);
 }
 
 float dcell(float p, float v, float size)
@@ -222,46 +219,60 @@ float dcell(float2 p, float2 v, float size)
 //https://github.com/Bundas102/robust-cone-map/tree/master
 // for planes with normal (0,1,0)
 // and centered around (0,0,0)
+
+//#define TESTOUT
+
 float3 ParallaxConemarch(float3 viewPos, float3 localPos)
 {
-    Ray ray;
-    ray.p = viewPos;
-    ray.v = localPos - ray.p;
-    float t = length(ray.v);
-    ray.v /= t;
+    float3 rayp = viewPos;
+    float3 rayv = localPos - rayp;
+    float t = length(rayv);
+    rayv /= t;
     
+    
+    float acc = 0;
     
     const uint maxSteps =
-    1000;
-    //debugValues.maxConeStep;
+        300;
+        //debugValues.maxConeStep;
     const float map_height = 1.;
-    float t_all = map_height / abs(ray.v.y) * debugValues.patchSizes.r;
-    //t += t_all;
-    float dt; // = t_all / float(maxSteps);
+    float dt;
     float3 p = localPos;
-    float sinB = sqrt(1. - ray.v.y * ray.v.y);
-    int i = 0;
+    float sinB = sqrt(1. - rayv.y * rayv.y);
+    int i;
     for (i = 0; i < maxSteps; ++i)
     {
-        float2 dat = readConeMap(p.xz);
+        float3 dat = readConeMap(p.xz);
 
-        float L = dat.y;
-        float y = dat.x - p.y;
+        float h = dat.x;
+        float tan = dat.y;
+        float mult = dat.z;
+        float y = h - p.y;
         if (y < 0.0)
+        {
+        
+            acc = 0;
+        
             break;
-        dt = max(
-         ray_coneapprox(y, sinB, ray.v.y, L) * debugValues.patchSizes.r,
+        }
+
+
+        dt = //max(
+         ConeApprox(y, sinB, rayv.y, tan * DISP_MAP_SIZE * mult);
 
         // ensure we atleast reach a new data holding texel.
-        dcell(p.xz, ray.v.xz, DISP_MAP_SIZE) * debugValues.patchSizes.r
+        //dcell(p.xz, rayv.xz, DISP_MAP_SIZE) * mult;
+        //);
 
-        );
-
+        acc += dt;
         t = t - dt;
-        p = ray.p + t * ray.v;
+        p = rayp + t * rayv;
 
     }
-    //return float3(i, i, i) / maxSteps;
+#ifdef TESTOUT
+    float x = acc / 10;
+    return float3(x, x, x);
+#endif
     return p;
 }
 
@@ -269,7 +280,6 @@ float3 ParallaxConemarch(float3 viewPos, float3 localPos)
 // Ran once per output vertex
 output_t main(input_t input) : SV_TARGET
 {
-    const bool apply_disp = true;
     
     float2 planeCoord = input.planeCoord;
     const float3 viewPos = camConstants.cameraPos;
@@ -278,12 +288,13 @@ output_t main(input_t input) : SV_TARGET
     //output.albedo = float4(readConeMap(float3(planeCoord.x, 0, planeCoord.y).xz) / 10., 1, 1);
         
     float3 localPos = ParallaxConemarch(viewPos - center, float3(planeCoord.x, 0, planeCoord.y));
-    //output_t output;
-    //localPos = float3(1, 1, 1);
-    //output.albedo = float4(localPos, 1);
-    //output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
-    //output.materialValues = float4(0, 0, 0, 0);
-    //return output;
+#ifdef TESTOUT
+    output_t output;
+    output.albedo = float4(localPos, 1);
+    output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
+    output.materialValues = float4(0, 0, 0, -1);
+    return output;
+#endif
     planeCoord = localPos.xz;
     localPos += center;
     

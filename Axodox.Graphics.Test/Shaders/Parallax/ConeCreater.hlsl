@@ -22,30 +22,25 @@ cbuffer Test : register(b9)
 
 groupshared float cache[M + K * 2][M + K * 2];
 
-// The + are overhangs
-[numthreads(M + K * 2, M + K * 2, 1)]
-void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3 GTid : SV_GroupID)
+
+#define L(i,j) ta=max(ta,(cache[px.x +i][px.y+j]-h0)*rsqrt(float(i*i+j*j)))
+
+
+float naive_method(uint2 px)
 {
-   
-    int2 groupID = GTid.xy;
-    int2 threadID = LTid.xy;
-
+    float ta = 0.;
+    float h0 = cache[px.x][px.y].x;
+    L(-2, -2);L(-1, -2);L(+0, -2);L(+1, -2);L(+2, -2);
+    L(-2, -1);L(-1, -1);L(+0, -1);L(+1, -1);L(+2, -1);
+    L(-2, +0);L(-1, +0);L(+1, +0);L(+2, +0);
+    L(-2, +1);L(-1, +1);L(+0, +1);L(+1, +1);L(+2, +1);
+    L(-2, +2);L(-1, +2);L(+0, +2);L(+1, +2);L(+2, +2);
+    return ta;
+}
+float smart_method(uint2 threadID)
+{
     
-    int2 loc = (groupID * M + threadID.xy - K) & (DISP_MAP_SIZE - 1);
-    float h = displacement.Load(int3(loc, 0)).y;
-    // rescale to 0,1    
-    h = ((h + 5.) / 10.);
-    cache[threadID.x][threadID.y] = h;
-
-    GroupMemoryBarrierWithGroupSync();
-
-    // These threads only exist to read from texture into groupshared mem
-    if (threadID.x < K || threadID.y < K || threadID.x >= M + K || threadID.y >= M + K)
-    {
-        return;
-    }
-
-    float ta = 1.;
+    float ta = 1.0;
     float hij = cache[threadID.x][threadID.y];
 
     [unroll]
@@ -73,17 +68,52 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3
             if (h00 > h10 || h00 > h01 || h10 > h11 || h01 > h11)
             {
                 float distance = sqrt(k * k + l * l);
-                ta = min(ta, distance / (hkl - hij));
+                ta = min(ta,
+                distance / (hkl - hij) / DISP_MAP_SIZE);
             }
         }
     }
+    return ta;
+
+}
+
+
+// The + are overhangs
+[numthreads(M + K * 2, M + K * 2, 1)]
+void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3 GTid : SV_GroupID)
+{
+   
+    int2 groupID = GTid.xy;
+    int2 threadID = LTid.xy;
+
+    
+    int2 loc = (groupID * M + threadID.xy - K) & (DISP_MAP_SIZE - 1);
+    float h = displacement.Load(int3(loc, 0)).y;
+    // rescale to 0,1    
+    h = ((h + 5.) / 10.);
+    cache[threadID.x][threadID.y] = h;
+
+    GroupMemoryBarrierWithGroupSync();
+
+    // These threads only exist to read from texture into groupshared mem
+    if (threadID.x < K || threadID.y < K || threadID.x >= M + K || threadID.y >= M + K)
+    {
+        return;
+    }
+
+    float hij = cache[threadID.x][threadID.y];
+    float ta = smart_method(threadID);
+    //float ta = naive_method(threadID);
+    
+    
     //ta = ta * DISP_MAP_SIZE;
     // or is it
     const float PATCH_SIZE = constants.patchSize;
-       // Why the div by 2?
-    const float TILE_SIZE = PATCH_SIZE / float(DISP_MAP_SIZE) / 2.;
+    // Why the div by 2?
+    float NN = float(DISP_MAP_SIZE);
+    const float TILE_SIZE = PATCH_SIZE / NN;
 
-    ta = ta * TILE_SIZE;
+    // ta = ta * TILE_SIZE  ;// * NN * NN;
     // ?
 
 

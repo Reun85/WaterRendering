@@ -144,3 +144,50 @@ struct ParallaxDraw : ShaderJob {
   void Run(CommandAllocator &allocator, const Inp &inp) const;
   ~ParallaxDraw() override = default;
 };
+
+struct MixMaxCompute : ShaderJob {
+  struct ShaderMask : public RootSignatureMask {
+    // In
+    // Texture2D<float4>
+    // should change to float
+    RootDescriptorTable<1> ReadTexture;
+
+    RootDescriptor<RootDescriptorType::ConstantBuffer> ComputeConstants;
+
+    // Out
+    // Texture2D<float2>
+    RootDescriptorTable<1> WriteTexture;
+
+    explicit ShaderMask(const RootSignatureContext &context)
+        : RootSignatureMask(context),
+          ReadTexture(this, {DescriptorRangeType::ShaderResource, {0}}),
+          ComputeConstants(this, {0}),
+          WriteTexture(this, {DescriptorRangeType::UnorderedAccess, {1}})
+
+    {
+      Flags = RootSignatureFlags::None;
+    }
+  };
+  struct Inp {
+    // Mip level 0 should be set by somewhere else
+    MutableTexture *texture;
+    const u32 mipLevels;
+    const u32 Extent;
+  };
+
+  RootSignature<ShaderMask> Signature;
+  PipelineState pipeline;
+
+  MixMaxCompute(PipelineStateProvider &pipelineProvider, GraphicsDevice &device,
+                ComputeShader *cs);
+
+  static MixMaxCompute
+  WithDefaultShaders(PipelineStateProvider &pipelineProvider,
+                     GraphicsDevice &device);
+  void Pre(CommandAllocator &allocator) const override {
+    pipeline.Apply(allocator);
+  }
+  void Run(CommandAllocator &allocator, DynamicBufferManager &buffermanager,
+           const Inp &inp) const;
+  ~MixMaxCompute() override = default;
+};

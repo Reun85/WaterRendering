@@ -213,8 +213,8 @@ SimulationData SimulationData::Default() {
                      .Depth = Depth,
                      .Highest =
                          {
-                             .displacementLambda = float3(0.f, 0.9f, 0.0f),
-                             .patchSize = 5.f,
+                             .displacementLambda = float3(0.f, 2.0f, 0.0f),
+                             .patchSize = 12.f,
                              .foamExponentialDecay = 0.320f,
                              .Amplitude = 0.005f,
                              .WindForce = 9,
