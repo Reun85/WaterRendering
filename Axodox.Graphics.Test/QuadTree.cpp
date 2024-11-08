@@ -3,8 +3,9 @@
 #include <array>
 
 ConstQuadTreeLeafIteratorDepthFirst::ConstQuadTreeLeafIteratorDepthFirst(
-    const NodeID node, const Depth maxDepth, const QuadTree &_tree)
-    : node(node), path(maxDepth), tree(_tree) {
+    const NodeID node, const Depth maxDepth, const QuadTree &_tree,
+    const TravelOrder &_order)
+    : node(node), path(maxDepth + 2), tree(_tree), order(_order) {
   path.clear();
   path.push_back(-1);
   IterateTillLeaf();
@@ -20,7 +21,6 @@ ConstQuadTreeLeafIteratorDepthFirst &
 ConstQuadTreeLeafIteratorDepthFirst::operator++() noexcept {
 
   AdjustNode();
-  IterateTillLeaf();
   return *this;
 }
 
@@ -133,33 +133,48 @@ ConstQuadTreeLeafIteratorDepthFirst::GetSmallerNeighbor() const {
 }
 inline void ConstQuadTreeLeafIteratorDepthFirst::AdjustNode() {
 
-  const auto curr_id = node;
-
-  if (curr_id + 1 == tree.GetAt(node).children[0]) {
+  /// if the id+1 is the first child of the parent,
+  /// then its has children: recurse!
+  if (tree.GetAt(node).HasChildren()) {
     // Child node
-    path.push_back(0);
-  } else if (path.back() != 3) {
-    // Sibling node
-    path.back()++;
+
+    ChildrenID dir = order.directionStart;
+    node = tree.GetAt(node).children[dir];
+    path.push_back(dir);
   } else {
-    while (path.back() == 3) {
-      path.pop_back();
+    if (order.directions[path.back()] != 9) {
+      // Sibling node
+    } else {
+      while (path.back() != -1 && order.directions[path.back()] == 9) {
+        path.pop_back();
+        node = tree.GetAt(node).parent;
+      }
     }
-    path.back()++;
+    // we are empty
+    if (path.back() == -1) {
+      node = tree.GetSize();
+      return;
+    } else {
+      ChildrenID dir = order.directions[path.back()];
+      node = tree.GetAt(tree.GetAt(node).parent).children[dir];
+      path.back() = dir;
+    }
   }
-  node++;
+  IterateTillLeaf();
 }
 
 void ConstQuadTreeLeafIteratorDepthFirst::IterateTillLeaf() {
   while (tree.GetAt(node).HasChildren()) {
-    AdjustNode();
+    ChildrenID dir = order.directionStart;
+    node = tree.GetAt(node).children[dir];
+    path.push_back(dir);
   }
 }
 
-void QuadTree::Build(const float3 center, const float2 fullSizeXZ,
-                     const float3 camEye, const Frustum &f,
-                     const XMMATRIX &mMatrix,
-                     const float quadTreeDistanceThreshold) {
+void QuadTree::Build(const float3 &center, const float2 &fullSizeXZ,
+                     const float3 &camEye, const float3 &camDir,
+                     const Frustum &f, const XMMATRIX &mMatrix,
+                     const float &quadTreeDistanceThreshold) {
 
   // zero it out, especially the children part
   memset(&nodes[0], 0, sizeof(Node) * nodes.size());
@@ -167,6 +182,7 @@ void QuadTree::Build(const float3 center, const float2 fullSizeXZ,
   nodes[0] = {{center.x, center.z}, {fullSizeXZ.x, fullSizeXZ.y}};
   count = 1;
   height = 0;
+  order = TravelOrder(camDir, mMatrix);
   BuildRecursively(0, center.y, camEye, quadTreeDistanceThreshold, 0, f,
                    mMatrix);
 }
@@ -219,4 +235,48 @@ void QuadTree::BuildRecursively(const uint index, const float yCoordinate,
                        depth + 1, f, mMatrix);
     }
   }
+}
+
+TravelOrder::TravelOrder(const float3 &camForward, const XMMATRIX &mMatrix) {
+  XMVECTOR forwardXZ = XMVectorSet(camForward.x, 0.0f, camForward.z, 0.0f);
+  forwardXZ = XMVector3Normalize(forwardXZ);
+
+  // World space coordinates of the plane centers
+  XMVECTOR Q1 =
+      XMVector3TransformCoord(XMVectorSet(-1.0f, 0.0f, -1.0f, 1.0f), mMatrix);
+  XMVECTOR Q2 =
+      XMVector3TransformCoord(XMVectorSet(1.0f, 0.0f, -1.0f, 1.0f), mMatrix);
+  XMVECTOR Q3 =
+      XMVector3TransformCoord(XMVectorSet(1.0f, 0.0f, 1.0f, 1.0f), mMatrix);
+  XMVECTOR Q4 =
+      XMVector3TransformCoord(XMVectorSet(-1.0f, 0.0f, 1.0f, 1.0f), mMatrix);
+
+  // Center of the square in world space
+  XMVECTOR center =
+      XMVector3TransformCoord(XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f), mMatrix);
+
+  // Direction vectors from center to each corner
+  XMVECTOR D1 = XMVector3Normalize(XMVectorSubtract(Q1, center));
+  XMVECTOR D2 = XMVector3Normalize(XMVectorSubtract(Q2, center));
+  XMVECTOR D3 = XMVector3Normalize(XMVectorSubtract(Q3, center));
+  XMVECTOR D4 = XMVector3Normalize(XMVectorSubtract(Q4, center));
+
+  // Dot products with forward direction
+  float dot1 = XMVector3Dot(D1, forwardXZ).m128_f32[0];
+  float dot2 = XMVector3Dot(D2, forwardXZ).m128_f32[0];
+  float dot3 = XMVector3Dot(D3, forwardXZ).m128_f32[0];
+  float dot4 = XMVector3Dot(D4, forwardXZ).m128_f32[0];
+
+  std::array<float, 4> values = {{dot1, dot2, dot3, dot4}};
+
+  std::array<u8, 4> indices = {0, 1, 2, 3};
+
+  std::ranges::sort(indices,
+                    [&values](int a, int b) { return values[a] < values[b]; });
+
+  directionStart = indices[0];
+  for (int i = 0; i < 3; ++i) {
+    directions[indices[i]] = indices[i + 1];
+  }
+  directions[indices[3]] = 9;
 }

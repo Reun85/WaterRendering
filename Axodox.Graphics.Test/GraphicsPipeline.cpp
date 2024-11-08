@@ -291,14 +291,19 @@ WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
   float3 center = {0, 0, 0};
   QuadTree qt;
   XMFLOAT3 camUsedPos;
-  XMVECTOR camEye = cam.GetEye();
-  XMStoreFloat3(&camUsedPos, camEye);
+  XMVECTOR tmp = cam.GetEye();
+  XMStoreFloat3(&camUsedPos, tmp);
+  XMFLOAT3 camDir;
+  tmp = cam.GetForward();
+  XMStoreFloat3(&camDir, tmp);
 
   decltype(std::chrono::high_resolution_clock::now()) start;
   if (runtimeResults)
     start = std::chrono::high_resolution_clock::now();
 
   qt.Build(center, fullSizeXZ, float3(camUsedPos.x, camUsedPos.y, camUsedPos.z),
+           float3(camDir.x, camDir.y, camDir.z),
+
            cam.GetFrustum(), mMatrix, quadTreeDistanceThreshold);
 
   if (runtimeResults) {

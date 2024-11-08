@@ -39,10 +39,23 @@ struct Node {
 
 class QuadTree;
 
+struct TravelOrder {
+
+  TravelOrder() = default;
+  TravelOrder(const TravelOrder &) = default;
+  TravelOrder(TravelOrder &&) = default;
+  TravelOrder(const float3 &camDir, const XMMATRIX &mMatrix);
+  TravelOrder &operator=(const TravelOrder &) = default;
+  TravelOrder &operator=(TravelOrder &&) = default;
+  std::array<ChildrenID, 4> directions = {1, 2, 3, 9};
+  u8 directionStart = 0;
+};
+
 class ConstQuadTreeLeafIteratorDepthFirst {
 public:
   ConstQuadTreeLeafIteratorDepthFirst(const NodeID node, const Depth maxDepth,
-                                      const QuadTree &_tree);
+                                      const QuadTree &_tree,
+                                      const TravelOrder &order);
 
   ConstQuadTreeLeafIteratorDepthFirst &operator++() noexcept;
   const Node &operator*() const;
@@ -84,6 +97,7 @@ private:
   // Path to get current leaf
   std::vector<ChildrenID> path;
   const QuadTree &tree;
+  const TravelOrder order;
 };
 // The plane must be perpendicular to the Y-axis.
 class QuadTree {
@@ -99,11 +113,13 @@ public:
 
   QuadTree(const uint allocation = 20000) : nodes(allocation) {}
   void
-  Build(const float3 center, const float2 fullSizeXZ, const float3 camEye,
-        const Frustum &f, const XMMATRIX &mMatrix,
-        const float quadTreeDistanceThreshold = Defaults::DistanceThreshold);
+  Build(const float3 &center, const float2 &fullSizeXZ, const float3 &camEye,
+        const float3 &camDir, const Frustum &f, const XMMATRIX &mMatrix,
+        const float &quadTreeDistanceThreshold = Defaults::DistanceThreshold);
   const value_type &GetRoot() const { return nodes[0]; }
-  const_iterator begin() const { return const_iterator(0, height, *this); }
+  const_iterator begin() const {
+    return const_iterator(0, height, *this, order);
+  }
   const value_type &GetAt(NodeID id) const { return nodes[id]; }
   NodeID end() const { return GetSize(); }
   const NodeID &GetSize() const { return count; }
@@ -121,4 +137,5 @@ private:
   Depth height = 0;
   Depth maxDepth = Defaults::maxDepth;
   Depth minDepth = Defaults::minDepth;
+  TravelOrder order;
 };
