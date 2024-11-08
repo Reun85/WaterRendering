@@ -89,8 +89,14 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3
     
     int2 loc = (groupID * M + threadID.xy - K) & (DISP_MAP_SIZE - 1);
     float h = displacement.Load(int3(loc, 0)).y;
-    // rescale to 0,1    
-    h = ((h + 5.) / 10.);
+    
+    
+    // Rescale h!
+    // TODO: 
+    h += 2;
+    
+    
+    
     cache[threadID.x][threadID.y] = h;
 
     GroupMemoryBarrierWithGroupSync();

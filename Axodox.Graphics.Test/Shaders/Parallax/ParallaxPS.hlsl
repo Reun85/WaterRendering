@@ -152,33 +152,35 @@ float3 readConeMap(
         
         float2 t = _coneMap1.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.x), 0);
         height += t.x;
+        float cmult = debugValues.patchSizes.x;
         if (slope > t.y)
         {
             slope = t.y;
-            mult = debugValues.patchSizes.x;
+            mult = cmult;
         }
     }
     if (has_flag(debugValues.flags, 4))
     {
         float2 t = _coneMap2.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.y), 0);
         height += t.x;
+        float cmult = debugValues.patchSizes.y;
         if (slope > t.y)
         {
             slope = t.y;
-            mult = debugValues.patchSizes.y;
+            mult = cmult;
         }
     }
     if (has_flag(debugValues.flags, 5))
     {
         float2 t = _coneMap3.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.z), 0);
         height += t.x;
+        float cmult = debugValues.patchSizes.z;
         if (slope > t.y)
         {
             slope = t.y;
-            mult = debugValues.patchSizes.z;
+            mult = cmult;
         }
     }
-
 
     return float3(height, slope, mult);
 }
@@ -233,7 +235,7 @@ float3 ParallaxConemarch(float3 viewPos, float3 localPos)
     float acc = 0;
     
     const uint maxSteps =
-        300;
+        50;
         //debugValues.maxConeStep;
     const float map_height = 1.;
     float dt;
@@ -248,21 +250,20 @@ float3 ParallaxConemarch(float3 viewPos, float3 localPos)
         float tan = dat.y;
         float mult = dat.z;
         float y = h - p.y;
-        if (y < 0.0)
+        if (y < -0.001)
         {
-        
-            acc = 0;
-        
             break;
         }
 
 
-        dt = //max(
-         ConeApprox(y, sinB, rayv.y, tan * DISP_MAP_SIZE * mult);
+        dt = max(
+         ConeApprox(y, sinB, rayv.y, tan / mult) * mult,
 
         // ensure we atleast reach a new data holding texel.
-        //dcell(p.xz, rayv.xz, DISP_MAP_SIZE) * mult;
-        //);
+        dcell(p.xz, rayv.xz, DISP_MAP_SIZE) * debugValues.patchSizes.r
+        );
+        //dt = max(ConeApprox(y, sinB, rayv.y, tan * mult), dcell(p.xz, rayv.xz, DISP_MAP_SIZE) * mult);
+
 
         acc += dt;
         t = t - dt;
@@ -300,6 +301,7 @@ output_t main(input_t input) : SV_TARGET
     
     float4 grad = readGrad(planeCoord);
 
+    // Calculate color based of these attributes
     return calculate(grad, input.Position, localPos, planeCoord);
 }
 
