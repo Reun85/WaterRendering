@@ -241,38 +241,30 @@ TravelOrder::TravelOrder(const float3 &camForward, const XMMATRIX &mMatrix) {
   XMVECTOR forwardXZ = XMVectorSet(camForward.x, 0.0f, camForward.z, 0.0f);
   forwardXZ = XMVector3Normalize(forwardXZ);
 
-  // World space coordinates of the plane centers
-  XMVECTOR Q1 =
-      XMVector3TransformCoord(XMVectorSet(-1.0f, 0.0f, -1.0f, 1.0f), mMatrix);
-  XMVECTOR Q2 =
-      XMVector3TransformCoord(XMVectorSet(1.0f, 0.0f, -1.0f, 1.0f), mMatrix);
-  XMVECTOR Q3 =
-      XMVector3TransformCoord(XMVectorSet(1.0f, 0.0f, 1.0f, 1.0f), mMatrix);
-  XMVECTOR Q4 =
-      XMVector3TransformCoord(XMVectorSet(-1.0f, 0.0f, 1.0f, 1.0f), mMatrix);
+  XMVECTOR camBasedOffset = XMVECTOR{camForward.x >= 0 ? 1.f : -1.f, 0.f,
+                                     camForward.z >= 0 ? 1.f : -1.f, 0.f};
+  std::array<float, 4> values;
+  for (int i = 0; i < 4; ++i) {
+    // World space coordinates of the plane centers
+    XMVECTOR curr = XMVector3TransformCoord(
+        XMVectorSet(Node::childDirections[i].x / 2.f, 0.0f,
+                    Node::childDirections[i].y / 2.f, 1.0f),
+        mMatrix);
+    curr = XMVectorAdd(curr, camBasedOffset);
+    // Cam is at 0,0,0
 
-  // Center of the square in world space
-  XMVECTOR center =
-      XMVector3TransformCoord(XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f), mMatrix);
+    // we want high dot and low length
+    // we can play around with dot^n and length^(-m)
+    float length = XMVectorGetX(XMVector3Length(curr));
+    float dot1 = XMVectorGetX(XMVector3Dot(curr, forwardXZ));
 
-  // Direction vectors from center to each corner
-  XMVECTOR D1 = XMVector3Normalize(XMVectorSubtract(Q1, center));
-  XMVECTOR D2 = XMVector3Normalize(XMVectorSubtract(Q2, center));
-  XMVECTOR D3 = XMVector3Normalize(XMVectorSubtract(Q3, center));
-  XMVECTOR D4 = XMVector3Normalize(XMVectorSubtract(Q4, center));
+    values[i] = dot1 / (length * length);
+  }
 
-  // Dot products with forward direction
-  float dot1 = XMVector3Dot(D1, forwardXZ).m128_f32[0];
-  float dot2 = XMVector3Dot(D2, forwardXZ).m128_f32[0];
-  float dot3 = XMVector3Dot(D3, forwardXZ).m128_f32[0];
-  float dot4 = XMVector3Dot(D4, forwardXZ).m128_f32[0];
-
-  std::array<float, 4> values = {{dot1, dot2, dot3, dot4}};
-
-  std::array<u8, 4> indices = {0, 1, 2, 3};
+  std::array<ChildrenID, 4> indices = {0, 1, 2, 3};
 
   std::ranges::sort(indices,
-                    [&values](int a, int b) { return values[a] < values[b]; });
+                    [&values](int a, int b) { return values[a] > values[b]; });
 
   directionStart = indices[0];
   for (int i = 0; i < 3; ++i) {
