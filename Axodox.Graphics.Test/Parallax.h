@@ -145,6 +145,90 @@ struct ParallaxDraw : ShaderJob {
   ~ParallaxDraw() override = default;
 };
 
+struct PrismParallaxDraw : ShaderJob {
+  struct ShaderMask : public RootSignatureMask {
+
+    RootDescriptor<RootDescriptorType::ConstantBuffer> cameraBuffer;
+    RootDescriptor<RootDescriptorType::ConstantBuffer> modelBuffer;
+    RootDescriptor<RootDescriptorType::ConstantBuffer> debugBuffer;
+    RootDescriptor<RootDescriptorType::ConstantBuffer> waterPBRBuffer;
+
+    // Optional
+    RootDescriptorTable<1> texture;
+
+    RootDescriptorTable<1> coneMapHighest;
+    RootDescriptorTable<1> coneMapMedium;
+    RootDescriptorTable<1> coneMapLowest;
+    RootDescriptorTable<1> gradientsHighest;
+    RootDescriptorTable<1> gradientsMedium;
+    RootDescriptorTable<1> gradientsLowest;
+
+    StaticSampler _textureSampler;
+
+    explicit ShaderMask(const RootSignatureContext &context)
+        : RootSignatureMask(context),
+          cameraBuffer(this, {0}, ShaderVisibility::All),
+          modelBuffer(this, {1}, ShaderVisibility::All),
+          debugBuffer(this, {9}, ShaderVisibility::All),
+          waterPBRBuffer(this, {2}, ShaderVisibility::Pixel),
+
+          texture(this, {DescriptorRangeType::ShaderResource, {9}},
+                  ShaderVisibility::Pixel),
+          coneMapHighest(this, {DescriptorRangeType::ShaderResource, {0}},
+                         ShaderVisibility::Pixel),
+          coneMapMedium(this, {DescriptorRangeType::ShaderResource, {1}},
+                        ShaderVisibility::Pixel),
+          coneMapLowest(this, {DescriptorRangeType::ShaderResource, {2}},
+                        ShaderVisibility::Pixel),
+          gradientsHighest(this, {DescriptorRangeType::ShaderResource, {3}},
+                           ShaderVisibility::Pixel),
+          gradientsMedium(this, {DescriptorRangeType::ShaderResource, {4}},
+                          ShaderVisibility::Pixel),
+          gradientsLowest(this, {DescriptorRangeType::ShaderResource, {5}},
+                          ShaderVisibility::Pixel),
+          _textureSampler(this, {0}, Filter::Linear, TextureAddressMode::Wrap,
+                          ShaderVisibility::All) {
+      Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
+    }
+  };
+
+  struct ModelBuffers {
+    float3 center;
+    int padding = 0;
+    float2 scale;
+    GpuVirtualAddress Upload(DynamicBufferManager &bufferManager) {
+      return bufferManager.AddBuffer(this);
+    }
+  };
+
+  struct Inp {
+    const std::array<ShaderResourceView *const, 3> &coneMaps;
+    const std::array<ShaderResourceView *const, 3> &gradients;
+    std::optional<ShaderResourceView *const> texture;
+    GpuVirtualAddress modelBuffers;
+    GpuVirtualAddress cameraBuffer;
+    GpuVirtualAddress debugBuffers;
+    GpuVirtualAddress waterPBRBuffers;
+    ImmutableMesh &mesh;
+  };
+
+  RootSignature<ShaderMask> Signature;
+  PipelineState pipeline;
+
+  PrismParallaxDraw(PipelineStateProvider &pipelineProvider,
+                    GraphicsDevice &device, VertexShader *vs, PixelShader *ps,
+                    GeometryShader *gs);
+
+  static PrismParallaxDraw
+  WithDefaultShaders(PipelineStateProvider &pipelineProvider,
+                     GraphicsDevice &device);
+  void Pre(CommandAllocator &allocator) const override {
+    pipeline.Apply(allocator);
+  }
+  void Run(CommandAllocator &allocator, const Inp &inp) const;
+  ~PrismParallaxDraw() override = default;
+};
+
 struct MixMaxCompute : ShaderJob {
   struct ShaderMask : public RootSignatureMask {
     // In

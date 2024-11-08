@@ -115,3 +115,57 @@ void MixMaxCompute::Run(CommandAllocator &allocator,
     allocator.Dispatch((inp.Extent >> i) / 16, (inp.Extent >> i) / 16, 1);
   }
 }
+
+PrismParallaxDraw::PrismParallaxDraw(PipelineStateProvider &pipelineProvider,
+                                     GraphicsDevice &device, VertexShader *vs,
+                                     PixelShader *ps, GeometryShader *gs)
+    : Signature(device),
+      pipeline(
+          pipelineProvider
+              .CreatePipelineStateAsync(GraphicsPipelineStateDefinition{
+                  .RootSignature = &Signature,
+                  .VertexShader = vs,
+                  .GeometryShader = gs,
+                  .PixelShader = ps,
+                  .RasterizerState = RasterizerFlags::CullClockwise,
+                  .DepthStencilState = DepthStencilMode::WriteDepth,
+                  .InputLayout = VertexPositionNormalTexture::Layout,
+                  .TopologyType = PrimitiveTopologyType::Patch,
+                  .RenderTargetFormats = std::initializer_list(
+                      std::to_address(
+                          DeferredShading::GBuffer::GetGBufferFormats()
+                              .begin()),
+                      std::to_address(
+                          DeferredShading::GBuffer::GetGBufferFormats().end())),
+                  .DepthStencilFormat = Format::D32_Float})
+              .get()) {}
+
+PrismParallaxDraw
+PrismParallaxDraw::WithDefaultShaders(PipelineStateProvider &pipelineProvider,
+                                      GraphicsDevice &device) {
+  VertexShader vs(app_folder() / L"PrismParallaxVS.cso");
+  PixelShader ps(app_folder() / L"PrismParallaxPS.cso");
+  GeometryShader gs(app_folder() / L"PrismParallaxGS.cso");
+  return PrismParallaxDraw(pipelineProvider, device, &vs, &ps, &gs);
+}
+
+void PrismParallaxDraw::Run(CommandAllocator &allocator, const Inp &inp) const {
+  auto mask = Signature.Set(allocator, RootSignatureUsage::Graphics);
+
+  if (inp.texture)
+    mask.texture = **inp.texture;
+  mask.coneMapHighest = *inp.coneMaps[0];
+  mask.coneMapMedium = *inp.coneMaps[1];
+  mask.coneMapLowest = *inp.coneMaps[2];
+  mask.gradientsHighest = *inp.gradients[0];
+  mask.gradientsMedium = *inp.gradients[1];
+  mask.gradientsLowest = *inp.gradients[2];
+
+  mask.waterPBRBuffer = inp.waterPBRBuffers;
+
+  mask.debugBuffer = inp.debugBuffers;
+  mask.cameraBuffer = inp.cameraBuffer;
+  mask.modelBuffer = inp.modelBuffers;
+
+  inp.mesh.Draw(allocator);
+}

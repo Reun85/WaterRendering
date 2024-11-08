@@ -4,6 +4,7 @@
 #include "Simulation.h"
 #include "Helpers.h"
 #include "Parallax.h"
+#include "DebugValues.h"
 
 using namespace std;
 using namespace winrt;
@@ -268,7 +269,6 @@ struct FullPipeline {
   static FullPipeline Create(GraphicsDevice &device,
                              PipelineStateProvider &pipelineStateProvider);
 };
-
 void WaterSimulationComputeShader(
     SimulationStage::SimulationResources &simResource,
     SimulationStage::ConstantGpuSources<Axodox::Graphics::D3D12::MutableTexture>
@@ -278,6 +278,7 @@ void WaterSimulationComputeShader(
     SimulationStage::FullPipeline &fullSimPipeline,
     Axodox::Graphics::D3D12::CommandAllocator &computeAllocator,
     Axodox::Graphics::D3D12::GpuVirtualAddress timeDataBuffer, const u32 &N,
+    const DebugValues &debugValues,
     const std::array<bool, 3> useLod = {true, true, true});
 
 } // namespace SimulationStage

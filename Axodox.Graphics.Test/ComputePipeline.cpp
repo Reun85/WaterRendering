@@ -82,7 +82,7 @@ void SimulationStage::WaterSimulationComputeShader(
     SimulationStage::FullPipeline &fullSimPipeline,
     Axodox::Graphics::D3D12::CommandAllocator &computeAllocator,
     Axodox::Graphics::D3D12::GpuVirtualAddress timeDataBuffer, const u32 &N,
-    const std::array<bool, 3> useLod) {
+    const DebugValues &debugValues, const std::array<bool, 3> useLod) {
   struct LODData {
   public:
     SimulationStage::SimulationResources::LODDataBuffers &buffers;
@@ -288,7 +288,7 @@ void SimulationStage::WaterSimulationComputeShader(
   }
 
   // Create ConeMaps
-  {
+  if (debugValues.calculateParallax()) {
     fullSimPipeline.coneMapCreater.Pre(computeAllocator);
     for (const LODData &dat : lodData) {
       fullSimPipeline.coneMapCreater.Run(
