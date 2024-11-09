@@ -23,9 +23,10 @@ cbuffer ModelBuffer : register(b1)
 
 struct output_t
 {
-    float4 albedo;
-    float4 normal;
-    float4 materialValues;
+    float4 albedo : SV_Target0;
+    float4 normal : SV_Target1;
+    float4 materialValues : SV_Target2;
+    float depth : SV_Depth;
 };
 
 
@@ -224,7 +225,15 @@ float dcell(float2 p, float2 v, float size)
 
 //#define TESTOUT
 
-float3 ParallaxConemarch(float3 viewPos, float3 localPos)
+struct ConeMarchResult
+{
+    float3 pos;
+    uint flags; // 0 = hit,
+                // 1 = miss, or we did not find it
+};
+
+#define BIT(x) (1 << x)
+ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos)
 {
     float3 rayp = viewPos;
     float3 rayv = localPos - rayp;
@@ -266,19 +275,27 @@ float3 ParallaxConemarch(float3 viewPos, float3 localPos)
 
 
         acc += dt;
-        t = t - dt;
+        t = t + dt;
         p = rayp + t * rayv;
 
     }
+    ConeMarchResult res;
+    res.pos = p;
+    res.flags = 0;
+    res.flags |= (i == maxSteps ? BIT(1) : BIT(0));
+
 #ifdef TESTOUT
     float x = acc / 10;
-    return float3(x, x, x);
+    res.pos= float3(x, x, x);
 #endif
-    return p;
+
+    return res;
 }
 
 
 // Ran once per output vertex
+
+//[conservativeDepth(greater)]
 output_t main(input_t input) : SV_TARGET
 {
     
@@ -288,7 +305,13 @@ output_t main(input_t input) : SV_TARGET
     //output_t output;
     //output.albedo = float4(readConeMap(float3(planeCoord.x, 0, planeCoord.y).xz) / 10., 1, 1);
         
-    float3 localPos = ParallaxConemarch(viewPos - center, float3(planeCoord.x, 0, planeCoord.y));
+    ConeMarchResult res = ParallaxConemarch(viewPos - center, float3(planeCoord.x, 0, planeCoord.y));
+    if (res.flags & BIT(1))
+    {
+        // miss
+        discard;
+    }
+    float3 localPos = res.pos;
 #ifdef TESTOUT
     output_t output;
     output.albedo = float4(localPos, 1);
@@ -302,5 +325,12 @@ output_t main(input_t input) : SV_TARGET
     float4 grad = readGrad(planeCoord);
 
     // Calculate color based of these attributes
-    return calculate(grad, input.Position, localPos, planeCoord);
+    output_t output = calculate(grad, input.Position, localPos, planeCoord);
+
+    
+    // set depth
+    float4 screenPos = mul(float4(localPos, 1), camConstants.vpMatrix);
+    output.depth = screenPos.z / screenPos.w;
+
+    return output;
 }

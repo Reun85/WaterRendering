@@ -203,6 +203,75 @@ inline MeshDescription CreateBackwardsPlane(float size,
   return result;
 }
 
+// size ==2 means -1 to 1 coordinates
+inline MeshDescription CreateCubeWithoutBottom(float size) {
+  MeshDescription result;
+  size = size / 2;
+
+  // Vertices
+  VertexPosition *pVertex;
+  result.Vertices = BufferData(8, pVertex);
+
+  *pVertex++ = VertexPosition{XMFLOAT3{size, size, -size}};
+  *pVertex++ = VertexPosition{XMFLOAT3{size, size, size}};
+  *pVertex++ = VertexPosition{XMFLOAT3{-size, size, -size}};
+  *pVertex++ = VertexPosition{XMFLOAT3{-size, size, size}};
+
+  *pVertex++ = VertexPosition{XMFLOAT3{size, -size, -size}};
+  *pVertex++ = VertexPosition{XMFLOAT3{size, -size, size}};
+  *pVertex++ = VertexPosition{XMFLOAT3{-size, -size, -size}};
+  *pVertex++ = VertexPosition{XMFLOAT3{-size, -size, size}};
+
+  // Indices
+  uint32_t *pIndex;
+  result.Indices = BufferData(5 * 2 * 3, pIndex);
+
+  // Top Face (1, 2, 3, 4)
+  *pIndex++ = 0;
+  *pIndex++ = 2;
+  *pIndex++ = 1; // Triangle 1
+  *pIndex++ = 1;
+  *pIndex++ = 2;
+  *pIndex++ = 3; // Triangle 2
+
+  // Front Face (1, 3, 5, 7)
+  *pIndex++ = 0;
+  *pIndex++ = 4;
+  *pIndex++ = 2; // Triangle 1
+  *pIndex++ = 2;
+  *pIndex++ = 4;
+  *pIndex++ = 6; // Triangle 2
+
+  // Back Face (2, 4, 6, 8)
+  *pIndex++ = 1;
+  *pIndex++ = 3;
+  *pIndex++ = 5; // Triangle 1
+  *pIndex++ = 5;
+  *pIndex++ = 3;
+  *pIndex++ = 7; // Triangle 2
+
+  // Left Face (3, 4, 7, 8)
+  *pIndex++ = 2;
+  *pIndex++ = 6;
+  *pIndex++ = 3; // Triangle 1
+  *pIndex++ = 3;
+  *pIndex++ = 6;
+  *pIndex++ = 7; // Triangle 2
+
+  // Right Face (1, 2, 5, 6)
+  *pIndex++ = 0;
+  *pIndex++ = 1;
+  *pIndex++ = 4; // Triangle 1
+  *pIndex++ = 4;
+  *pIndex++ = 1;
+  *pIndex++ = 5; // Triangle 2
+
+  // Topology
+  result.Topology = PrimitiveTopology::TriangleList;
+
+  return result;
+}
+
 template <typename T, const size_t N>
 std::initializer_list<typename std::array<T, N>::value_type>
 to_initializer_list(const std::array<T, N> &arr) {

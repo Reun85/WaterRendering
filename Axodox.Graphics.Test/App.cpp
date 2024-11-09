@@ -396,6 +396,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                                        CreateBackwardsPlane(2, XMUINT2(2, 2))};
     ImmutableMesh skyboxMesh{immutableAllocationContext, CreateCube(2)};
     ImmutableMesh Box{immutableAllocationContext, CreateCube(2)};
+    ImmutableMesh BoxWithoutBottom{immutableAllocationContext,
+                                   CreateCubeWithoutBottom(2)};
 
     const CubeMapPaths paths = {.PosX = app_folder() / "Assets/skybox/px.png",
                                 .NegX = app_folder() / "Assets/skybox/nx.png",
