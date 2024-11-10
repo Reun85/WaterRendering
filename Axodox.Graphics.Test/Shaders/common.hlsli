@@ -247,3 +247,26 @@ struct SceneLights
 };
 
 #define byte_sized_object uint8_t
+
+
+struct ConeMarchResult
+{
+    float2 uv;
+    float height;
+    uint flags; // 0 = hit,
+                // 1 = miss, or we did not find it
+};
+
+#define BIT(x) (1 << x)
+#define CONSERVATIVE_STEP true
+
+// inverts a 3x3 matrix
+// input: the 3 columns of the matrix
+float3x3 invMat(float3 a, float3 b, float3 c)
+{
+    float3 r1 = cross(b, c);
+    float3 r2 = cross(c, a);
+    float3 r3 = cross(a, b);
+    float invDet = 1 / dot(r3, c);
+    return invDet * float3x3(r1, r2, r3);
+}

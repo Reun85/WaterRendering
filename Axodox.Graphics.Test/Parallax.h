@@ -150,6 +150,7 @@ struct PrismParallaxDraw : ShaderJob {
 
     RootDescriptor<RootDescriptorType::ConstantBuffer> cameraBuffer;
     RootDescriptor<RootDescriptorType::ConstantBuffer> modelBuffer;
+    RootDescriptor<RootDescriptorType::ConstantBuffer> vertexBuffer;
     RootDescriptor<RootDescriptorType::ConstantBuffer> debugBuffer;
     RootDescriptor<RootDescriptorType::ConstantBuffer> waterPBRBuffer;
 
@@ -169,8 +170,9 @@ struct PrismParallaxDraw : ShaderJob {
         : RootSignatureMask(context),
           cameraBuffer(this, {0}, ShaderVisibility::All),
           modelBuffer(this, {1}, ShaderVisibility::All),
+          vertexBuffer(this, {2}, ShaderVisibility::All),
           debugBuffer(this, {9}, ShaderVisibility::All),
-          waterPBRBuffer(this, {2}, ShaderVisibility::Pixel),
+          waterPBRBuffer(this, {3}, ShaderVisibility::Pixel),
 
           texture(this, {DescriptorRangeType::ShaderResource, {9}},
                   ShaderVisibility::Pixel),
@@ -193,9 +195,20 @@ struct PrismParallaxDraw : ShaderJob {
   };
 
   struct ModelBuffers {
-    float3 center;
-    int padding = 0;
-    float2 scale;
+    XMFLOAT4X4 mMatrix;
+    XMFLOAT4X4 mINVMatrix;
+    XMFLOAT3 center;
+    float PrismHeight;
+    GpuVirtualAddress Upload(DynamicBufferManager &bufferManager) {
+      return bufferManager.AddBuffer(this);
+    }
+  };
+  struct VertexData {
+    struct InstanceData {
+      XMFLOAT2 scaling;
+      XMFLOAT2 offset;
+    };
+    std::array<InstanceData, DefaultsValues::App::maxInstances> instanceData;
     GpuVirtualAddress Upload(DynamicBufferManager &bufferManager) {
       return bufferManager.AddBuffer(this);
     }
@@ -205,19 +218,20 @@ struct PrismParallaxDraw : ShaderJob {
     const std::array<ShaderResourceView *const, 3> &coneMaps;
     const std::array<ShaderResourceView *const, 3> &gradients;
     std::optional<ShaderResourceView *const> texture;
-    GpuVirtualAddress modelBuffers;
     GpuVirtualAddress cameraBuffer;
     GpuVirtualAddress debugBuffers;
     GpuVirtualAddress waterPBRBuffers;
+    GpuVirtualAddress modelBuffers;
     ImmutableMesh &mesh;
+    GpuVirtualAddress vertexData;
+    u32 N;
   };
 
   RootSignature<ShaderMask> Signature;
   PipelineState pipeline;
 
   PrismParallaxDraw(PipelineStateProvider &pipelineProvider,
-                    GraphicsDevice &device, VertexShader *vs, PixelShader *ps,
-                    GeometryShader *gs);
+                    GraphicsDevice &device, VertexShader *vs, PixelShader *ps);
 
   static PrismParallaxDraw
   WithDefaultShaders(PipelineStateProvider &pipelineProvider,

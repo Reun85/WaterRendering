@@ -14,11 +14,6 @@ cbuffer DebugBuffer : register(b9)
     DebugValues debugValues;
 }
 
-cbuffer ModelBuffer : register(b1)
-{
-    float3 center;
-    float2 scaling;
-};
 
 
 struct output_t
@@ -31,7 +26,7 @@ struct output_t
 
 
 
-cbuffer PSProperties : register(b2)
+cbuffer PSProperties : register(b3)
 {
     float3 Albedo;
     float Roughness;
@@ -132,12 +127,11 @@ Texture2D<float4> gradients3 : register(t5);
 
 struct input_t
 {
-    float4 Position : SV_POSITION;
-    float2 planeCoord : PLANECOORD;
+    float3 localPos : POSITION;
+    //float3 normal : NORMAL;
+    float4 screenPos : SV_Position;
+    uint instanceID : SV_InstanceID;
 };
-
-
-
 
 
 
@@ -198,6 +192,23 @@ float4 readGrad(float2 uv)
 
 
 
+cbuffer ModelBuffer : register(b1)
+{
+    float4x4 mMatrix;
+    float4x4 mINVMatrix;
+    float3 center;
+    float PrismHeight;
+}
+struct InstanceData
+{
+    float2 scaling;
+    float2 offset;
+};
+
+cbuffer VertexBuffer : register(b2)
+{
+    InstanceData instances[NUM_INSTANCES];
+};
 
 
 
@@ -225,15 +236,133 @@ float dcell(float2 p, float2 v, float size)
 
 //#define TESTOUT
 
-struct ConeMarchResult
-{
-    float3 pos;
-    uint flags; // 0 = hit,
-                // 1 = miss, or we did not find it
-};
 
 #define BIT(x) (1 << x)
-ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos)
+#define CONSERVATIVE_STEP true
+ConeMarchResult findIntersection_coneStepMapping(float2 uv, float3 viewDirT, uint maxSteps)
+{
+    float2 HMres = float2(DISP_MAP_SIZE, DISP_MAP_SIZE);
+    float2 u2 = uv - viewDirT.xy / viewDirT.z;
+
+    float3 ds = float3(u2 - uv, 1);
+    ds = normalize(ds);
+    float w = PrismHeight / HMres.x;
+    float iz = sqrt(1.0 - ds.z * ds.z); // = length(ds.xz)
+    float sc = 0;
+    float3 dat = readConeMap(uv);
+    int stepCount = 0;
+    float zTimesSc = 0.0;
+
+    float2 dirSign = float2(ds.x < 0 ? -1 : 1, ds.y < 0 ? -1 : 1) * 0.5 / HMres.xy;
+
+    float relax = 0.9;
+    
+    while (PrismHeight - ds.z * sc > dat.x && stepCount < maxSteps)
+    {
+        zTimesSc = ds.z * sc;
+#if CONSERVATIVE_STEP
+        const float2 p = uv + ds.xy * sc;
+        const float2 cellCenter = (floor(p * HMres.xy - .5) + 1) / HMres.xy;
+        const float2 wall = cellCenter + dirSign;
+        const float2 stepToCellBorder = (wall - p) / ds.xy;
+        w = min(stepToCellBorder.x, stepToCellBorder.y) * dat.z + 1e-5;
+#endif
+        sc += relax * max(w, (PrismHeight - zTimesSc - dat.x) * dat.y / (-dat.y / dat.z * ds.z + iz));
+        //sc += relax * ConeApprox(-(prismHeight - zTimesSc - dat.x), iz, -ds.z, dat.y / dat.z) * dat.z;
+        dat = readConeMap(uv + ds.xy * sc);
+        ++stepCount;
+    }
+    
+    ConeMarchResult ret;
+    float tt = ds.z * sc;
+    ret.uv = (1 - tt) * uv + tt * u2;
+    ret.height = tt;
+    return ret;
+}
+
+output_t main2(input_t input)
+{
+    
+    const float3 viewPos = camConstants.cameraPos;
+
+    float3 viewDirW = normalize(input.localPos - viewPos);
+    float3 T, B, N;
+    //float3 normal = input.normal;
+    float3 normal =
+    float3(0, 1, 0);
+
+    if (abs(normal.x) > 0.5)
+    {
+    // +X or -X face
+        N = float3(sign(normal.x), 0, 0);
+        T = float3(0, 0, -sign(normal.x));
+        B = float3(0, 1, 0);
+    }
+    else if (abs(normal.y) > 0.5)
+    {
+    // +Y or -Y face
+        N = float3(0, sign(normal.y), 0);
+        T = float3(1, 0, 0);
+        B = float3(0, 0, -sign(normal.y));
+    }
+    else if (abs(normal.z) > 0.5)
+    {
+    // +Z or -Z face
+        N = float3(0, 0, sign(normal.z));
+        T = float3(sign(normal.z), 0, 0);
+        B = float3(0, 1, 0);
+    }
+
+
+
+    float3 viewDirT = mul(viewDirW, transpose(invMat(T, B, N))); // Transform viewDirW to tangent space
+ 
+    //output_t output;
+    //output.albedo = float4(readConeMap(float3(planeCoord.x, 0, planeCoord.y).xz) / 10., 1, 1);
+        
+    float2 centerOfPatch = instances[input.instanceID].offset;
+    float2 halfExtentOfPatch = instances[input.instanceID].scaling;
+    ConeMarchResult res = findIntersection_coneStepMapping(input.localPos.xz - center.xz, viewDirT, debugValues.maxConeStep);
+    if (res.flags & BIT(2))
+    {
+        //output_t output;
+        //output.albedo = float4(1, 0, 0, 1);
+        //output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
+        //output.materialValues = float4(0, 0, 0, -1);
+        //return output;
+        discard;
+    }
+    if (res.flags & BIT(1))
+    {
+        // miss
+        discard;
+    }
+    float3 localPos = float3(res.uv.x, res.height, res.uv.y);
+#ifdef TESTOUT
+    output_t output;
+    output.albedo = float4(localPos, 1);
+    output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
+    output.materialValues = float4(0, 0, 0, -1);
+    return output;
+#endif
+    float2 planeCoord = localPos.xz;
+    localPos += center;
+    
+    float4 grad = readGrad(planeCoord);
+
+    // Calculate color based of these attributes
+    output_t output = calculate(grad, input.screenPos, localPos, planeCoord);
+
+    
+    // set depth
+    float4 screenPos = mul(mul(float4(localPos, 1), mMatrix), camConstants.vpMatrix);
+    output.depth = screenPos.z / screenPos.w;
+
+    return output;
+}
+
+
+ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos, float2 mid, float2 halfExtent)
 {
     float3 rayp = viewPos;
     float3 rayv = localPos - rayp;
@@ -242,23 +371,25 @@ ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos)
     
     
     float acc = 0;
+    ConeMarchResult res;
     
     const uint maxSteps =
-        50;
-        //debugValues.maxConeStep;
-    const float map_height = 1.;
+        debugValues.maxConeStep;
+    const float map_height = 2.;
     float dt;
-    float3 p = localPos;
+    float2 uv = localPos.xz;
     float sinB = sqrt(1. - rayv.y * rayv.y);
     int i;
+    const float2 eps = 0.1;
+    float3 dat;
     for (i = 0; i < maxSteps; ++i)
     {
-        float3 dat = readConeMap(p.xz);
+        dat = readConeMap(uv);
 
         float h = dat.x;
         float tan = dat.y;
         float mult = dat.z;
-        float y = h - p.y;
+        float y = rayp.y + t * rayv.y - h;
         if (y < -0.001)
         {
             break;
@@ -268,19 +399,25 @@ ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos)
         dt = max(
          ConeApprox(y, sinB, rayv.y, tan / mult) * mult,
 
-        // ensure we atleast reach a new data holding texel.
-        dcell(p.xz, rayv.xz, DISP_MAP_SIZE) * debugValues.patchSizes.r
+            // ensure we atleast reach a new data holding texel.
+            dcell(uv, rayv.xz, DISP_MAP_SIZE) * debugValues.patchSizes.r
         );
         //dt = max(ConeApprox(y, sinB, rayv.y, tan * mult), dcell(p.xz, rayv.xz, DISP_MAP_SIZE) * mult);
 
 
         acc += dt;
         t = t + dt;
-        p = rayp + t * rayv;
-
+        uv = rayp.xz + t * rayv.xz;
+        // if we went outside the bounds then classify as a miss, the next patch should calculate it!
+        if (any(abs(uv - mid) > halfExtent + eps))
+        //if ((abs(p.x - mid.x) > halfExtent.x + eps.x) || (abs(p.z - mid.y) > halfExtent.y + eps.y))
+        {
+            res.flags = BIT(2);
+            return res;
+        }
     }
-    ConeMarchResult res;
-    res.pos = p;
+    res.uv = uv;
+    res.height = dat.x;
     res.flags = 0;
     res.flags |= (i == maxSteps ? BIT(1) : BIT(0));
 
@@ -295,23 +432,41 @@ ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos)
 
 // Ran once per output vertex
 
-//[conservativeDepth(greater)]
-output_t main(input_t input) : SV_TARGET
+output_t main(input_t input)
 {
     
-    float2 planeCoord = input.planeCoord;
     const float3 viewPos = camConstants.cameraPos;
        
     //output_t output;
     //output.albedo = float4(readConeMap(float3(planeCoord.x, 0, planeCoord.y).xz) / 10., 1, 1);
         
-    ConeMarchResult res = ParallaxConemarch(viewPos - center, float3(planeCoord.x, 0, planeCoord.y));
+    float2 centerOfPatch = instances[input.instanceID].offset;
+    float2 halfExtentOfPatch = instances[input.instanceID].scaling;
+    //if (any(abs(abs((input.localPos - center).xz - centerOfPatch) - halfExtentOfPatch) < 0.001))
+    //{
+    //    output_t output;
+    //    output.albedo = float4(1, 0, 0, 1);
+    //    output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
+    //    output.materialValues = float4(0, 0, 0, -1);
+    //    return output;
+    //}
+
+    ConeMarchResult res = ParallaxConemarch(viewPos - center, input.localPos - center, centerOfPatch, halfExtentOfPatch);
+    if (res.flags & BIT(2))
+    {
+        //output_t output;
+        //output.albedo = float4(1, 0, 0, 1);
+        //output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
+        //output.materialValues = float4(0, 0, 0, -1);
+        //return output;
+        discard;
+    }
     if (res.flags & BIT(1))
     {
         // miss
         discard;
     }
-    float3 localPos = res.pos;
+    float3 localPos = float3(res.uv.x, res.height, res.uv.y);
 #ifdef TESTOUT
     output_t output;
     output.albedo = float4(localPos, 1);
@@ -319,17 +474,17 @@ output_t main(input_t input) : SV_TARGET
     output.materialValues = float4(0, 0, 0, -1);
     return output;
 #endif
-    planeCoord = localPos.xz;
+    float2 planeCoord = localPos.xz;
     localPos += center;
     
     float4 grad = readGrad(planeCoord);
 
     // Calculate color based of these attributes
-    output_t output = calculate(grad, input.Position, localPos, planeCoord);
+    output_t output = calculate(grad, input.screenPos, localPos, planeCoord);
 
     
     // set depth
-    float4 screenPos = mul(float4(localPos, 1), camConstants.vpMatrix);
+    float4 screenPos = mul(mul(float4(localPos, 1), mMatrix), camConstants.vpMatrix);
     output.depth = screenPos.z / screenPos.w;
 
     return output;

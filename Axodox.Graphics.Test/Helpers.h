@@ -203,8 +203,8 @@ inline MeshDescription CreateBackwardsPlane(float size,
   return result;
 }
 
-// size ==2 means -1 to 1 coordinates
-inline MeshDescription CreateCubeWithoutBottom(float size) {
+inline MeshDescription
+CreateCubeWithoutBottom(float size, XMFLOAT3 offset = XMFLOAT3{0, 0, 0}) {
   MeshDescription result;
   size = size / 2;
 
@@ -221,6 +221,11 @@ inline MeshDescription CreateCubeWithoutBottom(float size) {
   *pVertex++ = VertexPosition{XMFLOAT3{size, -size, size}};
   *pVertex++ = VertexPosition{XMFLOAT3{-size, -size, -size}};
   *pVertex++ = VertexPosition{XMFLOAT3{-size, -size, size}};
+  for (int i = -(i32)result.Vertices.ItemCount(); i < 0; i++) {
+    pVertex[i].Position.x += offset.x;
+    pVertex[i].Position.y += offset.y;
+    pVertex[i].Position.z += offset.z;
+  }
 
   // Indices
   uint32_t *pIndex;

@@ -118,19 +118,19 @@ void MixMaxCompute::Run(CommandAllocator &allocator,
 
 PrismParallaxDraw::PrismParallaxDraw(PipelineStateProvider &pipelineProvider,
                                      GraphicsDevice &device, VertexShader *vs,
-                                     PixelShader *ps, GeometryShader *gs)
+                                     PixelShader *ps)
     : Signature(device),
       pipeline(
           pipelineProvider
               .CreatePipelineStateAsync(GraphicsPipelineStateDefinition{
                   .RootSignature = &Signature,
                   .VertexShader = vs,
-                  .GeometryShader = gs,
                   .PixelShader = ps,
                   .RasterizerState = RasterizerFlags::CullClockwise,
+                  //.RasterizerState = RasterizerFlags::Wireframe,
                   .DepthStencilState = DepthStencilMode::WriteDepth,
-                  .InputLayout = VertexPositionNormalTexture::Layout,
-                  .TopologyType = PrimitiveTopologyType::Patch,
+                  .InputLayout = VertexPosition::Layout,
+                  .TopologyType = PrimitiveTopologyType::Triangle,
                   .RenderTargetFormats = std::initializer_list(
                       std::to_address(
                           DeferredShading::GBuffer::GetGBufferFormats()
@@ -145,8 +145,7 @@ PrismParallaxDraw::WithDefaultShaders(PipelineStateProvider &pipelineProvider,
                                       GraphicsDevice &device) {
   VertexShader vs(app_folder() / L"PrismParallaxVS.cso");
   PixelShader ps(app_folder() / L"PrismParallaxPS.cso");
-  GeometryShader gs(app_folder() / L"PrismParallaxGS.cso");
-  return PrismParallaxDraw(pipelineProvider, device, &vs, &ps, &gs);
+  return PrismParallaxDraw(pipelineProvider, device, &vs, &ps);
 }
 
 void PrismParallaxDraw::Run(CommandAllocator &allocator, const Inp &inp) const {
@@ -166,6 +165,7 @@ void PrismParallaxDraw::Run(CommandAllocator &allocator, const Inp &inp) const {
   mask.debugBuffer = inp.debugBuffers;
   mask.cameraBuffer = inp.cameraBuffer;
   mask.modelBuffer = inp.modelBuffers;
+  mask.vertexBuffer = inp.vertexData;
 
-  inp.mesh.Draw(allocator);
+  inp.mesh.Draw(allocator, inp.N);
 }

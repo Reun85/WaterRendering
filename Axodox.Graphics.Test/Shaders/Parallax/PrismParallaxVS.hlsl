@@ -8,6 +8,9 @@ cbuffer CameraBuffer : register(b0)
 cbuffer ModelBuffer : register(b1)
 {
     float4x4 mMatrix;
+    float4x4 mINVMatrix;
+    float3 center;
+    float PrismHeight;
 };
 
 struct InstanceData
@@ -29,30 +32,27 @@ struct input_t
 
 struct output_t
 {
-    float2 planeCoord : PLANECOORD;
-    float3 localPosBottom : POSITION0;
-    float3 localPosTop : POSITION1;
-    float4 ScreenPosBottom : ScreenPos0;
-    float4 ScreenPosTop : ScreenPos1;
+    float3 localPos : POSITION;
+    float4 screenPos : SV_Position;
+    uint instanceID : SV_InstanceID;
 };
 
-float PrismHeight = 2.0f;
 
 output_t main(input_t input)
 {
+    const float eps = 0.1;
+
     output_t output;
 
     const float2 scaling = instances[input.instanceID].scaling;
     const float2 offset = instances[input.instanceID].offset;
+
     float2 texCoord = input.Position.xz * scaling + offset;
-    output.planeCoord = texCoord;
+    float3 localPos = float3(texCoord.x, input.Position.y > eps ? PrismHeight / 2 : 0, texCoord.y);
 
-    output.localPosBottom = float3(texCoord.x, 0, texCoord.y);
-    output.localPosTop = output.localPosBottom += float3(0.0f, PrismHeight, 0.0f);
-    output.localPosBottom = mul(float4(output.localPosBottom, 1), mMatrix).xyz;
-    output.localPosTop = mul(float4(output.localPosTop, 1), mMatrix).xyz;
+    output.localPos = localPos + center;
+    output.screenPos = mul(float4(localPos, 1), camConstants.vpMatrix);
+    output.instanceID = input.instanceID;
 
-    output.ScreenPosBottom = mul(float4(output.localPosBottom, 1), camConstants.vpMatrix);
-    output.ScreenPosTop = mul(float4(output.localPosTop, 1), camConstants.vpMatrix);
     return output;
 }

@@ -46,7 +46,7 @@ struct DebugValues {
   bool enableSSR = false;
   bool lockQuadTree = false;
   int maxConeStep = 10;
-  DrawMethod drawMethod = DrawMethod::Tesselation;
+  DrawMethod drawMethod = DrawMethod::Parallax;
   const static constexpr std::initializer_list<
       std::pair<u8, std::optional<const char *>>>
       DebugBitsDesc = {{2, "Use Foam"},

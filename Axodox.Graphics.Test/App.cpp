@@ -358,8 +358,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     ParallaxDraw parallaxDraw =
         ParallaxDraw::WithDefaultShaders(pipelineStateProvider, device);
 
-    // PrismParallaxDraw prismParallaxDraw =
-    //     PrismParallaxDraw::WithDefaultShaders(pipelineStateProvider, device);
+    PrismParallaxDraw prismParallaxDraw =
+        PrismParallaxDraw::WithDefaultShaders(pipelineStateProvider, device);
 
     WaterGraphicRootDescription::WaterPixelShaderData waterData;
     DeferredShading::DeferredShaderBuffers defData;
@@ -396,8 +396,11 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                                        CreateBackwardsPlane(2, XMUINT2(2, 2))};
     ImmutableMesh skyboxMesh{immutableAllocationContext, CreateCube(2)};
     ImmutableMesh Box{immutableAllocationContext, CreateCube(2)};
-    ImmutableMesh BoxWithoutBottom{immutableAllocationContext,
-                                   CreateCubeWithoutBottom(2)};
+    ImmutableMesh BoxWithoutBottom{
+        immutableAllocationContext,
+        CreateCubeWithoutBottom(1, XMFLOAT3{0, 0.5, 0})};
+    // ImmutableMesh BoxWithoutBottom{immutableAllocationContext,
+    // CreateCube(1)};
 
     const CubeMapPaths paths = {.PosX = app_folder() / "Assets/skybox/px.png",
                                 .NegX = app_folder() / "Assets/skybox/nx.png",
@@ -562,7 +565,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
       frameResource.MakeCompatible(*renderTargetView, mutableAllocationContext);
 
-      bool camChanged = cam.Update(deltaTime);
+      bool camChanged = cam.Update(deltaTime) || first_loop;
 
       // Frame Begin
       {
@@ -575,10 +578,11 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       RuntimeResults runtimeResults;
 
       auto oceanModelMatrix =
-          XMMatrixTranslationFromVector(XMVECTOR{0, -5, 0, 1});
+          XMMatrixTranslationFromVector(XMVECTOR{0, -5, 0, 0});
       std::future<std::vector<WaterGraphicRootDescription::OceanData> &>
           oceanDataFuture;
       if (debugValues.drawMethod == DebugValues::DrawMethod::Tesselation ||
+          debugValues.drawMethod == DebugValues::DrawMethod::PrismParallax ||
           first_loop) {
         oceanDataFuture = threadpool_execute<
             std::vector<WaterGraphicRootDescription::OceanData> &>(
@@ -606,6 +610,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         commonDescriptorHeap.Set(computeAllocator);
 
         // If a change has been issued change constant buffers
+
         if (newData.highestData || newData.mediumData || newData.lowestData) {
           auto copyRes = [&computeAllocator](const MutableTexture &src,
                                              const MutableTexture &dst) {
@@ -949,18 +954,27 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                        DebugValues::DrawMethod::PrismParallax) {
 
                 // Ocean Buffers
-                ParallaxDraw::ModelBuffers modelConstants{};
+                PrismParallaxDraw::ModelBuffers modelConstants{};
 
-                modelConstants.center = float3(0, -5, 0);
-                modelConstants.scale = float2(DefaultsValues::App::oceanSize,
-                                              DefaultsValues::App::oceanSize);
+                XMMATRIX modelMatrix =
+                    XMMatrixTranslationFromVector(XMVECTOR{0, 0.5, 0, 1});
+                modelMatrix = XMMatrixIdentity();
+                XMStoreFloat4x4(&modelConstants.mMatrix,
+                                XMMatrixTranspose(modelMatrix));
+
+                XMStoreFloat4x4(
+                    &modelConstants.mINVMatrix,
+                    XMMatrixTranspose(XMMatrixInverse(nullptr, modelMatrix)));
+
+                const float prismHeight = 3.f;
+                modelConstants.center = XMFLOAT3{0, -5, 0};
+                modelConstants.PrismHeight = prismHeight;
 
                 GpuVirtualAddress modelBuffer =
                     frameResource.DynamicBuffer.AddBuffer(modelConstants);
 
-                parallaxDraw.Pre(allocator);
-
-                ParallaxDraw::Inp inp{
+                prismParallaxDraw.Pre(allocator);
+                PrismParallaxDraw::Inp inp{
                     .coneMaps = {drawingSimResource.LODs[0]
                                      ->coneMapBuffer.ShaderResource(allocator),
                                  drawingSimResource.LODs[1]
@@ -975,17 +989,27 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                                 ->gradients.ShaderResource(allocator),
                             drawingSimResource.LODs[2]
                                 ->gradients.ShaderResource(allocator),
-
                         },
                     .texture = usedTextureAddress,
-                    .modelBuffers = modelBuffer,
                     .cameraBuffer = cameraConstantBuffer,
                     .debugBuffers = debugConstantBuffer,
                     .waterPBRBuffers = waterDataBuffer,
-                    .mesh = simplePlane,
+                    .modelBuffers = modelBuffer,
+                    .mesh = BoxWithoutBottom,
+                    .vertexData = GpuVirtualAddress(0),
 
                 };
-                parallaxDraw.Run(allocator, inp);
+
+                const auto &oceanQuadData = oceanDataFuture.get();
+                for (auto &curr : oceanQuadData) {
+                  if (curr.N == 0)
+                    continue;
+
+                  inp.vertexData = frameResource.DynamicBuffer.AddBuffer(
+                      curr.vertexConstants);
+                  inp.N = curr.N;
+                  prismParallaxDraw.Run(allocator, inp);
+                }
               }
             }
             // skybox

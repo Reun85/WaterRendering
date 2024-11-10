@@ -12,7 +12,7 @@ cbuffer Test : register(b9)
 #define LOG2_M 4
 #define M (1<<LOG2_M)
 // must be odd
-#define BOXSIZE 17
+#define BOXSIZE 5
 #define MHalf (M>>1)
 #define LOG2_N_DIV_M (DISP_MAP_LOG2-LOG2_M)
 #define N_DIV_M (1 << LOG2_N_DIV_M)
@@ -93,7 +93,7 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3
     
     // Rescale h!
     // TODO: 
-    h += 2;
+    h += 1;
     
     
     
