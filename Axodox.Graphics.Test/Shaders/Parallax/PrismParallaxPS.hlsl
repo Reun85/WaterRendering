@@ -432,6 +432,7 @@ ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos, float2 mid, f
 
 // Ran once per output vertex
 
+[earlydepthstencil]
 output_t main(input_t input)
 {
     

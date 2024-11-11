@@ -251,9 +251,9 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     CommandQueue directQueue{device};
     // CommandQueue computeQueue{device, /* CommandKind::Compute*/};
     CommandQueue &computeQueue = directQueue;
-    // CoreSwapChain swapChain{directQueue, window,
-    //  SwapChainFlags::IsTearingAllowed
-    //};
+    //  CoreSwapChain swapChain{directQueue, window,
+    //   SwapChainFlags::IsTearingAllowed
+    // };
     CoreSwapChain swapChain{directQueue, window, SwapChainFlags::Default};
 
     PipelineStateProvider pipelineStateProvider{device};
