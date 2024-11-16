@@ -28,7 +28,6 @@ SilhouetteDetector::Buffers::Buffers(ResourceAllocationContext &context,
       EdgeCountBuffer(context.ResourceAllocator->CreateBuffer(
           BufferDefinition(IndexCount * sizeof(EdgeCountBufferType),
                            BufferFlags::UnorderedAccess))),
-
       Edge(context, &*EdgeBuffer,
            BufferViewDefinitions{
                .ShaderResource =

@@ -109,11 +109,17 @@ MixMaxCompute::WithDefaultShaders(PipelineStateProvider &pipelineProvider,
 void MixMaxCompute::Run(CommandAllocator &allocator,
                         DynamicBufferManager &buffermanager,
                         const Inp &inp) const {
-  for (u32 i = 0; i < inp.mipLevels; ++i) {
-    auto mask = Signature.Set(allocator, RootSignatureUsage::Compute);
-    assert("not yet implemented");
-    allocator.Dispatch((inp.Extent >> i) / 16, (inp.Extent >> i) / 16, 1);
-  }
+  auto mask = Signature.Set(allocator, RootSignatureUsage::Compute);
+  Buffer buffers{.SrcMipLevel = 0,
+                 .NumMipLevels = inp.mipLevels,
+                 .TexelSize = float2(1., 1.) / float2(inp.Extent, inp.Extent)};
+  mask.ComputeConstants = buffermanager.AddBuffer(buffers);
+  mask.ReadTexture = *inp.texture;
+  mask.MipMap1 = *inp.mipMaps[0];
+  mask.MipMap2 = *inp.mipMaps[1];
+  mask.MipMap3 = *inp.mipMaps[2];
+  mask.MipMap4 = *inp.mipMaps[3];
+  allocator.Dispatch(inp.Extent >> 3, inp.Extent >> 3, 1);
 }
 
 PrismParallaxDraw::PrismParallaxDraw(PipelineStateProvider &pipelineProvider,
@@ -126,7 +132,7 @@ PrismParallaxDraw::PrismParallaxDraw(PipelineStateProvider &pipelineProvider,
                   .RootSignature = &Signature,
                   .VertexShader = vs,
                   .PixelShader = ps,
-                  .RasterizerState = RasterizerFlags::CullClockwise,
+                  .RasterizerState = RasterizerFlags::CullNone,
                   //.RasterizerState = RasterizerFlags::Wireframe,
                   .DepthStencilState = DepthStencilMode::WriteDepth,
                   .InputLayout = VertexPosition::Layout,
@@ -153,12 +159,18 @@ void PrismParallaxDraw::Run(CommandAllocator &allocator, const Inp &inp) const {
 
   if (inp.texture)
     mask.texture = **inp.texture;
+
   mask.coneMapHighest = *inp.coneMaps[0];
   mask.coneMapMedium = *inp.coneMaps[1];
   mask.coneMapLowest = *inp.coneMaps[2];
+
   mask.gradientsHighest = *inp.gradients[0];
   mask.gradientsMedium = *inp.gradients[1];
   mask.gradientsLowest = *inp.gradients[2];
+
+  mask.heightMapHighest = *inp.heightMaps[0];
+  mask.heightMapMedium = *inp.heightMaps[1];
+  mask.heightMapLowest = *inp.heightMaps[2];
 
   mask.waterPBRBuffer = inp.waterPBRBuffers;
 

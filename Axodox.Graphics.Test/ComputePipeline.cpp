@@ -59,6 +59,9 @@ FullPipeline SimulationStage::FullPipeline::Create(
   ConeMapCreater coneMapCreater =
       ConeMapCreater::WithDefaultShaders(pipelineStateProvider, device);
 
+  MixMaxCompute mixMaxCompute =
+      MixMaxCompute::WithDefaultShaders(pipelineStateProvider, device);
+
   return FullPipeline{.spektrumRootDescription = spektrumRootDescription,
                       .FFTRootDescription = FFTRootDescription,
                       .displacementRootDescription =
@@ -70,7 +73,8 @@ FullPipeline SimulationStage::FullPipeline::Create(
                       .displacementPipeline = displacementPipelineState.get(),
                       .gradientPipeline = gradientPipelineState.get(),
                       .foamDecayPipeline = foamDecayPipelineState.get(),
-                      .coneMapCreater = coneMapCreater};
+                      .coneMapCreater = coneMapCreater,
+                      .mixMaxCompute = mixMaxCompute};
 }
 
 void SimulationStage::WaterSimulationComputeShader(
@@ -284,6 +288,28 @@ void SimulationStage::WaterSimulationComputeShader(
       const auto sizeY = N;
       computeAllocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
                                 (sizeY + yGroupSize - 1) / yGroupSize, 1);
+    }
+  }
+
+  // Calculate Mix Max
+  {
+    for (const LODData &dat : lodData) {
+      dat.buffers.mixMaxDisplacementMap.UnorderedAccess(computeAllocator);
+    }
+    fullSimPipeline.mixMaxCompute.Pre(computeAllocator);
+
+    for (const LODData &dat : lodData) {
+      std::array<UnorderedAccessView *, 4> uavs;
+      for (int i = 0; i < 4; ++i) {
+        uavs[i] = &*dat.buffers.DisplacementMapMipsUAV[i];
+      }
+      fullSimPipeline.mixMaxCompute.Run(
+          computeAllocator, simResource.DynamicBuffer,
+          {.mipLevels = 4,
+           .Extent = N,
+           .texture =
+               dat.buffers.displacementMap.ShaderResource(computeAllocator),
+           .mipMaps = uavs});
     }
   }
 

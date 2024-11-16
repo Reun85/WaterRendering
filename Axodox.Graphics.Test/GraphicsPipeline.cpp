@@ -403,8 +403,7 @@ void BasicShader::Pre(CommandAllocator &allocator) const {
   pipeline.Apply(allocator);
 }
 
-void BasicShader::Run(CommandAllocator &allocator,
-                      DynamicBufferManager &buffermanager,
+void BasicShader::Run(CommandAllocator &allocator, DynamicBufferManager &_,
                       const Inp &inp) const {
   auto mask = Signature.Set(allocator, RootSignatureUsage::Graphics);
   mask.camera = inp.camera;

@@ -158,6 +158,11 @@ struct SimulationResources {
 
     MutableTextureWithState &coneMapBuffer = Dim2HighBuffer1;
 
+    MutableTextureWithState mixMaxDisplacementMap;
+    std::array<UnorderedAccessViewRef, 4> DisplacementMapMipsUAV;
+
+    Axodox::Infrastructure::event_subscription _allocatedSubscription;
+
     LODDataBuffers(const ResourceAllocationContext &context, const u32 N,
                    const u32 M)
         : tildeh(context, TextureDefinition::TextureDefinition(
@@ -183,9 +188,37 @@ struct SimulationResources {
           displacementMap(context, TextureDefinition::TextureDefinition(
                                        Format::R16G16B16A16_Float, N, M, 0,
                                        TextureFlags::UnorderedAccess)),
+          mixMaxDisplacementMap(
+              context, TextureDefinition::TextureDefinition(
+                           TextureHeader::TextureHeader(D3D12_RESOURCE_DESC{
+                               D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+                               0,
+                               N,
+                               N,
+                               0,
+                               4,
+                               DXGI_FORMAT_R16G16B16A16_FLOAT,
+                               {0, 0},
+                               D3D12_TEXTURE_LAYOUT_UNKNOWN,
+                               D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS}),
+                           TextureFlags::UnorderedAccess)),
           gradients(context, TextureDefinition::TextureDefinition(
                                  Format::R16G16B16A16_Float, N, M, 0,
                                  TextureFlags::UnorderedAccess)) {
+      TextureRef &tr = mixMaxDisplacementMap.getTexture();
+
+      _allocatedSubscription = tr->Allocated.subscribe([&](Resource *res) {
+        for (u32 i = 0; i < 4; ++i) {
+          D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+          uavDesc.Format =
+              DXGI_FORMAT(mixMaxDisplacementMap.Definition()->PixelFormat);
+          uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+          uavDesc.Texture2D.MipSlice = 0 + i;
+          DisplacementMapMipsUAV[i] =
+              context.CommonDescriptorHeap
+                  ->CreateDescriptor<UnorderedAccessView>(res->get(), &uavDesc);
+        }
+      });
     }
   };
 
@@ -265,6 +298,7 @@ struct FullPipeline {
   PipelineState gradientPipeline;
   PipelineState foamDecayPipeline;
   ConeMapCreater coneMapCreater;
+  MixMaxCompute mixMaxCompute;
 
   static FullPipeline Create(GraphicsDevice &device,
                              PipelineStateProvider &pipelineStateProvider);

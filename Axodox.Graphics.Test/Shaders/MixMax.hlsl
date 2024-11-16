@@ -3,27 +3,134 @@
 #define LOG2_M 4
 #define M (1<<LOG2_M)
 
-// Currently float4, but we only care about .y
-Texture2D<float4> srcTexture : register(t0);
-RWTexture2D<float4> dstTexture : register(u0);
+//
+// Copyright (c) Microsoft. All rights reserved.
+// This code is licensed under the MIT License (MIT).
+// THIS CODE IS PROVIDED *AS IS* WITHOUT WARRANTY OF
+// ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY
+// IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR
+// PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
+//
+// Developed by Minigraph
+//
+// Author:  James Stanard 
+// Adapted to my use case
 
-cbuffer MipInfo : register(b0)
+RWTexture2D<float4> OutMip1 : register(u0);
+RWTexture2D<float4> OutMip2 : register(u1);
+RWTexture2D<float4> OutMip3 : register(u2);
+RWTexture2D<float4> OutMip4 : register(u3);
+Texture2D<float4> SrcMip : register(t0);
+SamplerState BilinearClamp : register(s0);
+
+cbuffer CB0 : register(b0)
 {
-    uint srcMipLevel;
-};
+    uint SrcMipLevel; // Texture level of source mip
+    uint NumMipLevels; // Number of OutMips to write: [1, 4]
+    float2 TexelSize; // 1.0 / OutMip1.Dimensions
+}
 
-[numthreads(M, M, 1)]
-void main(uint3 DTid : SV_DispatchThreadID)
+// The reason for separating channels is to reduce bank conflicts in the
+// local data memory controller.  A large stride will cause more threads
+// to collide on the same memory bank.
+groupshared float gs_R[64];
+groupshared float gs_G[64];
+groupshared float gs_B[64];
+groupshared float gs_A[64];
+
+void StoreColor(uint Index, float4 Color)
 {
-    uint2 dstCoord = DTid.xy;
+    gs_R[Index] = Color.r;
+    gs_G[Index] = Color.g;
+    gs_B[Index] = Color.b;
+    gs_A[Index] = Color.a;
+}
 
-    uint2 srcCoord = dstCoord * 2;
-    /// its definitely larger than this
-    float val = -99999;
-    val = max(val, srcTexture.Load(int3(srcCoord, srcMipLevel)).y);
-    val = max(val, srcTexture.Load(int3(srcCoord + uint2(1, 0), srcMipLevel)).y);
-    val = max(val, srcTexture.Load(int3(srcCoord + uint2(0, 1), srcMipLevel)).y);
-    val = max(val, srcTexture.Load(int3(srcCoord + uint2(1, 1), srcMipLevel)).y);
+float4 LoadColor(uint Index)
+{
+    return float4(gs_R[Index], gs_G[Index], gs_B[Index], gs_A[Index]);
+}
+float4 PackColor(float4 val)
+{
+    return val;
+}
+float4 LinearInterpolate(float4 Src1, float4 Src2, float4 Src3, float4 Src4)
+{
+    return 0.25 * (Src1 + Src2 + Src3 + Src4);
+}
+float4 Max(float4 Src1, float4 Src2, float4 Src3, float4 Src4)
+{
+    return max(max(max(Src1, Src2), Src3), Src4);
+}
 
-    dstTexture[dstCoord] = float4(0, val, 0, 0);
+// all pixels must start a write:
+// for texture size N, start N >> 3, N>>3, 1 threads.
+// Only works if N is a power of 2.
+[numthreads(8, 8, 1)]
+void main(uint GI : SV_GroupIndex, uint3 DTid : SV_DispatchThreadID)
+{
+    float2 UV = TexelSize * (DTid.xy + 0.5);
+    float4 Src1 = SrcMip.SampleLevel(BilinearClamp, UV, SrcMipLevel);
+
+    OutMip1[DTid.xy] = Src1;
+
+    // A scalar (constant) branch can exit all threads coherently.
+    if (NumMipLevels == 1)
+        return;
+
+    // Without lane swizzle operations, the only way to share data with other
+    // threads is through LDS.
+    StoreColor(GI, Src1);
+
+    // This guarantees all LDS writes are complete and that all threads have
+    // executed all instructions so far (and therefore have issued their LDS
+    // write instructions.)
+    GroupMemoryBarrierWithGroupSync();
+
+    // With low three bits for X and high three bits for Y, this bit mask
+    // (binary: 001001) checks that X and Y are even.
+    if ((GI & 0x9) == 0)
+    {
+        float4 Src2 = LoadColor(GI + 0x01);
+        float4 Src3 = LoadColor(GI + 0x08);
+        float4 Src4 = LoadColor(GI + 0x09);
+        Src1 = Max(Src1, Src2, Src3, Src4);
+
+        OutMip2[DTid.xy / 2] = PackColor(Src1);
+        StoreColor(GI, Src1);
+    }
+
+    if (NumMipLevels == 2)
+        return;
+
+    GroupMemoryBarrierWithGroupSync();
+
+    // This bit mask (binary: 011011) checks that X and Y are multiples of four.
+    if ((GI & 0x1B) == 0)
+    {
+        float4 Src2 = LoadColor(GI + 0x02);
+        float4 Src3 = LoadColor(GI + 0x10);
+        float4 Src4 = LoadColor(GI + 0x12);
+        Src1 = Max(Src1, Src2, Src3, Src4);
+
+        OutMip3[DTid.xy / 4] = PackColor(Src1);
+        StoreColor(GI, Src1);
+    }
+
+    if (NumMipLevels == 3)
+        return;
+
+    GroupMemoryBarrierWithGroupSync();
+
+    // This bit mask would be 111111 (X & Y multiples of 8), but only one
+    // thread fits that criteria.
+    if (GI == 0)
+    {
+        float4 Src2 = LoadColor(GI + 0x04);
+        float4 Src3 = LoadColor(GI + 0x20);
+        float4 Src4 = LoadColor(GI + 0x24);
+        Src1 = Max(Src1, Src2, Src3, Src4);
+
+        OutMip4[DTid.xy / 8] = PackColor(Src1);
+    }
 }

@@ -396,9 +396,11 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                                        CreateBackwardsPlane(2, XMUINT2(2, 2))};
     ImmutableMesh skyboxMesh{immutableAllocationContext, CreateCube(2)};
     ImmutableMesh Box{immutableAllocationContext, CreateCube(2)};
-    ImmutableMesh BoxWithoutBottom{
-        immutableAllocationContext,
-        CreateCubeWithoutBottom(1, XMFLOAT3{0, 0.5, 0})};
+    // ImmutableMesh BoxWithoutBottom{
+    //     immutableAllocationContext,
+    //     CreateCubeWithoutBottom(1, XMFLOAT3{0, 0.5, 0})};
+    ImmutableMesh BoxOnlyWithIndexBuffer{immutableAllocationContext,
+                                         CreateBoxInVSMesh()};
     // ImmutableMesh BoxWithoutBottom{immutableAllocationContext,
     // CreateCube(1)};
 
@@ -721,7 +723,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         // Draw Ocean
         {
           // Will be accessed in multiple sections
-          const auto &modelMatrix = oceanModelMatrix;
+          const XMMATRIX modelMatrix = oceanModelMatrix;
 
           // Need to reset after drawing
           std::optional<ShaderResourceView *> usedTextureAddress;
@@ -956,9 +958,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                 // Ocean Buffers
                 PrismParallaxDraw::ModelBuffers modelConstants{};
 
-                XMMATRIX modelMatrix =
-                    XMMatrixTranslationFromVector(XMVECTOR{0, 0.5, 0, 1});
-                modelMatrix = XMMatrixIdentity();
                 XMStoreFloat4x4(&modelConstants.mMatrix,
                                 XMMatrixTranspose(modelMatrix));
 
@@ -966,9 +965,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                     &modelConstants.mINVMatrix,
                     XMMatrixTranspose(XMMatrixInverse(nullptr, modelMatrix)));
 
-                const float prismHeight = 3.f;
                 modelConstants.center = XMFLOAT3{0, -5, 0};
-                modelConstants.PrismHeight = prismHeight;
 
                 GpuVirtualAddress modelBuffer =
                     frameResource.DynamicBuffer.AddBuffer(modelConstants);
@@ -990,12 +987,24 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                             drawingSimResource.LODs[2]
                                 ->gradients.ShaderResource(allocator),
                         },
+                    .heightMaps =
+                        {
+                            drawingSimResource.LODs[0]
+                                ->mixMaxDisplacementMap.ShaderResource(
+                                    allocator),
+                            drawingSimResource.LODs[1]
+                                ->mixMaxDisplacementMap.ShaderResource(
+                                    allocator),
+                            drawingSimResource.LODs[2]
+                                ->mixMaxDisplacementMap.ShaderResource(
+                                    allocator),
+                        },
                     .texture = usedTextureAddress,
                     .cameraBuffer = cameraConstantBuffer,
                     .debugBuffers = debugConstantBuffer,
                     .waterPBRBuffers = waterDataBuffer,
                     .modelBuffers = modelBuffer,
-                    .mesh = BoxWithoutBottom,
+                    .mesh = BoxOnlyWithIndexBuffer,
                     .vertexData = GpuVirtualAddress(0),
 
                 };

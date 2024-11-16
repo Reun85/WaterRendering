@@ -25,8 +25,8 @@ struct ShadowVolume : ShaderJob {
 
     explicit Textures(const ResourceAllocationContext &context);
 
-    void MakeCompatible(const RenderTargetView &finalTarget,
-                        ResourceAllocationContext &allocationContext) override {
+    void MakeCompatible(const RenderTargetView &_,
+                        ResourceAllocationContext &__) override {
       // No need to allocate
     }
     void Clear(CommandAllocator &allocator) override;
