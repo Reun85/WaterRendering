@@ -45,8 +45,9 @@ struct DebugValues {
 
   bool enableSSR = false;
   bool lockQuadTree = false;
-  int maxConeStep = 10;
-  DrawMethod drawMethod = DrawMethod::Parallax;
+  int maxConeStep = 40;
+  float prismHeight = 2;
+  DrawMethod drawMethod = DrawMethod::PrismParallax;
   const static constexpr std::initializer_list<
       std::pair<u8, std::optional<const char *>>>
       DebugBitsDesc = {{2, "Use Foam"},
@@ -95,6 +96,7 @@ struct DebugValues {
       CullingImGuiDraw(out);
 
       ImGui::InputFloat4("Blend Distances", (float *)&blendDistances);
+      ImGui::InputFloat("Prism Height", &prismHeight);
       ImGui::Checkbox("Enable SSR", &enableSSR);
       ImGui::Checkbox("Lock QuadTree", &lockQuadTree);
 

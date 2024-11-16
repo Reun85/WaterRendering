@@ -40,8 +40,10 @@ void SimulationData::DrawImGui(NeedToDo &out, bool exclusiveWindow) {
     ImGui::Text("Lowest");
     bool low = Lowest.DrawImGui("Lowest");
     ImGui::Separator();
-    change |= ImGui::InputFloat("QuadTree distanceThreshold",
-                                &quadTreeDistanceThreshold);
+    ImGui::InputFloat("QuadTree distanceThreshold", &quadTreeDistanceThreshold);
+    i32 x = (i32)maxDepth;
+    ImGui::InputInt("Max Depth", &x);
+    maxDepth = (u32)x;
     ImGui::Separator();
     out.patchHighestChanged = hig || change;
     out.patchMediumChanged = med || change;

@@ -254,7 +254,8 @@ struct ConeMarchResult
     float2 uv;
     float height;
     uint flags; // 0 = hit,
-                // 1 = miss, or we did not find it
+                // 1 = miss
+                // 2 = went outside
 };
 
 #define BIT(x) (1 << x)

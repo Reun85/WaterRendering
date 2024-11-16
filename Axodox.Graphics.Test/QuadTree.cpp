@@ -174,7 +174,7 @@ void ConstQuadTreeLeafIteratorDepthFirst::IterateTillLeaf() {
 void QuadTree::Build(const float3 &center, const float2 &fullSizeXZ,
                      const float3 &camEye, const float3 &camDir,
                      const Frustum &f, const XMMATRIX &mMatrix,
-                     const float &quadTreeDistanceThreshold) {
+                     const float &quadTreeDistanceThreshold, Depth MaxDepth) {
 
   // zero it out, especially the children part
   memset(&nodes[0], 0, sizeof(Node) * nodes.size());
@@ -182,6 +182,7 @@ void QuadTree::Build(const float3 &center, const float2 &fullSizeXZ,
   nodes[0] = {{center.x, center.z}, {fullSizeXZ.x, fullSizeXZ.y}};
   count = 1;
   height = 0;
+  maxDepth = MaxDepth;
   order = TravelOrder(camDir, mMatrix);
   BuildRecursively(0, center.y, camEye, quadTreeDistanceThreshold, 0, f,
                    mMatrix);

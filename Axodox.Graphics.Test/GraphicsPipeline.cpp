@@ -284,6 +284,7 @@ std::vector<WaterGraphicRootDescription::OceanData> &
 WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
     std::vector<WaterGraphicRootDescription::OceanData> &vec, const Camera &cam,
     const XMMATRIX &mMatrix, const float &quadTreeDistanceThreshold,
+    const Depth &MaxDepth,
     const std::optional<RuntimeResults *> &runtimeResults) {
   float2 fullSizeXZ = {DefaultsValues::App::oceanSize,
                        DefaultsValues::App::oceanSize};
@@ -304,7 +305,7 @@ WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
   qt.Build(center, fullSizeXZ, float3(camUsedPos.x, camUsedPos.y, camUsedPos.z),
            float3(camDir.x, camDir.y, camDir.z),
 
-           cam.GetFrustum(), mMatrix, quadTreeDistanceThreshold);
+           cam.GetFrustum(), mMatrix, quadTreeDistanceThreshold, MaxDepth);
 
   if (runtimeResults) {
     (*runtimeResults)->QuadTreeBuildTime += std::chrono::duration_cast<
@@ -403,8 +404,7 @@ void BasicShader::Pre(CommandAllocator &allocator) const {
   pipeline.Apply(allocator);
 }
 
-void BasicShader::Run(CommandAllocator &allocator,
-                      DynamicBufferManager &buffermanager,
+void BasicShader::Run(CommandAllocator &allocator, DynamicBufferManager &_,
                       const Inp &inp) const {
   auto mask = Signature.Set(allocator, RootSignatureUsage::Graphics);
   mask.camera = inp.camera;

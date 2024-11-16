@@ -50,6 +50,16 @@ cbuffer DebugBuffer : register(b9)
 {
     DebugValues debugValues;
 }
+float4 readHeightMapWith(float2 uv)
+{
+    float4 t1 = heightMap1.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.r), 4);
+    //float4 t2 = heightMap2.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.g), 4);
+    //float4 t3 = heightMap3.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.b), 4);
+    float4 t2 = float4(0, 0, 0, 0);
+    float4 t3 = float4(0, 0, 0, 0);
+
+    return max(t1, 0) + max(t2, 0) + max(t3, 0);
+}
 output_t main(input_t input)
 {
     const float eps = 0.1;
@@ -75,7 +85,11 @@ output_t main(input_t input)
     localPos = float3(xyz) - 0.5;
 
     localPos.xz = localPos.xz * scaling + offset;
-    float height = PrismHeight;
+    float height =
+    readHeightMapWith(offset + float2(0.5, 0.5) * scaling).y;
+    height = max(height, readHeightMapWith(offset + float2(-0.5, 0.5) * scaling).y);
+    height = max(height, readHeightMapWith(offset + float2(-0.5, -0.5) * scaling).y);
+    height = max(height, readHeightMapWith(offset + float2(0.5, -0.5) * scaling).y);
 
     localPos.y = localPos.y > eps ? height : -10;
     

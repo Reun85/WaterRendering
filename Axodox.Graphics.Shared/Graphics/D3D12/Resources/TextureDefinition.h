@@ -31,7 +31,8 @@ struct AXODOX_GRAPHICS_API TextureDefinition : public ResourceDefinition,
   TextureFlags Flags;
 
   TextureDefinition();
-  TextureDefinition(TextureHeader header);
+  TextureDefinition(TextureHeader header,
+                    TextureFlags flags = TextureFlags::None);
   TextureDefinition(Format format, uint32_t width, uint32_t height,
                     uint16_t arraySize = 0,
                     TextureFlags flags = TextureFlags::None);

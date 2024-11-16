@@ -87,8 +87,7 @@ static ResourceStates GetResourceStateFromFlags(const TextureFlags &flags) {
 // A class meant to simplify keeping track of a GPU resource's state.
 // If multiple threads (cpu or gpu command queues) use this in parallel, this
 // abstraction will cause more issues than it solves.
-class MutableTextureWithState
-    : private Axodox::Graphics::D3D12::MutableTexture {
+class MutableTextureWithState : public Axodox::Graphics::D3D12::MutableTexture {
   ResourceStates _state;
 
 public:
@@ -132,6 +131,8 @@ public:
   };
 
   MutableTexture &getInnerUnsafe() { return *this; }
+
+  TextureRef &getTexture() { return _texture; };
 };
 
 inline float frac(float x) { return x - std::floor(x); }
@@ -270,6 +271,44 @@ CreateCubeWithoutBottom(float size, XMFLOAT3 offset = XMFLOAT3{0, 0, 0}) {
   *pIndex++ = 4;
   *pIndex++ = 1;
   *pIndex++ = 5; // Triangle 2
+
+  // Topology
+  result.Topology = PrimitiveTopology::TriangleList;
+
+  return result;
+}
+
+inline MeshDescription CreateBoxInVSMesh() {
+  MeshDescription result;
+
+  // Indices
+  uint32_t *pIndex;
+  // 3 indices per 2 triangle per 3 face
+  result.Indices = BufferData(3 * 2 * 3, pIndex);
+
+  // xz plane
+  *pIndex++ = 0;
+  *pIndex++ = 1;
+  *pIndex++ = 2; // Triangle 1
+  *pIndex++ = 2;
+  *pIndex++ = 1;
+  *pIndex++ = 3; // Triangle 2
+
+  // zy plane
+  *pIndex++ = 2;
+  *pIndex++ = 6;
+  *pIndex++ = 3; // Triangle 1
+  *pIndex++ = 3;
+  *pIndex++ = 6;
+  *pIndex++ = 7; // Triangle 2
+
+  // xy plane
+  *pIndex++ = 1;
+  *pIndex++ = 5;
+  *pIndex++ = 3; // Triangle 1
+  *pIndex++ = 3;
+  *pIndex++ = 5;
+  *pIndex++ = 7; // Triangle 2
 
   // Topology
   result.Topology = PrimitiveTopology::TriangleList;

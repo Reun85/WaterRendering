@@ -137,7 +137,7 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
   CollectOceanQuadInfoWithQuadTree(
       std::vector<WaterGraphicRootDescription::OceanData> &vec,
       const Camera &cam, const XMMATRIX &mMatrix,
-      const float &quadTreeDistanceThreshold,
+      const float &quadTreeDistanceThreshold, const u32 &MaxDepth,
       const std::optional<RuntimeResults *> &runRes = std::nullopt);
 };
 
@@ -240,8 +240,8 @@ struct ShadowMapping : public RootSignatureMask {
     explicit Textures(const ResourceAllocationContext &context,
                       const u32 N = 1024);
 
-    void MakeCompatible(const RenderTargetView &finalTarget,
-                        ResourceAllocationContext &allocationContext) override {
+    void MakeCompatible(const RenderTargetView &_,
+                        ResourceAllocationContext &__) override {
       // No need to allocate
     }
     void Clear(CommandAllocator &allocator) override;

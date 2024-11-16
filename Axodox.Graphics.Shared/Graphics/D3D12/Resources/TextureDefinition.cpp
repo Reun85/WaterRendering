@@ -48,9 +48,8 @@ TextureDefinition::TextureDefinition()
     : TextureHeader(), SampleCount(1), SampleQuality(0),
       Flags(TextureFlags::None) {}
 
-TextureDefinition::TextureDefinition(TextureHeader header)
-    : TextureHeader(header), SampleCount(1), SampleQuality(0),
-      Flags(TextureFlags::None) {}
+TextureDefinition::TextureDefinition(TextureHeader header, TextureFlags flags)
+    : TextureHeader(header), SampleCount(1), SampleQuality(0), Flags(flags) {}
 
 TextureDefinition::TextureDefinition(Format format, uint32_t width,
                                      uint32_t height, uint16_t arraySize,

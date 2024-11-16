@@ -103,7 +103,7 @@ private:
 class QuadTree {
 public:
   struct Defaults {
-    static constexpr Depth maxDepth = 40;
+    static constexpr Depth maxDepth = 5;
     static constexpr Depth minDepth = 0;
     static constexpr float DistanceThreshold = 2e+2f;
   };
@@ -111,11 +111,12 @@ public:
   using value_type = Node;
   using const_iterator = ConstQuadTreeLeafIteratorDepthFirst;
 
-  QuadTree(const uint allocation = 20000) : nodes(allocation) {}
+  explicit QuadTree(const uint allocation = 20000) : nodes(allocation) {}
   void
   Build(const float3 &center, const float2 &fullSizeXZ, const float3 &camEye,
         const float3 &camDir, const Frustum &f, const XMMATRIX &mMatrix,
-        const float &quadTreeDistanceThreshold = Defaults::DistanceThreshold);
+        const float &quadTreeDistanceThreshold = Defaults::DistanceThreshold,
+        Depth MaxDepth = Defaults::maxDepth);
   const value_type &GetRoot() const { return nodes[0]; }
   const_iterator begin() const {
     return const_iterator(0, height, *this, order);
@@ -135,7 +136,7 @@ private:
   std::vector<value_type> nodes;
   NodeID count = 0;
   Depth height = 0;
-  Depth maxDepth = Defaults::maxDepth;
+  Depth maxDepth;
   Depth minDepth = Defaults::minDepth;
   TravelOrder order;
 };

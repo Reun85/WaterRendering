@@ -160,9 +160,14 @@ struct PrismParallaxDraw : ShaderJob {
     RootDescriptorTable<1> coneMapHighest;
     RootDescriptorTable<1> coneMapMedium;
     RootDescriptorTable<1> coneMapLowest;
+
     RootDescriptorTable<1> gradientsHighest;
     RootDescriptorTable<1> gradientsMedium;
     RootDescriptorTable<1> gradientsLowest;
+
+    RootDescriptorTable<1> heightMapHighest;
+    RootDescriptorTable<1> heightMapMedium;
+    RootDescriptorTable<1> heightMapLowest;
 
     StaticSampler _textureSampler;
 
@@ -188,6 +193,12 @@ struct PrismParallaxDraw : ShaderJob {
                           ShaderVisibility::Pixel),
           gradientsLowest(this, {DescriptorRangeType::ShaderResource, {5}},
                           ShaderVisibility::Pixel),
+          heightMapHighest(this, {DescriptorRangeType::ShaderResource, {6}},
+                           ShaderVisibility::All),
+          heightMapMedium(this, {DescriptorRangeType::ShaderResource, {7}},
+                          ShaderVisibility::All),
+          heightMapLowest(this, {DescriptorRangeType::ShaderResource, {8}},
+                          ShaderVisibility::All),
           _textureSampler(this, {0}, Filter::Linear, TextureAddressMode::Wrap,
                           ShaderVisibility::All) {
       Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
@@ -198,6 +209,7 @@ struct PrismParallaxDraw : ShaderJob {
     XMFLOAT4X4 mMatrix;
     XMFLOAT4X4 mINVMatrix;
     XMFLOAT3 center;
+
     float PrismHeight;
     GpuVirtualAddress Upload(DynamicBufferManager &bufferManager) {
       return bufferManager.AddBuffer(this);
@@ -217,6 +229,7 @@ struct PrismParallaxDraw : ShaderJob {
   struct Inp {
     const std::array<ShaderResourceView *const, 3> &coneMaps;
     const std::array<ShaderResourceView *const, 3> &gradients;
+    const std::array<ShaderResourceView *const, 3> &heightMaps;
     std::optional<ShaderResourceView *const> texture;
     GpuVirtualAddress cameraBuffer;
     GpuVirtualAddress debugBuffers;
@@ -244,6 +257,12 @@ struct PrismParallaxDraw : ShaderJob {
 };
 
 struct MixMaxCompute : ShaderJob {
+  struct Buffer {
+
+    u32 SrcMipLevel;  // Texture level of source mip
+    u32 NumMipLevels; // Number of OutMips to write: [1, 4]
+    float2 TexelSize; // 1.0 / OutMip1.Dimensions
+  };
   struct ShaderMask : public RootSignatureMask {
     // In
     // Texture2D<float4>
@@ -253,24 +272,33 @@ struct MixMaxCompute : ShaderJob {
     RootDescriptor<RootDescriptorType::ConstantBuffer> ComputeConstants;
 
     // Out
-    // Texture2D<float2>
-    RootDescriptorTable<1> WriteTexture;
+    // Texture2D<float4>
+    RootDescriptorTable<1> MipMap1;
+    RootDescriptorTable<1> MipMap2;
+    RootDescriptorTable<1> MipMap3;
+    RootDescriptorTable<1> MipMap4;
+
+    StaticSampler _textureSampler;
 
     explicit ShaderMask(const RootSignatureContext &context)
         : RootSignatureMask(context),
           ReadTexture(this, {DescriptorRangeType::ShaderResource, {0}}),
           ComputeConstants(this, {0}),
-          WriteTexture(this, {DescriptorRangeType::UnorderedAccess, {1}})
-
-    {
+          MipMap1(this, {DescriptorRangeType::UnorderedAccess, 0}),
+          MipMap2(this, {DescriptorRangeType::UnorderedAccess, 1}),
+          MipMap3(this, {DescriptorRangeType::UnorderedAccess, 2}),
+          MipMap4(this, {DescriptorRangeType::UnorderedAccess, 3}),
+          _textureSampler(this, {0}, Filter::Linear, TextureAddressMode::Clamp,
+                          ShaderVisibility::All) {
       Flags = RootSignatureFlags::None;
     }
   };
   struct Inp {
     // Mip level 0 should be set by somewhere else
-    MutableTexture *texture;
     const u32 mipLevels;
     const u32 Extent;
+    ShaderResourceView *texture;
+    std::array<UnorderedAccessView *, 4> mipMaps;
   };
 
   RootSignature<ShaderMask> Signature;
@@ -288,4 +316,62 @@ struct MixMaxCompute : ShaderJob {
   void Run(CommandAllocator &allocator, DynamicBufferManager &buffermanager,
            const Inp &inp) const;
   ~MixMaxCompute() override = default;
+};
+
+struct DisplacedHeightMapJob : ShaderJob {
+  struct ShaderMask : public RootSignatureMask {
+    // In
+    // Texture2D<float4>
+    // should change to float
+    // float3
+    RootDescriptorTable<1> DisplacementMap;
+    // float4
+    RootDescriptorTable<1> Gradients;
+
+    RootDescriptor<RootDescriptorType::ConstantBuffer> ComputeConstants;
+
+    // Out
+    // float
+    RootDescriptorTable<1> OutHeightMap;
+    // float4
+    RootDescriptorTable<1> OutGradients;
+
+    explicit ShaderMask(const RootSignatureContext &context)
+        : RootSignatureMask(context),
+          DisplacementMap(this, {DescriptorRangeType::ShaderResource, {0}}),
+          Gradients(this, {DescriptorRangeType::ShaderResource, {1}}),
+          ComputeConstants(this, {0}),
+          OutHeightMap(this, {DescriptorRangeType::UnorderedAccess, 0}),
+          OutGradients(this, {DescriptorRangeType::UnorderedAccess, 1}) {
+      Flags = RootSignatureFlags::None;
+    }
+  };
+  struct Inp {
+    // Mip level 0 should be set by somewhere else
+    const GpuVirtualAddress ComputeConstants;
+    ShaderResourceView *displacementMap;
+    ShaderResourceView *gradients;
+    UnorderedAccessView *outHeightMap;
+    UnorderedAccessView *outGradients;
+    /// <summary>
+    /// texture size
+    /// </summary>
+    const u32 N;
+  };
+
+  RootSignature<ShaderMask> Signature;
+  PipelineState pipeline;
+
+  DisplacedHeightMapJob(PipelineStateProvider &pipelineProvider,
+                        GraphicsDevice &device, ComputeShader *cs);
+
+  static DisplacedHeightMapJob
+  WithDefaultShaders(PipelineStateProvider &pipelineProvider,
+                     GraphicsDevice &device);
+  void Pre(CommandAllocator &allocator) const override {
+    pipeline.Apply(allocator);
+  }
+  void Run(CommandAllocator &allocator, DynamicBufferManager &buffermanager,
+           const Inp &inp) const;
+  ~DisplacedHeightMapJob() override = default;
 };

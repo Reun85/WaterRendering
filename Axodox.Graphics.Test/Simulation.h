@@ -36,6 +36,7 @@ struct SimulationData {
   PatchData Medium;
   PatchData Lowest;
   float quadTreeDistanceThreshold = QuadTree::Defaults::DistanceThreshold;
+  u32 maxDepth = QuadTree::Defaults::maxDepth;
   SimulationData &operator=(const SimulationData &other) = default;
 
 public:

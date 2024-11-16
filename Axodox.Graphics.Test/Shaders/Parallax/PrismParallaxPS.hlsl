@@ -128,7 +128,6 @@ Texture2D<float4> gradients3 : register(t5);
 struct input_t
 {
     float3 localPos : POSITION;
-    //float3 normal : NORMAL;
     float4 screenPos : SV_Position;
     uint instanceID : SV_InstanceID;
 };
@@ -375,16 +374,18 @@ ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos, float2 mid, f
     
     const uint maxSteps =
         debugValues.maxConeStep;
-    const float map_height = 2.;
     float dt;
-    float2 uv = localPos.xz;
+    float2 u = localPos.xz;
+    float2 uv = float2(0, 0);
     float sinB = sqrt(1. - rayv.y * rayv.y);
     int i;
     const float2 eps = 0.1;
     float3 dat;
+
+    res.flags = BIT(1);
     for (i = 0; i < maxSteps; ++i)
     {
-        dat = readConeMap(uv);
+        dat = readConeMap(u + uv);
 
         float h = dat.x;
         float tan = dat.y;
@@ -392,33 +393,34 @@ ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos, float2 mid, f
         float y = rayp.y + t * rayv.y - h;
         if (y < -0.001)
         {
+            res.flags &= ~BIT(1);
             break;
+        }
+
+        // if its not a hit and we went over, just discard this fragment
+        if (any(abs((uv + u) - mid) > halfExtent + eps))
+        {
+            res.flags = BIT(2);
+            return res;
         }
 
 
         dt = max(
-         ConeApprox(y, sinB, rayv.y, tan / mult) * mult,
+         0.9 * ConeApprox(y, sinB, rayv.y, tan / mult) * mult,
 
             // ensure we atleast reach a new data holding texel.
-            dcell(uv, rayv.xz, DISP_MAP_SIZE) * debugValues.patchSizes.r
+        dcell(uv, rayv.xz, DISP_MAP_SIZE) * debugValues.patchSizes.r
         );
         //dt = max(ConeApprox(y, sinB, rayv.y, tan * mult), dcell(p.xz, rayv.xz, DISP_MAP_SIZE) * mult);
 
 
         acc += dt;
         t = t + dt;
-        uv = rayp.xz + t * rayv.xz;
+        u = rayp.xz + t * rayv.xz;
         // if we went outside the bounds then classify as a miss, the next patch should calculate it!
-        if (any(abs(uv - mid) > halfExtent + eps))
-        //if ((abs(p.x - mid.x) > halfExtent.x + eps.x) || (abs(p.z - mid.y) > halfExtent.y + eps.y))
-        {
-            res.flags = BIT(2);
-            return res;
-        }
     }
-    res.uv = uv;
+    res.uv = uv + u;
     res.height = dat.x;
-    res.flags = 0;
     res.flags |= (i == maxSteps ? BIT(1) : BIT(0));
 
 #ifdef TESTOUT
@@ -435,11 +437,14 @@ ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos, float2 mid, f
 [earlydepthstencil]
 output_t main(input_t input)
 {
-    
+    output_t output;
     const float3 viewPos = camConstants.cameraPos;
        
-    //output_t output;
-    //output.albedo = float4(readConeMap(float3(planeCoord.x, 0, planeCoord.y).xz) / 10., 1, 1);
+    //output.albedo = float4(readConeMap(input.localPos.xz - center.xz).xz / 10., 1, 1);
+    //output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
+    //output.materialValues = float4(0, 0, 0, -1);
+    //output.depth = input.screenPos.z / input.screenPos.w;
+    //return output;
         
     float2 centerOfPatch = instances[input.instanceID].offset;
     float2 halfExtentOfPatch = instances[input.instanceID].scaling;
@@ -465,7 +470,12 @@ output_t main(input_t input)
     if (res.flags & BIT(1))
     {
         // miss
-        discard;
+
+        output.albedo = float4(1, 0, 0, 1);
+        output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
+        output.materialValues = float4(0, 0, 0, -1);
+        return output;
+        //discard;
     }
     float3 localPos = float3(res.uv.x, res.height, res.uv.y);
 #ifdef TESTOUT
@@ -481,7 +491,7 @@ output_t main(input_t input)
     float4 grad = readGrad(planeCoord);
 
     // Calculate color based of these attributes
-    output_t output = calculate(grad, input.screenPos, localPos, planeCoord);
+    output = calculate(grad, input.screenPos, localPos, planeCoord);
 
     
     // set depth

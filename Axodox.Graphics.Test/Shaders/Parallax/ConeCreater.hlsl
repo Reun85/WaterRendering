@@ -91,11 +91,6 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3
     float h = displacement.Load(int3(loc, 0)).y;
     
     
-    // Rescale h!
-    // TODO: 
-    h += 1;
-    
-    
     
     cache[threadID.x][threadID.y] = h;
 
