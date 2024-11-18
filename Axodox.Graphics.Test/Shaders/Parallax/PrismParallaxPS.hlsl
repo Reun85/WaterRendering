@@ -406,7 +406,7 @@ ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos, float2 mid, f
 
 
         dt = max(
-         0.9 * ConeApprox(y, sinB, rayv.y, tan / mult) * mult,
+         1.2 * ConeApprox(y, sinB, rayv.y, tan / mult) * mult,
 
             // ensure we atleast reach a new data holding texel.
         dcell(uv, rayv.xz, DISP_MAP_SIZE) * debugValues.patchSizes.r
