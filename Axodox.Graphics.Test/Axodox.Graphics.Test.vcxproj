@@ -120,7 +120,6 @@
     <ClInclude Include="Parallax.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="QuadTree.h" />
-    <ClInclude Include="Shaders\DebugValues.h" />
     <ClInclude Include="ShadowVolume.h" />
     <ClInclude Include="SkyboxPipeline.hpp" />
     <ClInclude Include="Typedefs.h" />

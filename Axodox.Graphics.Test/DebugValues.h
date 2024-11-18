@@ -47,6 +47,7 @@ struct DebugValues {
   bool lockQuadTree = false;
   int maxConeStep = 40;
   float prismHeight = 2;
+  float coneStepRelax = 0.9;
   DrawMethod drawMethod = DrawMethod::PrismParallax;
   const static constexpr std::initializer_list<
       std::pair<u8, std::optional<const char *>>>
@@ -60,6 +61,8 @@ struct DebugValues {
                        {11, "Show worldPos"},
                        {12, "Show materialValues"},
                        {13, "Show depth"},
+                       {14, "Per pixel show miss"},
+                       {15, "Per pixel allow backwards"},
                        {24, "Normal overflow"},
                        {25, "Display Foam"},
 
@@ -97,6 +100,7 @@ struct DebugValues {
 
       ImGui::InputFloat4("Blend Distances", (float *)&blendDistances);
       ImGui::InputFloat("Prism Height", &prismHeight);
+      ImGui::SliderFloat("Cone step relax", &coneStepRelax, 0, 3);
       ImGui::Checkbox("Enable SSR", &enableSSR);
       ImGui::Checkbox("Lock QuadTree", &lockQuadTree);
 
@@ -243,6 +247,7 @@ struct DebugGPUBufferStuff {
   u32 flags = 0; // Its here because padding
   float EnvMapMult;
   int maxConeStep;
+  float coneStepRelax;
 };
 static void set_flag(u32 &flag, u32 flagIndex, bool flagValue = true) {
   if (flagValue) {
@@ -261,7 +266,7 @@ static DebugGPUBufferStuff From(const DebugValues &deb,
   res.patchSizes = XMFLOAT3(simData.Highest.patchSize, simData.Medium.patchSize,
                             simData.Lowest.patchSize);
   res.maxConeStep = deb.maxConeStep;
-
+  res.coneStepRelax = deb.coneStepRelax;
   for (int i = 0; i < deb.DebugBits.size(); i++) {
     set_flag(res.flags, i, deb.DebugBits[i]);
   }

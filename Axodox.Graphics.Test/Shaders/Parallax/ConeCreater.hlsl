@@ -12,13 +12,13 @@ cbuffer Test : register(b9)
 #define LOG2_M 4
 #define M (1<<LOG2_M)
 // must be odd
-#define BOXSIZE 5
+#define BOXSIZE 7
 #define MHalf (M>>1)
 #define LOG2_N_DIV_M (DISP_MAP_LOG2-LOG2_M)
 #define N_DIV_M (1 << LOG2_N_DIV_M)
 
 #define K (BOXSIZE>>1)
-#define InnerK (K-1)
+#define InnerK K
 
 groupshared float cache[M + K * 2][M + K * 2];
 
@@ -46,7 +46,6 @@ float smart_method(uint2 threadID)
     [unroll]
     for (int k = -InnerK; k <= InnerK; ++k)
     {
-            
         [unroll]
         for (int l = -InnerK; l <= InnerK; ++l)
         {
@@ -74,7 +73,6 @@ float smart_method(uint2 threadID)
         }
     }
     return ta;
-
 }
 
 

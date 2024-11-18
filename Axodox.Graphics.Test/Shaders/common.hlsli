@@ -31,10 +31,13 @@ struct DebugValues
     // 11: DS show pos
     // 12: DS show materialVal
     // 13: DS show depth
+    // 14: PP show miss
+    // 15: PP allow backwards
     // Bits [24,31] are reversed for debug reasons
     uint flags;
     float EnvMapMult;
     int maxConeStep;
+    float coneStepRelax;
 
 };
 
