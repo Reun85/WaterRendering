@@ -63,6 +63,7 @@ struct DebugValues {
                        {13, "Show depth"},
                        {14, "Per pixel show miss"},
                        {15, "Per pixel allow backwards"},
+                       {16, "Per pixel show side usage"},
                        {24, "Normal overflow"},
                        {25, "Display Foam"},
 

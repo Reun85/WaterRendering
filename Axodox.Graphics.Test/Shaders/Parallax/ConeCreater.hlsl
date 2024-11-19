@@ -12,7 +12,7 @@ cbuffer Test : register(b9)
 #define LOG2_M 4
 #define M (1<<LOG2_M)
 // must be odd
-#define BOXSIZE 7
+#define BOXSIZE 11
 #define MHalf (M>>1)
 #define LOG2_N_DIV_M (DISP_MAP_LOG2-LOG2_M)
 #define N_DIV_M (1 << LOG2_N_DIV_M)

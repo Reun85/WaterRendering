@@ -216,7 +216,8 @@ void QuadTree::BuildRecursively(const uint index, const float yCoordinate,
   double dist = sqrt(diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
   dist *= dist;
 
-  bool cont = dist / (node.size.x * node.size.y) < quadTreeDistanceThreshold;
+  dist = dist / (node.size.x * node.size.y);
+  bool cont = dist < quadTreeDistanceThreshold;
   // float x = std::max(node.size.x, node.size.y);
   // x *= x;
   // bool cont = dist / x < quadTreeDistanceThreshold;

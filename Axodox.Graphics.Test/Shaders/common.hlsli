@@ -33,6 +33,7 @@ struct DebugValues
     // 13: DS show depth
     // 14: PP show miss
     // 15: PP allow backwards
+    // 16: show side usage
     // Bits [24,31] are reversed for debug reasons
     uint flags;
     float EnvMapMult;

@@ -376,17 +376,16 @@ ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos, float2 mid, f
         debugValues.maxConeStep;
     float dt;
     float2 u = localPos.xz;
-    float2 uv = float2(0, 0);
+    float2 uv = u;
     float sinB = sqrt(1. - rayv.y * rayv.y);
     int i;
     const float2 eps = 0.1;
     float3 dat;
 
-    float2 edmid = u - mid;
     res.flags = BIT(1);
     for (i = 0; i < maxSteps; ++i)
     {
-        dat = readConeMap(u + uv);
+        dat = readConeMap(uv);
 
         float h = dat.x;
         float tan = dat.y;
@@ -399,7 +398,7 @@ ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos, float2 mid, f
         }
 
         // if its not a hit and we went over, just discard this fragment
-        if (any(abs(uv - edmid) > halfExtent + eps))
+        if (any(abs(uv - mid) > halfExtent + eps))
         {
             res.flags = BIT(2);
             return res;
@@ -410,93 +409,16 @@ ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos, float2 mid, f
          debugValues.coneStepRelax * ConeApprox(y, sinB, rayv.y, tan / mult) * mult,
 
             // ensure we atleast reach a new data holding texel.
-        dcell(GetTextureCoordFromPlaneCoordAndPatch(uv, mult), rayv.xz, DISP_MAP_SIZE) * mult //* debugValues.patchSizes.r
+        dcell(GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.r), rayv.xz, DISP_MAP_SIZE) * debugValues.patchSizes.r //* debugValues.patchSizes.r
         );
         //dt = max(ConeApprox(y, sinB, rayv.y, tan * mult), dcell(p.xz, rayv.xz, DISP_MAP_SIZE) * mult);
 
 
         acc += dt;
         t = t + dt;
-        u = rayp.xz + t * rayv.xz;
-        // if we went outside the bounds then classify as a miss, the next patch should calculate it!
+        uv = rayp.xz + t * rayv.xz;
     }
-    res.uv = uv + u;
-    res.height = dat.x;
-    res.flags |= (i == maxSteps ? BIT(1) : BIT(0));
-
-#ifdef TESTOUT
-    float x = acc / 10;
-    res.pos= float3(x, x, x);
-#endif
-
-    return res;
-}
-ConeMarchResult ParallaxConemarchBackwards(float3 viewPos, float3 localPos, float2 mid, float2 halfExtent)
-{
-    float3 rayp = viewPos;
-    float3 rayv = localPos - rayp;
-    float t = length(rayv);
-    rayv /= t;
-    
-    
-    float acc = 0;
-    ConeMarchResult res;
-    
-    const uint maxSteps =
-        debugValues.maxConeStep;
-    float dt;
-    float2 u = localPos.xz;
-    float2 uv = float2(0, 0);
-    float sinB = sqrt(1. - rayv.y * rayv.y);
-    int i;
-    const float2 eps = 0.1;
-    float3 dat = readConeMap(u + uv);
-
-    bool dir = dat.x > localPos.y;
-
-
-    float2 edmid = u - mid;
-    res.flags = 0;
-    res.flags |= BIT(1);
-    if (dir)
-        res.flags |= BIT(3);
-    for (i = 0; i < maxSteps; ++i)
-    {
-        dat = readConeMap(u + uv);
-
-        float h = dat.x;
-        float tan = dat.y;
-        float mult = dat.z;
-        float y = rayp.y + t * rayv.y - h;
-        if (y * (dir ? -1 : 1) < -0.001)
-        {
-            res.flags &= ~BIT(1);
-            break;
-        }
-
-        // if its not a hit and we went over, just discard this fragment
-        if (any(abs(uv - edmid) > halfExtent + eps))
-        {
-            res.flags = BIT(2);
-            return res;
-        }
-
-
-        dt = max(
-         debugValues.coneStepRelax * ConeApprox(y, sinB, rayv.y * (dir ? -1 : 1), tan / mult) * mult,
-
-            // ensure we atleast reach a new data holding texel.
-        dcell(GetTextureCoordFromPlaneCoordAndPatch(uv, mult), rayv.xz * (dir ? -1 : 1), DISP_MAP_SIZE) * mult //* debugValues.patchSizes.r
-        ) * (dir ? -1 : 1);
-        //dt = max(ConeApprox(y, sinB, rayv.y, tan * mult), dcell(p.xz, rayv.xz, DISP_MAP_SIZE) * mult);
-
-
-        acc += dt;
-        t = t + dt;
-        u = rayp.xz + t * rayv.xz;
-        // if we went outside the bounds then classify as a miss, the next patch should calculate it!
-    }
-    res.uv = uv + u;
+    res.uv = uv;
     res.height = dat.x;
     res.flags |= (i == maxSteps ? BIT(1) : BIT(0));
 
@@ -535,20 +457,19 @@ output_t main(input_t input)
     //}
 
     ConeMarchResult res;
-   // if (has_flag(debugValues.flags, 15))
-   // {
-   //     res = ParallaxConemarch(viewPos - center, input.localPos - center, centerOfPatch, halfExtentOfPatch);
-    //}
-   // else
-    res = ParallaxConemarchBackwards(viewPos - center, input.localPos - center, centerOfPatch, halfExtentOfPatch);
+    res = ParallaxConemarch(viewPos - center, input.localPos - center, centerOfPatch, halfExtentOfPatch);
     if (res.flags & BIT(2))
     {
-        //output_t output;
-        //output.albedo = float4(1, 0, 0, 1);
-        //output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
-        //output.materialValues = float4(0, 0, 0, -1);
-        //return output;
-        discard;
+        if (has_flag(debugValues.flags, 16))
+        {
+            output_t output;
+            output.albedo = float4(1, 0, 0, 1);
+            output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
+            output.materialValues = float4(0, 0, 0, -1);
+            return output;
+        }
+        else
+            discard;
     }
     if (res.flags & BIT(1) && has_flag(debugValues.flags, 14))
     {
