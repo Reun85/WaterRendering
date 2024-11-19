@@ -458,7 +458,8 @@ ConeMarchResult ParallaxConemarchBackwards(float3 viewPos, float3 localPos, floa
     float2 edmid = u - mid;
     res.flags = 0;
     res.flags |= BIT(1);
-    res.flags |= dir ? BIT(3) : 0;
+    if (dir)
+        res.flags |= BIT(3);
     for (i = 0; i < maxSteps; ++i)
     {
         dat = readConeMap(u + uv);
