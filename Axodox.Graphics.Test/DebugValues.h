@@ -309,3 +309,21 @@ static DebugGPUBufferStuff From(const DebugValues &deb,
   }
   return res;
 }
+
+struct RuntimeSettings {
+  bool timeRunning = true;
+  bool showImgui = true;
+  XMFLOAT4 clearColor = DefaultsValues::App::clearColor;
+  bool quit = false;
+  void DrawImGui([[maybe_unused]] NeedToDo &out, bool exclusiveWindow = false) {
+    bool cont = true;
+    if (exclusiveWindow)
+      cont = ImGui::Begin("Runtime Settings");
+    if (cont) {
+      ImGui::ColorEdit3("clear color", (float *)&clearColor);
+      ImGui::Checkbox("Time running", &timeRunning);
+    }
+    if (exclusiveWindow)
+      ImGui::End();
+  }
+};

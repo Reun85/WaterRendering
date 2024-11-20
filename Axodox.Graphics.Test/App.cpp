@@ -12,6 +12,7 @@
 #include "ShadowVolume.h"
 #include "Parallax.h"
 #include "DebugValues.h"
+#include <TestConfigLoader.h>
 
 using namespace std;
 using namespace winrt;
@@ -29,7 +30,6 @@ using namespace Axodox::Storage;
 using namespace Axodox::Threading;
 using namespace DirectX;
 using namespace DirectX::PackedVector;
-
 struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   IFrameworkView CreateView() const { return *this; }
   void Initialize(CoreApplicationView const &) const {
@@ -47,24 +47,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   struct TimeData {
     float deltaTime;
     float timeSinceLaunch;
-  };
-  struct RuntimeSettings {
-    bool timeRunning = true;
-    bool showImgui = true;
-    XMFLOAT4 clearColor = DefaultsValues::App::clearColor;
-    bool quit = false;
-    void DrawImGui([[maybe_unused]] NeedToDo &out,
-                   bool exclusiveWindow = false) {
-      bool cont = true;
-      if (exclusiveWindow)
-        cont = ImGui::Begin("Runtime Settings");
-      if (cont) {
-        ImGui::ColorEdit3("clear color", (float *)&clearColor);
-        ImGui::Checkbox("Time running", &timeRunning);
-      }
-      if (exclusiveWindow)
-        ImGui::End();
-    }
   };
 
   static void SetUpWindowInput(const CoreWindow &window,
@@ -1174,6 +1156,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           simData.DrawImGui(beforeNextFrame);
           DrawImGuiForPSResources(waterData, sunData, defData, true);
 
+          ShowImguiLoaderConfig(debugValues, simData, waterData, sunData,
+                                defData, settings, cam, beforeNextFrame, true);
           ImGui::Render();
 
           allocator->SetDescriptorHeaps(1, &ImGuiDescriptorHeap);

@@ -122,6 +122,7 @@
     <ClInclude Include="QuadTree.h" />
     <ClInclude Include="ShadowVolume.h" />
     <ClInclude Include="SkyboxPipeline.hpp" />
+    <ClInclude Include="TestConfigLoader.h" />
     <ClInclude Include="Typedefs.h" />
     <ClInclude Include="Simulation.h" />
     <ClInclude Include="WrapperAddons\ResourceTransitor.h" />
@@ -149,6 +150,7 @@
     <ClCompile Include="QuadTree.cpp" />
     <ClCompile Include="ShadowVolume.cpp" />
     <ClCompile Include="Simulation.cpp" />
+    <ClCompile Include="TestConfigLoader.cpp" />
     <ClCompile Include="WrapperAddons\StructuredObject.cpp" />
     <ClCompile Include="WrapperAddons\ConstantGPUBuffer.cpp" />
     <ClCompile Include="WrapperAddons\CubeMap.cpp" />
