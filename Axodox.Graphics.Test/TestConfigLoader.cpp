@@ -166,11 +166,11 @@ template <Streamable T> void filedo(std::ios *os, T &val, bool write = false) {
     }
   }
 }
+static std::filesystem::path dir =
+    std::filesystem::path(GetLocalFolder()) / "SimConfig";
 static std::vector<std::pair<std::string, std::filesystem::path>> getFiles() {
   std::vector<std::pair<std::string, std::filesystem::path>> files;
 
-  std::filesystem::path dir =
-      std::filesystem::path(GetLocalFolder()) / "SimConfig";
   try {
     for (const auto &entry : std::filesystem::directory_iterator(dir)) {
       if (entry.is_regular_file()) {
@@ -181,7 +181,44 @@ static std::vector<std::pair<std::string, std::filesystem::path>> getFiles() {
   }
   return files;
 }
+#include <winrt/Windows.Storage.Pickers.h>
+#include <winrt/Windows.Storage.h>
 
+using namespace winrt;
+using namespace Windows::Storage;
+using namespace Windows::Storage::Pickers;
+std::filesystem::path FromWinrtPath(const StorageFile &file) {
+  return std::filesystem::path{file.Path().c_str()};
+}
+
+// Function to pick a file for reading
+std::optional<std::filesystem::path> PickReadFile() {
+  FileOpenPicker picker;
+  picker.SuggestedStartLocation(PickerLocationId::DocumentsLibrary);
+  picker.FileTypeFilter().Append(L"*");
+
+  auto file = picker.PickSingleFileAsync().get();
+  if (file) {
+    return FromWinrtPath(file);
+  }
+  return std::nullopt;
+}
+
+// Function to pick a file for writing
+std::optional<std::filesystem::path> PickWriteFile() {
+  FileSavePicker picker;
+  picker.SuggestedStartLocation(PickerLocationId::DocumentsLibrary);
+
+  picker.SuggestedFileName(L"default_filename");
+  picker.FileTypeChoices().Insert(
+      L"All Files", winrt::single_threaded_vector<hstring>({L"*"}));
+
+  auto file = picker.PickSaveFileAsync().get();
+  if (file) {
+    return FromWinrtPath(file);
+  }
+  return std::nullopt;
+}
 void inn(std::ios *s, DebugValues &x, bool v) {
   filedo(s, x.pixelMult, v);
   filedo(s, x.swizzleorder, v);
@@ -303,111 +340,40 @@ void ShowImguiLoaderConfig(
     RuntimeSettings &settings, Camera &cam, NeedToDo &beforeNextFrame,
     bool exclusiveWindow) {
 
-  static std::vector<std::pair<std::string, std::filesystem::path>> files =
-      getFiles();
-  static std::string Text = "";
-  Text.reserve(128);
-  static u16 selectedFile = 0;
-  static bool canOverwrite = false;
-  static bool canOverSave = false;
-  static bool canDelete = false;
+  std::optional<std::filesystem::path> file = {};
 
   bool pressedSave = false;
   bool pressedLoad = false;
-  bool pressedDelete = false;
 
   bool cont = true;
   if (exclusiveWindow)
     cont = ImGui::Begin("Save data");
   if (cont) {
-    if (!files.empty()) {
 
-      if (ImGui::BeginCombo("File", files[selectedFile].first.c_str())) {
-        for (uint i = 0; i < files.size(); i++) {
-          bool isSelected = (selectedFile == i);
-          if (ImGui::Selectable(files[selectedFile].first.c_str(),
-                                isSelected)) {
-            selectedFile = i;
-          }
-          if (isSelected) {
-            ImGui::SetItemDefaultFocus();
-          }
-        }
-        ImGui::EndCombo();
-      }
-      ImGui::Checkbox("sure?##DeleteCheck", &canDelete);
-      ImGui::SameLine();
-      if (!canDelete)
-        ImGui::BeginDisabled();
-      if (ImGui::Button("Delete")) {
-        canDelete = false;
-        pressedDelete = true;
-      }
-      if (!canDelete && !pressedDelete)
-        ImGui::EndDisabled();
-    }
-
-    if (Text == "")
-      ImGui::BeginDisabled();
-    if (ImGui::Button("Create!")) {
-      namespace fs = std::filesystem;
-      fs::path dir = fs::path(GetLocalFolder()) / "SimConfig";
-
-      if (!fs::exists(dir)) {
-        fs::create_directories(dir); // Create directories if they don't exist
-      }
-      fs::path file = dir / Text;
-      std::ofstream os(file);
-      os.close();
-      files = getFiles();
-    }
-    if (Text == "")
-      ImGui::EndDisabled();
-    ImGui::SameLine();
-    if (ImGui::InputText("New file: ##Create new file", Text.data(), 128)) {
-      Text.resize(strlen(Text.c_str()));
-    }
-
-    ImGui::Checkbox("sure?##SaveCheck", &canOverSave);
-    ImGui::SameLine();
-    if (!canOverSave)
-      ImGui::BeginDisabled();
     if (ImGui::Button("Save")) {
       pressedSave = true;
-      canOverSave = false;
-    }
-    if (!canOverSave && !pressedSave)
-      ImGui::EndDisabled();
 
-    ImGui::Checkbox("sure?##LoadCheck", &canOverwrite);
-    ImGui::SameLine();
-    if (!canOverwrite)
-      ImGui::BeginDisabled();
+      file = PickWriteFile();
+    }
+
     if (ImGui::Button("Load")) {
       pressedLoad = true;
-      canOverwrite = false;
+      file = PickReadFile();
     }
-    if (!canOverwrite && !pressedLoad)
-      ImGui::EndDisabled();
   }
   if (exclusiveWindow)
     ImGui::End();
 
-  if (pressedSave) {
-    std::ofstream os(files[selectedFile].second);
+  if (pressedSave && file) {
+    std::ofstream os(*file);
     PerformFileOperation(&os, true, debugValues, simData, waterData, sunData,
                          deferredData, settings, cam, beforeNextFrame);
     os.close();
   }
-  if (pressedLoad) {
-    std::ifstream os(files[selectedFile].second);
+  if (pressedSave && file) {
+    std::ifstream os(*file);
     PerformFileOperation(&os, false, debugValues, simData, waterData, sunData,
                          deferredData, settings, cam, beforeNextFrame);
     os.close();
-  }
-  if (pressedDelete) {
-    namespace fs = std::filesystem;
-    fs::remove(files[selectedFile].second);
-    files = getFiles();
   }
 }
