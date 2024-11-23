@@ -35,6 +35,44 @@ void ConeMapCreater::Run(CommandAllocator &allocator, DynamicBufferManager &_,
   allocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
                      (sizeY + yGroupSize - 1) / yGroupSize, 1);
 }
+ConeMapCreater2::ConeMapCreater2(PipelineStateProvider &pipelineProvider,
+                                 GraphicsDevice &device, ComputeShader *cs)
+    : Signature(device),
+      pipeline(pipelineProvider
+                   .CreatePipelineStateAsync(ComputePipelineStateDefinition{
+                       .RootSignature = &Signature,
+                       .ComputeShader = cs,
+                   })
+                   .get()) {}
+
+ConeMapCreater2
+ConeMapCreater2::WithDefaultShaders(PipelineStateProvider &pipelineProvider,
+                                    GraphicsDevice &device) {
+  ComputeShader cs(app_folder() / L"ConeCreater2.cso");
+  return ConeMapCreater2(pipelineProvider, device, &cs);
+}
+void ConeMapCreater2::Run(CommandAllocator &allocator,
+                          DynamicBufferManager &buffermanager,
+                          const Inp &inp) const {
+
+  auto mask = Signature.Set(allocator, RootSignatureUsage::Compute);
+
+  mask.ConeMap = *inp.coneMap;
+  mask.MixMax = *inp.mixMax;
+  mask.ComputeConstants =
+      buffermanager.AddBuffer(ConeMapCreater2::ShaderMask::Constants{
+          .maxLevel = 2,
+          .N = inp.N,
+          .M = inp.N,
+          .deltaHalf = float2(0.5f / float(inp.N), 0.5f / float(inp.N))});
+
+  const auto xGroupSize = 16;
+  const auto yGroupSize = 16;
+  const auto sizeX = inp.N;
+  const auto sizeY = inp.N;
+  allocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
+                     (sizeY + yGroupSize - 1) / yGroupSize, 1);
+}
 } // namespace SimulationStage
 
 ParallaxDraw::ParallaxDraw(PipelineStateProvider &pipelineProvider,

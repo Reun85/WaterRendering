@@ -197,7 +197,7 @@ struct SimulationResources {
                                N,
                                0,
                                4,
-                               DXGI_FORMAT_R16G16B16A16_FLOAT,
+                               DXGI_FORMAT_R16G16_FLOAT,
                                {0, 0},
                                D3D12_TEXTURE_LAYOUT_UNKNOWN,
                                D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS}),

@@ -60,6 +60,59 @@ struct ConeMapCreater : ShaderJob {
   ~ConeMapCreater() override = default;
 };
 
+struct ConeMapCreater2 : ShaderJob {
+  struct ShaderMask : public RootSignatureMask {
+    // In
+    // Texture2D<float4>
+    // should change to float
+    RootDescriptorTable<1> MixMax;
+
+    RootDescriptor<RootDescriptorType::ConstantBuffer> ComputeConstants;
+
+    // Out
+    // Texture2D<float2>
+    RootDescriptorTable<1> ConeMap;
+
+    explicit ShaderMask(const RootSignatureContext &context)
+        : RootSignatureMask(context),
+          MixMax(this, {DescriptorRangeType::ShaderResource, {0}}),
+          ComputeConstants(this, {0}),
+          ConeMap(this, {DescriptorRangeType::UnorderedAccess, {10}})
+
+    {
+      Flags = RootSignatureFlags::None;
+    }
+    struct Constants {
+      u32 maxLevel;     // ending mipmap level
+      u32 N;            // texture size
+      u32 M;            // texture size
+      float2 deltaHalf; // (UV size of a texel)/2
+    };
+  };
+  struct Inp {
+    const UnorderedAccessView *const coneMap;
+    // Currently float4
+    const ShaderResourceView *const mixMax;
+    const u32 N;
+  };
+
+  RootSignature<ShaderMask> Signature;
+  PipelineState pipeline;
+
+  ConeMapCreater2(PipelineStateProvider &pipelineProvider,
+                  GraphicsDevice &device, ComputeShader *cs);
+
+  static ConeMapCreater2
+  WithDefaultShaders(PipelineStateProvider &pipelineProvider,
+                     GraphicsDevice &device);
+  void Pre(CommandAllocator &allocator) const override {
+    pipeline.Apply(allocator);
+  }
+  void Run(CommandAllocator &allocator, DynamicBufferManager &buffermanager,
+           const Inp &inp) const;
+  ~ConeMapCreater2() override = default;
+};
+
 } // namespace SimulationStage
 
 struct ParallaxDraw : ShaderJob {
