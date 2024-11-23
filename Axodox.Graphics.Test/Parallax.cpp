@@ -59,12 +59,11 @@ void ConeMapCreater2::Run(CommandAllocator &allocator,
 
   mask.ConeMap = *inp.coneMap;
   mask.MixMax = *inp.mixMax;
-  mask.ComputeConstants =
-      buffermanager.AddBuffer(ConeMapCreater2::ShaderMask::Constants{
-          .maxLevel = 2,
-          .N = inp.N,
-          .M = inp.N,
-          .deltaHalf = float2(0.5f / float(inp.N), 0.5f / float(inp.N))});
+  ConeMapCreater2::ShaderMask::Constants cont{
+      .maxLevel = 2,
+      .textureSize = {inp.N, inp.N},
+      .deltaHalf = {0.5f / float(inp.N), 0.5f / float(inp.N)}};
+  mask.ComputeConstants = buffermanager.AddBuffer(cont);
 
   const auto xGroupSize = 16;
   const auto yGroupSize = 16;

@@ -1,4 +1,4 @@
-#define MAX_AT_TEXEL_CENTER 1
+#define MAX_AT_TEXEL_CENTER 0
 
 cbuffer CScb : register(b0)
 {
@@ -7,8 +7,8 @@ cbuffer CScb : register(b0)
     float2 deltaHalf; // (UV size of a texel)/2
 };
 
-Texture2D<float2> srcMinmaxMap; // float2 valued, storing [min, max]
-RWTexture2D<float2> dstConeMap; // float2 valued, storing [height, cone tan]
+Texture2D<float2> srcMinmaxMap : register(t0); // float2 valued, storing [min, max]
+RWTexture2D<float2> dstConeMap : register(u0); // float2 valued, storing [height, cone tan]
 
 // Get texture coodinate of texel center from texel index
 float2 texCoord(uint2 texelInd, uint2 textureSize)
@@ -90,7 +90,7 @@ void generateQuickConeMap_regionGrowing3x3(uint3 threadId)
         }
     }
     
-    for (uint currLevel = 1; currLevel <= maxLevel; ++currLevel)
+    for (uint currLevel = 0; currLevel <= maxLevel; ++currLevel)
     {
         uint2 lastIJ = currIJ;
         float2 lastUV = currUV;

@@ -64,11 +64,14 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
     const float MediumMax = sqr(debugValues.blendDistances.g);
     const float LowestMax = sqr(debugValues.blendDistances.b);
 
-    float HighestMult = GetMultiplier(0, HighestMax, viewDistanceSqr);
-    float MediumMult = GetMultiplier(HighestMax, MediumMax, viewDistanceSqr);
-    // Multiplied by (1-HighestMult), essentially turning it off if the highestresolution waves are used, 
-    // and will gradually merge between them when the highests are no longer used and the lowest are used
-    float LowestMult = GetMultiplier(MediumMax, LowestMax, viewDistanceSqr);
+    //float HighestMult = GetMultiplier(0, HighestMax, viewDistanceSqr);
+    //float MediumMult = GetMultiplier(HighestMax, MediumMax, viewDistanceSqr);
+    //// Multiplied by (1-HighestMult), essentially turning it off if the highestresolution waves are used, 
+    //// and will gradually merge between them when the highests are no longer used and the lowest are used
+    //float LowestMult = GetMultiplier(MediumMax, LowestMax, viewDistanceSqr);
+    float HighestMult = 1;
+    float MediumMult = 1;
+    float LowestMult = 1;
 
     float highestaccountedfor = 0;
 

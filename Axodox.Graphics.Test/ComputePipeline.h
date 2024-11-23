@@ -297,7 +297,7 @@ struct FullPipeline {
   PipelineState displacementPipeline;
   PipelineState gradientPipeline;
   PipelineState foamDecayPipeline;
-  ConeMapCreater coneMapCreater;
+  ConeMapCreater2 coneMapCreater;
   MixMaxCompute mixMaxCompute;
 
   static FullPipeline Create(GraphicsDevice &device,

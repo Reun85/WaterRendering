@@ -56,8 +56,8 @@ FullPipeline SimulationStage::FullPipeline::Create(
   auto foamDecayPipelineState = pipelineStateProvider.CreatePipelineStateAsync(
       foamDecayRootStateDefinition);
 
-  ConeMapCreater coneMapCreater =
-      ConeMapCreater::WithDefaultShaders(pipelineStateProvider, device);
+  ConeMapCreater2 coneMapCreater =
+      ConeMapCreater2::WithDefaultShaders(pipelineStateProvider, device);
 
   MixMaxCompute mixMaxCompute =
       MixMaxCompute::WithDefaultShaders(pipelineStateProvider, device);
@@ -320,8 +320,8 @@ void SimulationStage::WaterSimulationComputeShader(
       fullSimPipeline.coneMapCreater.Run(
           computeAllocator, simResource.DynamicBuffer,
           {dat.buffers.coneMapBuffer.UnorderedAccess(computeAllocator),
-           dat.buffers.displacementMap.ShaderResource(computeAllocator),
-           dat.constantBuffer, N});
+           dat.buffers.mixMaxDisplacementMap.ShaderResource(computeAllocator),
+           N});
     }
   }
 }

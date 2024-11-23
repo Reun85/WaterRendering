@@ -77,16 +77,16 @@ struct ConeMapCreater2 : ShaderJob {
         : RootSignatureMask(context),
           MixMax(this, {DescriptorRangeType::ShaderResource, {0}}),
           ComputeConstants(this, {0}),
-          ConeMap(this, {DescriptorRangeType::UnorderedAccess, {10}})
+          ConeMap(this, {DescriptorRangeType::UnorderedAccess, {0}})
 
     {
       Flags = RootSignatureFlags::None;
     }
     struct Constants {
-      u32 maxLevel;     // ending mipmap level
-      u32 N;            // texture size
-      u32 M;            // texture size
-      float2 deltaHalf; // (UV size of a texel)/2
+      u32 maxLevel;        // ending mipmap level
+      XMUINT2 textureSize; // texture size
+      u32 padding = 0;
+      XMFLOAT2 deltaHalf; // (UV size of a texel)/2
     };
   };
   struct Inp {

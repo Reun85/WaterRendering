@@ -17,7 +17,7 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint3
     // Required due to interval change
     float sign_correction = (((loc.x + loc.y) & 1) == 1) ? -1.0 : 1.0;
 
-    float h = sign_correction * heightfield[loc].x;
+    float h = sign_correction * heightfield[loc].x + 2;
     float2 D = sign_correction * choppyfield[loc].xy;
 
     // Why are we using float4?
