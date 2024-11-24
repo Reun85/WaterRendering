@@ -13,6 +13,9 @@ struct SimulationData {
   u32 M;
   struct PatchData {
     float3 displacementLambda;
+    // Used for wave generation,
+    f32 patchExtent;
+    // used for display
     f32 patchSize;
     f32 foamExponentialDecay;
     f32 Amplitude;
@@ -192,8 +195,12 @@ CalculateFrequencies(const SimulationData::PatchData &dat) {
       const auto index = Inner::Indexing(i, j, N, M);
 
       const float k = length(kvec);
-      const float tmp = gravity * k * std::tanh(k * D);
-      res[index] = sqrtf(tmp);
+      float tmp = gravity * k * std::tanh(k * D);
+      float mult = 1;
+      if (k < 0.01 * 0.01) {
+        mult = 1 + k * k * L * L;
+      }
+      res[index] = sqrtf(tmp * mult);
     }
   }
   return res;

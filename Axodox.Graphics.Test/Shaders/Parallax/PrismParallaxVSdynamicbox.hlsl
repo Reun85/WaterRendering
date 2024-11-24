@@ -1,4 +1,3 @@
-
 #include "../common.hlsli"
 
 
@@ -42,9 +41,8 @@ struct output_t
 
 struct input_t
 {
+    uint vertexID : SV_VertexID;
     uint instanceID : SV_InstanceID;
-    float3 localPos : Position;
-    
 };
 
 
@@ -55,19 +53,30 @@ cbuffer DebugBuffer : register(b9)
 output_t main(input_t input)
 {
     const float eps = 0.1;
+    uint vx = input.vertexID;
  
     uint instanceID = input.instanceID;
     output_t output;
 
     const float2 scaling = instances[instanceID].scaling;
     const float2 offset = instances[instanceID].offset;
+    float3 localPos = float3(offset.x, 0, offset.y) + center;
+    const float3 cameraPosT = camConstants.cameraPos - localPos;
 
-    float3 localPos = input.localPos;
+    uint3 xyz = uint3(vx & 1, (vx & 4) >> 2, (vx & 2) >> 1);
+
+    if (cameraPosT.x > 0)
+        xyz.x = 1 - xyz.x;
+    if (cameraPosT.y < 0)
+        xyz.y = 1 - xyz.y;
+    if (cameraPosT.z > 0)
+        xyz.z = 1 - xyz.z;
+
+    localPos = float3(xyz) - 0.5;
+
     localPos.xz = localPos.xz * scaling + offset;
     float height = PrismHeight;
 
-        
-    
     localPos.y = localPos.y > eps ? height : -10;
     
 

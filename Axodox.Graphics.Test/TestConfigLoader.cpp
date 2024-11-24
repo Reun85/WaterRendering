@@ -202,6 +202,7 @@ void inn(std::ios *s, SimulationData::PatchData &x, bool v) {
 
   filedo(s, x.displacementLambda, v);
   filedo(s, x.patchSize, v);
+  filedo(s, x.patchExtent, v);
   filedo(s, x.foamExponentialDecay, v);
   filedo(s, x.Amplitude, v);
   filedo(s, x.WindForce, v);

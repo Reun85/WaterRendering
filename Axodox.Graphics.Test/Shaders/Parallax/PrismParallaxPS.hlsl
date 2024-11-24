@@ -238,127 +238,6 @@ float dcell(float2 p, float2 v, float size)
 
 #define BIT(x) (1 << x)
 #define CONSERVATIVE_STEP true
-ConeMarchResult findIntersection_coneStepMapping(float2 uv, float3 viewDirT, uint maxSteps)
-{
-    float2 HMres = float2(DISP_MAP_SIZE, DISP_MAP_SIZE);
-    float2 u2 = uv - viewDirT.xy / viewDirT.z;
-
-    float3 ds = float3(u2 - uv, 1);
-    ds = normalize(ds);
-    float w = PrismHeight / HMres.x;
-    float iz = sqrt(1.0 - ds.z * ds.z); // = length(ds.xz)
-    float sc = 0;
-    float3 dat = readConeMap(uv);
-    int stepCount = 0;
-    float zTimesSc = 0.0;
-
-    float2 dirSign = float2(ds.x < 0 ? -1 : 1, ds.y < 0 ? -1 : 1) * 0.5 / HMres.xy;
-
-    float relax = 0.9;
-    
-    while (PrismHeight - ds.z * sc > dat.x && stepCount < maxSteps)
-    {
-        zTimesSc = ds.z * sc;
-#if CONSERVATIVE_STEP
-        const float2 p = uv + ds.xy * sc;
-        const float2 cellCenter = (floor(p * HMres.xy - .5) + 1) / HMres.xy;
-        const float2 wall = cellCenter + dirSign;
-        const float2 stepToCellBorder = (wall - p) / ds.xy;
-        w = min(stepToCellBorder.x, stepToCellBorder.y) * dat.z + 1e-5;
-#endif
-        sc += relax * max(w, (PrismHeight - zTimesSc - dat.x) * dat.y / (-dat.y / dat.z * ds.z + iz));
-        //sc += relax * ConeApprox(-(prismHeight - zTimesSc - dat.x), iz, -ds.z, dat.y / dat.z) * dat.z;
-        dat = readConeMap(uv + ds.xy * sc);
-        ++stepCount;
-    }
-    
-    ConeMarchResult ret;
-    float tt = ds.z * sc;
-    ret.uv = (1 - tt) * uv + tt * u2;
-    ret.height = tt;
-    return ret;
-}
-
-output_t main2(input_t input)
-{
-    
-    const float3 viewPos = camConstants.cameraPos;
-
-    float3 viewDirW = normalize(input.localPos - viewPos);
-    float3 T, B, N;
-    //float3 normal = input.normal;
-    float3 normal =
-    float3(0, 1, 0);
-
-    if (abs(normal.x) > 0.5)
-    {
-    // +X or -X face
-        N = float3(sign(normal.x), 0, 0);
-        T = float3(0, 0, -sign(normal.x));
-        B = float3(0, 1, 0);
-    }
-    else if (abs(normal.y) > 0.5)
-    {
-    // +Y or -Y face
-        N = float3(0, sign(normal.y), 0);
-        T = float3(1, 0, 0);
-        B = float3(0, 0, -sign(normal.y));
-    }
-    else if (abs(normal.z) > 0.5)
-    {
-    // +Z or -Z face
-        N = float3(0, 0, sign(normal.z));
-        T = float3(sign(normal.z), 0, 0);
-        B = float3(0, 1, 0);
-    }
-
-
-
-    float3 viewDirT = mul(viewDirW, transpose(invMat(T, B, N))); // Transform viewDirW to tangent space
- 
-    //output_t output;
-    //output.albedo = float4(readConeMap(float3(planeCoord.x, 0, planeCoord.y).xz) / 10., 1, 1);
-        
-    float2 centerOfPatch = instances[input.instanceID].offset;
-    float2 halfExtentOfPatch = instances[input.instanceID].scaling;
-    ConeMarchResult res = findIntersection_coneStepMapping(input.localPos.xz - center.xz, viewDirT, debugValues.maxConeStep);
-    if (res.flags & BIT(2))
-    {
-        //output_t output;
-        //output.albedo = float4(1, 0, 0, 1);
-        //output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
-        //output.materialValues = float4(0, 0, 0, -1);
-        //return output;
-        discard;
-    }
-    if (res.flags & BIT(1))
-    {
-        // miss
-        discard;
-    }
-    float3 localPos = float3(res.uv.x, res.height, res.uv.y);
-#ifdef TESTOUT
-    output_t output;
-    output.albedo = float4(localPos, 1);
-    output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
-    output.materialValues = float4(0, 0, 0, -1);
-    return output;
-#endif
-    float2 planeCoord = localPos.xz;
-    localPos += center;
-    
-    float4 grad = readGrad(planeCoord);
-
-    // Calculate color based of these attributes
-    output_t output = calculate(grad, input.screenPos, localPos, planeCoord);
-
-    
-    // set depth
-    float4 screenPos = mul(mul(float4(localPos, 1), mMatrix), camConstants.vpMatrix);
-    output.depth = screenPos.z / screenPos.w;
-
-    return output;
-}
 
 
 ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos, float2 mid, float2 halfExtent)
@@ -379,7 +258,7 @@ ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos, float2 mid, f
     float2 uv = u;
     float sinB = sqrt(1. - rayv.y * rayv.y);
     int i;
-    const float2 eps = 0.1;
+    const float2 eps = 0.3;
     float3 dat;
 
     res.flags = BIT(1);
@@ -394,6 +273,8 @@ ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos, float2 mid, f
         if (y < -0.001)
         {
             res.flags &= ~BIT(1);
+            if (i == 0)
+                res.flags |= BIT(4);
             break;
         }
 
@@ -405,18 +286,20 @@ ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos, float2 mid, f
         }
 
 
+        float x1 =
+        dcell(GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.r), rayv.xz, DISP_MAP_SIZE) * debugValues.patchSizes.r;
+
+        float x2 =
+         debugValues.coneStepRelax * ConeApprox(y, sinB, rayv.y, tan);
         dt = max(
-         debugValues.coneStepRelax * ConeApprox(y, sinB, rayv.y, tan / mult) * mult,
-
+x1, x2
             // ensure we atleast reach a new data holding texel.
-        dcell(GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.r), rayv.xz, DISP_MAP_SIZE) * debugValues.patchSizes.r //* debugValues.patchSizes.r
-        );
-        //dt = max(ConeApprox(y, sinB, rayv.y, tan * mult), dcell(p.xz, rayv.xz, DISP_MAP_SIZE) * mult);
-
+               );
 
         acc += dt;
         t = t + dt;
         uv = rayp.xz + t * rayv.xz;
+
     }
     res.uv = uv;
     res.height = dat.x;
@@ -433,7 +316,7 @@ ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos, float2 mid, f
 
 // Ran once per output vertex
 
-[earlydepthstencil]
+//[earlydepthstencil]
 output_t main(input_t input)
 {
     output_t output;
@@ -458,18 +341,29 @@ output_t main(input_t input)
 
     ConeMarchResult res;
     res = ParallaxConemarch(viewPos - center, input.localPos - center, centerOfPatch, halfExtentOfPatch);
+
+    if (res.flags & BIT(4) && has_flag(debugValues.flags, 15))
+    {
+        output.albedo = float4(0, 0, 1, 1);
+        output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
+        output.materialValues = float4(0, 0, 0, -1);
+        return output;
+    }
+
     if (res.flags & BIT(2))
     {
         if (has_flag(debugValues.flags, 16))
         {
             output_t output;
-            output.albedo = float4(1, 0, 0, 1);
+            output.albedo = float4(0, 1, 0, 1);
             output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
             output.materialValues = float4(0, 0, 0, -1);
             return output;
         }
         else
+        {
             discard;
+        }
     }
     if (res.flags & BIT(1) && has_flag(debugValues.flags, 14))
     {
@@ -480,11 +374,7 @@ output_t main(input_t input)
         output.materialValues = float4(0, 0, 0, -1);
         return output;
     }
-    if (res.flags & BIT(1) && ~res.flags & BIT(3) && has_flag(debugValues.flags, 15))
-    {
-        discard;
-    }
-    
+        
     float3 localPos = float3(res.uv.x, res.height, res.uv.y);
 #ifdef TESTOUT
     output_t output;

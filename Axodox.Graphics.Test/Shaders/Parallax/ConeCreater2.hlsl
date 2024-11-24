@@ -45,7 +45,7 @@ void generateQuickConeMap_regionGrowing3x3(uint3 threadId)
         return;
 
     float baseH = srcMinmaxMap.Load(int3(threadId.xy, 0)).g;
-    float minTan = 1;
+    float minTan = 10;
     uint2 currIJ = threadId.xy; // texel index on the current level
     uint2 currSize = maxSize; // size of the current level
     float2 currDeltaHalf = deltaHalf; // (distance between neighbouring texels)/2

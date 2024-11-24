@@ -75,12 +75,13 @@ output_t main(input_t input)
 
     uint3 xyz = uint3(vx & 1, (vx & 4) >> 2, (vx & 2) >> 1);
 
-    if (cameraPosT.x < 0)
+    if (cameraPosT.x > 0)
         xyz.x = 1 - xyz.x;
-    if (cameraPosT.y > 0)
+    if (cameraPosT.y < 0)
         xyz.y = 1 - xyz.y;
-    if (cameraPosT.z < 0)
+    if (cameraPosT.z > 0)
         xyz.z = 1 - xyz.z;
+ 
 
     localPos = float3(xyz) - 0.5;
 

@@ -56,6 +56,8 @@ bool SimulationData::PatchData::DrawImGui(std::string_view ID) {
   bool change = false;
   const std::string text1 = "Patch Size##" + std::string(ID);
   change |= ImGui::InputFloat(text1.c_str(), &patchSize);
+  const std::string text1_2 = "Patch Display Size##" + std::string(ID);
+  change |= ImGui::InputFloat(text1_2.c_str(), &patchExtent);
   const std::string text2 = "Foam Decay##" + std::string(ID);
   change |= ImGui::SliderFloat(text2.c_str(), &foamExponentialDecay, 0, 1);
   const std::string text3 = "Displacement Lambda##" + std::string(ID);
@@ -85,6 +87,8 @@ static SimulationData Preset1() {
                      .Highest =
                          {
                              .displacementLambda = float3(0.f, 0.9f, 0.0f),
+                             .patchExtent = 5.f,
+
                              .patchSize = 5.f,
                              .foamExponentialDecay = 0.320f,
                              .Amplitude = 0.009f,
@@ -101,6 +105,7 @@ static SimulationData Preset1() {
                      .Medium =
                          {
                              .displacementLambda = float3(0.0f, 1.3f, 0.0f),
+                             .patchExtent = 91.f,
                              .patchSize = 91.f,
                              .foamExponentialDecay = 0.17f,
                              .Amplitude = 0.00001f,
@@ -116,6 +121,7 @@ static SimulationData Preset1() {
                          },
                      .Lowest = {
                          .displacementLambda = float3(0.0f, 0.7f, 0.0f),
+                         .patchExtent = 383.f,
                          .patchSize = 383,
                          .foamExponentialDecay = 0.023f,
                          .Amplitude = 0.00001f,
@@ -146,6 +152,7 @@ SimulationData OldPreset() {
                      .Highest =
                          {
                              .displacementLambda = float3(0.0f, 0.5, 0.0f),
+                             .patchExtent = 13.f,
                              .patchSize = 13.f,
                              .foamExponentialDecay = 0.1f,
                              .Amplitude = 0.4e-3f,
@@ -162,6 +169,7 @@ SimulationData OldPreset() {
                      .Medium =
                          {
                              .displacementLambda = float3(0.0f, 0.5, 0.0f),
+                             .patchExtent = 91.f,
                              .patchSize = 91.f,
                              .foamExponentialDecay = 0.1f,
                              .Amplitude = 0.15e-3f,
@@ -177,6 +185,7 @@ SimulationData OldPreset() {
                          },
                      .Lowest = {
                          .displacementLambda = float3(0.0f, 0.5, 0.0f),
+                         .patchExtent = 383.f,
                          .patchSize = 383,
                          .foamExponentialDecay = 0.1f,
                          .Amplitude = 0.1e-4f,
@@ -216,6 +225,7 @@ SimulationData SimulationData::Default() {
                      .Highest =
                          {
                              .displacementLambda = float3(0.f, 2.0f, 0.0f),
+                             .patchExtent = 12.f,
                              .patchSize = 12.f,
                              .foamExponentialDecay = 0.320f,
                              .Amplitude = 0.005f,
@@ -232,6 +242,7 @@ SimulationData SimulationData::Default() {
                      .Medium =
                          {
                              .displacementLambda = float3(0.0f, 1.3f, 0.0f),
+                             .patchExtent = 91.f,
                              .patchSize = 91.f,
                              .foamExponentialDecay = 0.17f,
                              .Amplitude = 0.00003f,
@@ -247,6 +258,7 @@ SimulationData SimulationData::Default() {
                          },
                      .Lowest = {
                          .displacementLambda = float3(0.0f, 1.0f, 0.0f),
+                         .patchExtent = 383.f,
                          .patchSize = 383,
                          .foamExponentialDecay = 0.023f,
                          .Amplitude = 0.000002f,

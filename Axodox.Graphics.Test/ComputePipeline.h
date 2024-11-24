@@ -38,7 +38,7 @@ struct LODComputeBuffer {
       : displacementLambda(patchData.displacementLambda.x,
                            patchData.displacementLambda.y,
                            patchData.displacementLambda.z, 1),
-        patchSize(patchData.patchSize),
+        patchSize(patchData.patchExtent),
 
         foamExponentialDecay(patchData.foamExponentialDecay),
         foamMinValue(patchData.foamMinValue), foamBias(patchData.foamBias),
@@ -297,7 +297,8 @@ struct FullPipeline {
   PipelineState displacementPipeline;
   PipelineState gradientPipeline;
   PipelineState foamDecayPipeline;
-  ConeMapCreater2 coneMapCreater;
+  ConeMapCreater coneMapCreater;
+  ConeMapCreater2 coneMapCreater2;
   MixMaxCompute mixMaxCompute;
 
   static FullPipeline Create(GraphicsDevice &device,

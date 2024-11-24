@@ -169,10 +169,11 @@ PrismParallaxDraw::PrismParallaxDraw(PipelineStateProvider &pipelineProvider,
                   .RootSignature = &Signature,
                   .VertexShader = vs,
                   .PixelShader = ps,
-                  .RasterizerState = RasterizerFlags::CullNone,
+                  //.RasterizerState = RasterizerFlags::CullNone,
+                  .RasterizerState = RasterizerFlags::CullClockwise,
                   //.RasterizerState = RasterizerFlags::Wireframe,
                   .DepthStencilState = DepthStencilMode::WriteDepth,
-                  .InputLayout = VertexPosition::Layout,
+                  .InputLayout = VertexPositionNormalTexture::Layout,
                   .TopologyType = PrimitiveTopologyType::Triangle,
                   .RenderTargetFormats = std::initializer_list(
                       std::to_address(

@@ -56,7 +56,9 @@ FullPipeline SimulationStage::FullPipeline::Create(
   auto foamDecayPipelineState = pipelineStateProvider.CreatePipelineStateAsync(
       foamDecayRootStateDefinition);
 
-  ConeMapCreater2 coneMapCreater =
+  ConeMapCreater coneMapCreater =
+      ConeMapCreater::WithDefaultShaders(pipelineStateProvider, device);
+  ConeMapCreater2 coneMapCreater2 =
       ConeMapCreater2::WithDefaultShaders(pipelineStateProvider, device);
 
   MixMaxCompute mixMaxCompute =
@@ -74,6 +76,7 @@ FullPipeline SimulationStage::FullPipeline::Create(
                       .gradientPipeline = gradientPipelineState.get(),
                       .foamDecayPipeline = foamDecayPipelineState.get(),
                       .coneMapCreater = coneMapCreater,
+                      .coneMapCreater2 = coneMapCreater2,
                       .mixMaxCompute = mixMaxCompute};
 }
 
@@ -314,15 +317,27 @@ void SimulationStage::WaterSimulationComputeShader(
   }
 
   // Create ConeMaps
+
   if (debugValues.calculateParallax()) {
     fullSimPipeline.coneMapCreater.Pre(computeAllocator);
     for (const LODData &dat : lodData) {
       fullSimPipeline.coneMapCreater.Run(
           computeAllocator, simResource.DynamicBuffer,
           {dat.buffers.coneMapBuffer.UnorderedAccess(computeAllocator),
+           dat.buffers.displacementMap.ShaderResource(computeAllocator),
+           dat.constantBuffer, N});
+    }
+  }
+
+  /*if (debugValues.calculateParallax()) {
+    fullSimPipeline.coneMapCreater2.Pre(computeAllocator);
+    for (const LODData &dat : lodData) {
+      fullSimPipeline.coneMapCreater2.Run(
+          computeAllocator, simResource.DynamicBuffer,
+          {dat.buffers.coneMapBuffer.UnorderedAccess(computeAllocator),
            dat.buffers.mixMaxDisplacementMap.ShaderResource(computeAllocator),
            N});
     }
-  }
+  }*/
 }
 } // namespace SimulationStage
