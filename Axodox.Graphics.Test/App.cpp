@@ -577,7 +577,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                     CollectOceanQuadInfoWithQuadTree(
                         cpuBuffers.oceanData, cam, oceanModelMatrix,
                         simData.quadTreeDistanceThreshold, simData.maxDepth,
-                        &runtimeResults);
+                        debugValues, &runtimeResults);
               }
               return cpuBuffers.oceanData;
             });

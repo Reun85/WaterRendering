@@ -284,7 +284,7 @@ std::vector<WaterGraphicRootDescription::OceanData> &
 WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
     std::vector<WaterGraphicRootDescription::OceanData> &vec, const Camera &cam,
     const XMMATRIX &mMatrix, const float &quadTreeDistanceThreshold,
-    const Depth &MaxDepth,
+    const Depth &MaxDepth, const DebugValues &debugValues,
     const std::optional<RuntimeResults *> &runtimeResults) {
   float2 fullSizeXZ = {DefaultsValues::App::oceanSize,
                        DefaultsValues::App::oceanSize};
@@ -336,7 +336,7 @@ WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
         curr->vertexConstants.instanceData[curr->N].offset = {it->center.x,
                                                               it->center.y};
       }
-      {
+      if (!debugValues.calculateParallax()) {
         start = std::chrono::high_resolution_clock::now();
 
         auto res = it.GetSmallerNeighbor();

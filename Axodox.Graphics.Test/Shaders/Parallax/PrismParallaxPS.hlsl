@@ -15,13 +15,12 @@ cbuffer DebugBuffer : register(b9)
 }
 
 
-
 struct output_t
 {
     float4 albedo : SV_Target0;
     float4 normal : SV_Target1;
     float4 materialValues : SV_Target2;
-    float depth : SV_Depth;
+    float depth : SV_DepthGreaterEqual;
 };
 
 
@@ -40,7 +39,7 @@ cbuffer PSProperties : register(b3)
 };
 
 
-output_t calculate(float4 grad, float4 Screen, float3 localPos, float2 planeCoord)
+output_t calculate(float4 grad, float3 localPos, float2 planeCoord, float depth)
 {
 
     output_t output;
@@ -84,10 +83,6 @@ output_t calculate(float4 grad, float4 Screen, float3 localPos, float2 planeCoor
         return output;
     }
     
-    float depth = Screen.z / Screen.w;
-
-				
-
 				
     float foam = 0;
     if (has_flag(debugValues.flags, 2))
@@ -96,15 +91,10 @@ output_t calculate(float4 grad, float4 Screen, float3 localPos, float2 planeCoor
     lerp(0.0f, Jacobian, pow(depth, foamDepthFalloff));
     }
 
-    normal = lerp(normal, float3(0, 1, 0), pow(depth, NormalDepthAttenuation));
-
-
-
+    //normal = lerp(normal, float3(0, 1, 0), pow(depth, NormalDepthAttenuation));
 				
     // Make foam appear rougher
     float a = Roughness + foam * foamRoughnessModifier;
-
-   
     				
     float3 albedo = Albedo;
 
@@ -114,6 +104,7 @@ output_t calculate(float4 grad, float4 Screen, float3 localPos, float2 planeCoor
     output.normal = float4(OctahedronNormalEncode(normal), _Fresnel, 1);
     //low
     output.materialValues = float4(a, _HeightModifier * _WavePeakScatterStrength, _ScatterShadowStrength, 1);
+    output.depth = depth;
     return output;
 }
 
@@ -128,7 +119,6 @@ Texture2D<float4> gradients3 : register(t5);
 struct input_t
 {
     float3 localPos : POSITION;
-    float4 screenPos : SV_Position;
     uint instanceID : SV_InstanceID;
 };
 
@@ -147,7 +137,8 @@ float3 readConeMap(
         float2 t = _coneMap1.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.x), 0);
         height += t.x;
         float cmult = debugValues.patchSizes.x;
-        if (slope > t.y)
+        
+        if (slope * cmult > t.y * mult)
         {
             slope = t.y;
             mult = cmult;
@@ -158,7 +149,7 @@ float3 readConeMap(
         float2 t = _coneMap2.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.y), 0);
         height += t.x;
         float cmult = debugValues.patchSizes.y;
-        if (slope > t.y)
+        if (slope * cmult > t.y * mult)
         {
             slope = t.y;
             mult = cmult;
@@ -169,7 +160,7 @@ float3 readConeMap(
         float2 t = _coneMap3.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.z), 0);
         height += t.x;
         float cmult = debugValues.patchSizes.z;
-        if (slope > t.y)
+        if (slope * cmult > t.y * mult)
         {
             slope = t.y;
             mult = cmult;
@@ -178,6 +169,7 @@ float3 readConeMap(
 
     return float3(height, slope, mult);
 }
+
 
 float4 readGrad(float2 uv)
 {
@@ -189,8 +181,6 @@ float4 readGrad(float2 uv)
 }
 
 
-
-
 cbuffer ModelBuffer : register(b1)
 {
     float4x4 mMatrix;
@@ -198,6 +188,7 @@ cbuffer ModelBuffer : register(b1)
     float3 center;
     float PrismHeight;
 }
+
 struct InstanceData
 {
     float2 scaling;
@@ -208,7 +199,6 @@ cbuffer VertexBuffer : register(b2)
 {
     InstanceData instances[NUM_INSTANCES];
 };
-
 
 
 float ConeApprox(
@@ -247,7 +237,6 @@ ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos, float2 mid, f
     float t = length(rayv);
     rayv /= t;
     
-    
     float acc = 0;
     ConeMarchResult res;
     
@@ -269,6 +258,7 @@ ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos, float2 mid, f
         float h = dat.x;
         float tan = dat.y;
         float mult = dat.z;
+        float slope = mult / tan;
         float y = rayp.y + t * rayv.y - h;
         if (y < -0.001)
         {
@@ -285,22 +275,22 @@ ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos, float2 mid, f
             return res;
         }
 
-
+        // ensure we atleast reach a new data holding texel.
         float x1 =
-        dcell(GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.r), rayv.xz, DISP_MAP_SIZE) * debugValues.patchSizes.r;
+            dcell(GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.r), rayv.xz, DISP_MAP_SIZE) * debugValues.patchSizes.r;
+       // dcell(GetTextureCoordFromPlaneCoordAndPatch(uv, mult), rayv.xz, DISP_MAP_SIZE) * mult;
 
         float x2 =
-         debugValues.coneStepRelax * ConeApprox(y, sinB, rayv.y, tan);
-        dt = max(
-x1, x2
-            // ensure we atleast reach a new data holding texel.
-               );
+         //debugValues.coneStepRelax * ConeApprox(y, sinB, rayv.y, tan);
+            debugValues.coneStepRelax * ConeApprox(y, sinB, rayv.y, slope);
+
+        dt = max(x1, x2);
 
         acc += dt;
         t = t + dt;
         uv = rayp.xz + t * rayv.xz;
-
     }
+
     res.uv = uv;
     res.height = dat.x;
     res.flags |= (i == maxSteps ? BIT(1) : BIT(0));
@@ -316,7 +306,6 @@ x1, x2
 
 // Ran once per output vertex
 
-//[earlydepthstencil]
 output_t main(input_t input)
 {
     output_t output;
@@ -347,6 +336,9 @@ output_t main(input_t input)
         output.albedo = float4(0, 0, 1, 1);
         output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
         output.materialValues = float4(0, 0, 0, -1);
+        float3 localPos = float3(res.uv.x, res.height, res.uv.y);
+        float4 screenPos = mul(mul(float4(localPos, 1), mMatrix), camConstants.vpMatrix);
+        output.depth = screenPos.z / screenPos.w;
         return output;
     }
 
@@ -358,11 +350,15 @@ output_t main(input_t input)
             output.albedo = float4(0, 1, 0, 1);
             output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
             output.materialValues = float4(0, 0, 0, -1);
+            float3 localPos = float3(res.uv.x, res.height, res.uv.y);
+            float4 screenPos = mul(mul(float4(localPos, 1), mMatrix), camConstants.vpMatrix);
+            output.depth = screenPos.z / screenPos.w;
             return output;
         }
         else
         {
             discard;
+            //res.uv = float2(10000, 10000);
         }
     }
     if (res.flags & BIT(1) && has_flag(debugValues.flags, 14))
@@ -372,6 +368,9 @@ output_t main(input_t input)
         output.albedo = float4(1, 0, 0, 1);
         output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
         output.materialValues = float4(0, 0, 0, -1);
+        float3 localPos = float3(res.uv.x, res.height, res.uv.y);
+        float4 screenPos = mul(mul(float4(localPos, 1), mMatrix), camConstants.vpMatrix);
+        output.depth = screenPos.z / screenPos.w;
         return output;
     }
         
@@ -389,12 +388,12 @@ output_t main(input_t input)
     float4 grad = readGrad(planeCoord);
 
     // Calculate color based of these attributes
-    output = calculate(grad, input.screenPos, localPos, planeCoord);
+    float4 screenPos = mul(mul(float4(localPos, 1), mMatrix), camConstants.vpMatrix);
+    float depth = screenPos.z / screenPos.w;
+    output = calculate(grad, localPos, planeCoord, depth);
 
     
     // set depth
-    float4 screenPos = mul(mul(float4(localPos, 1), mMatrix), camConstants.vpMatrix);
-    output.depth = screenPos.z / screenPos.w;
 
     return output;
 }

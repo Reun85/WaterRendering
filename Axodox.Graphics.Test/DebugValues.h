@@ -49,6 +49,7 @@ struct DebugValues {
   float prismHeight = 2;
   float coneStepRelax = 0.9;
   DrawMethod drawMethod = DrawMethod::PrismParallax;
+  bool conecreater = false;
   const static constexpr std::initializer_list<
       std::pair<u8, std::optional<const char *>>>
       DebugBitsDesc = {{2, "Use Foam"},
@@ -104,6 +105,7 @@ struct DebugValues {
       ImGui::SliderFloat("Cone step relax", &coneStepRelax, 0, 3);
       ImGui::Checkbox("Enable SSR", &enableSSR);
       ImGui::Checkbox("Lock QuadTree", &lockQuadTree);
+      ImGui::Checkbox("Cone Creater", &conecreater);
 
       static const std::array<std::string, 3> modeitems = {
           "Tesselation",

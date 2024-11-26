@@ -35,8 +35,8 @@ cbuffer VertexBuffer : register(b2)
 struct output_t
 {
     float3 localPos : POSITION;
-    float4 screenPos : SV_Position;
     uint instanceID : SV_InstanceID;
+    float4 screenPos : SV_Position;
 };
 
 

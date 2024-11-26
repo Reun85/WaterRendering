@@ -318,7 +318,7 @@ void SimulationStage::WaterSimulationComputeShader(
 
   // Create ConeMaps
 
-  if (debugValues.calculateParallax()) {
+  if (debugValues.calculateParallax() && !debugValues.conecreater) {
     fullSimPipeline.coneMapCreater.Pre(computeAllocator);
     for (const LODData &dat : lodData) {
       fullSimPipeline.coneMapCreater.Run(
@@ -329,7 +329,7 @@ void SimulationStage::WaterSimulationComputeShader(
     }
   }
 
-  /*if (debugValues.calculateParallax()) {
+  if (debugValues.calculateParallax() && debugValues.conecreater) {
     fullSimPipeline.coneMapCreater2.Pre(computeAllocator);
     for (const LODData &dat : lodData) {
       fullSimPipeline.coneMapCreater2.Run(
@@ -338,6 +338,6 @@ void SimulationStage::WaterSimulationComputeShader(
            dat.buffers.mixMaxDisplacementMap.ShaderResource(computeAllocator),
            N});
     }
-  }*/
+  }
 }
 } // namespace SimulationStage

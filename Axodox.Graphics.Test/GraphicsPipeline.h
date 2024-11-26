@@ -2,6 +2,7 @@
 #include "pch.h"
 #include "Defaults.h"
 #include "Helpers.h"
+#include "DebugValues.h"
 
 using namespace DirectX;
 using namespace DirectX::PackedVector;
@@ -138,6 +139,7 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
       std::vector<WaterGraphicRootDescription::OceanData> &vec,
       const Camera &cam, const XMMATRIX &mMatrix,
       const float &quadTreeDistanceThreshold, const u32 &MaxDepth,
+      const DebugValues &debugValues,
       const std::optional<RuntimeResults *> &runRes = std::nullopt);
 };
 
