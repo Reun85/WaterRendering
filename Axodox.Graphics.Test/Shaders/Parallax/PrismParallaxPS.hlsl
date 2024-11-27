@@ -232,36 +232,38 @@ float dcell(float2 p, float2 v, float size)
 
 ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos, float2 mid, float2 halfExtent)
 {
-    float3 rayp = viewPos;
-    float3 rayv = localPos - rayp;
-    float t = length(rayv);
-    rayv /= t;
+    float3 rayp = localPos;
+    float3 rayv = normalize(localPos - viewPos);
     
     float acc = 0;
     ConeMarchResult res;
     
     const uint maxSteps =
         debugValues.maxConeStep;
-    float dt;
-    float2 u = localPos.xz;
-    float2 uv = u;
-    float sinB = sqrt(1. - rayv.y * rayv.y);
-    int i;
+    const float2 u = localPos.xz;
+    const float2 editedmid = u - mid;
+    const float sinB = sqrt(1. - rayv.y * rayv.y);
     const float2 eps = 0.3;
+
+    float dt;
+    float2 uv = float2(0, 0);
+    int i;
+    float t = 0;
     float3 dat;
+
 
     res.flags = BIT(1);
     for (i = 0; i < maxSteps; ++i)
     {
-        dat = readConeMap(uv);
+        dat = readConeMap(uv + u);
 
         float h = dat.x;
         float tan = dat.y;
         float mult = dat.z;
         float slope = mult / tan;
-        //float slope = tan / mult;
+       // float slope = tan / mult;
         float y = rayp.y + t * rayv.y - h;
-        if (y < -0.001)
+        if (y < 0.00001)
         {
             res.flags &= ~BIT(1);
             if (i == 0)
@@ -270,7 +272,7 @@ ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos, float2 mid, f
         }
 
         // if its not a hit and we went over, just discard this fragment
-        if (any(abs(uv - mid) > halfExtent + eps))
+        if (any(abs(uv + editedmid) > halfExtent + eps))
         {
             res.flags = BIT(2);
             break;
@@ -278,7 +280,7 @@ ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos, float2 mid, f
 
         // ensure we atleast reach a new data holding texel.
         float x1 =
-            dcell(GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.r), rayv.xz, DISP_MAP_SIZE) * debugValues.patchSizes.r;
+            dcell(GetTextureCoordFromPlaneCoordAndPatch(uv + u, debugValues.patchSizes.r), rayv.xz, DISP_MAP_SIZE) * debugValues.patchSizes.r;
        // dcell(GetTextureCoordFromPlaneCoordAndPatch(uv, mult), rayv.xz, DISP_MAP_SIZE) * mult;
 
         float x2 =
@@ -289,10 +291,10 @@ ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos, float2 mid, f
 
         acc += dt;
         t = t + dt;
-        uv = rayp.xz + t * rayv.xz;
+        uv = t * rayv.xz;
     }
 
-    res.uv = uv;
+    res.uv = uv + u;
     res.height = dat.x;
     res.flags |= (i == maxSteps ? BIT(1) : BIT(0));
 
@@ -319,7 +321,7 @@ output_t main(input_t input)
     //return output;
         
     float2 centerOfPatch = instances[input.instanceID].offset;
-    float2 halfExtentOfPatch = instances[input.instanceID].scaling;
+    float2 halfExtentOfPatch = instances[input.instanceID].scaling / 2;
     //if (any(abs(abs((input.localPos - center).xz - centerOfPatch) - halfExtentOfPatch) < 0.001))
     //{
     //    output_t output;

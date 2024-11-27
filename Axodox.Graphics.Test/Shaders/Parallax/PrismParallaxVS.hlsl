@@ -44,7 +44,6 @@ struct input_t
 {
     uint instanceID : SV_InstanceID;
     float3 localPos : Position;
-    
 };
 
 

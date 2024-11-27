@@ -128,8 +128,6 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
             grad += gradients3.SampleLevel(_sampler, texCoord, 0);
         }
 
-
-
         localPos += disp.xyz;
     }
     else

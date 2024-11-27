@@ -326,8 +326,7 @@ void ShowImguiLoaderConfig(
       if (ImGui::BeginCombo("File", files[selectedFile].first.c_str())) {
         for (uint i = 0; i < files.size(); i++) {
           bool isSelected = (selectedFile == i);
-          if (ImGui::Selectable(files[selectedFile].first.c_str(),
-                                isSelected)) {
+          if (ImGui::Selectable(files[i].first.c_str(), isSelected)) {
             selectedFile = i;
           }
           if (isSelected) {
@@ -336,8 +335,6 @@ void ShowImguiLoaderConfig(
         }
         ImGui::EndCombo();
       }
-      ImGui::Checkbox("sure?##DeleteCheck", &canDelete);
-      ImGui::SameLine();
       if (!canDelete)
         ImGui::BeginDisabled();
       if (ImGui::Button("Delete")) {
@@ -346,7 +343,20 @@ void ShowImguiLoaderConfig(
       }
       if (!canDelete && !pressedDelete)
         ImGui::EndDisabled();
+      ImGui::SameLine();
+      ImGui::Checkbox("sure?##DeleteCheck", &canDelete);
     }
+
+    ImGui::Checkbox("sure?##SaveCheck", &canOverSave);
+    ImGui::SameLine();
+    if (!canOverSave)
+      ImGui::BeginDisabled();
+    if (ImGui::Button("Save")) {
+      pressedSave = true;
+      canOverSave = false;
+    }
+    if (!canOverSave && !pressedSave)
+      ImGui::EndDisabled();
 
     if (Text == "")
       ImGui::BeginDisabled();
@@ -361,24 +371,21 @@ void ShowImguiLoaderConfig(
       std::ofstream os(file);
       os.close();
       files = getFiles();
+      auto it = std::find_if(files.begin(), files.end(), [](const auto &pair) {
+        return pair.first == Text;
+      });
+
+      if (it != files.end()) {
+        selectedFile = std::distance(files.begin(), it);
+        pressedSave = true;
+      }
     }
     if (Text == "")
       ImGui::EndDisabled();
     ImGui::SameLine();
-    if (ImGui::InputText("New file: ##Create new file", Text.data(), 128)) {
+    if (ImGui::InputText("New file: ##Createnewfile", Text.data(), 128)) {
       Text.resize(strlen(Text.c_str()));
     }
-
-    ImGui::Checkbox("sure?##SaveCheck", &canOverSave);
-    ImGui::SameLine();
-    if (!canOverSave)
-      ImGui::BeginDisabled();
-    if (ImGui::Button("Save")) {
-      pressedSave = true;
-      canOverSave = false;
-    }
-    if (!canOverSave && !pressedSave)
-      ImGui::EndDisabled();
 
     ImGui::Checkbox("sure?##LoadCheck", &canOverwrite);
     ImGui::SameLine();

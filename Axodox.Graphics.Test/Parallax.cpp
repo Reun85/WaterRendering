@@ -173,7 +173,7 @@ PrismParallaxDraw::PrismParallaxDraw(PipelineStateProvider &pipelineProvider,
                   .RasterizerState = RasterizerFlags::CullClockwise,
                   //.RasterizerState = RasterizerFlags::Wireframe,
                   .DepthStencilState = DepthStencilMode::WriteDepth,
-                  .InputLayout = VertexPositionNormalTexture::Layout,
+                  .InputLayout = VertexPosition::Layout,
                   .TopologyType = PrimitiveTopologyType::Triangle,
                   .RenderTargetFormats = std::initializer_list(
                       std::to_address(

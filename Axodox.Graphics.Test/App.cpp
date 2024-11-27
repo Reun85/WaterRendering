@@ -30,6 +30,8 @@ using namespace Axodox::Storage;
 using namespace Axodox::Threading;
 using namespace DirectX;
 using namespace DirectX::PackedVector;
+
+using namespace Windows::UI::ViewManagement;
 struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
   IFrameworkView CreateView() const { return *this; }
   void Initialize(CoreApplicationView const &) const {
@@ -58,6 +60,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                     &showImgui](CoreWindow const &, KeyEventArgs const &args) {
       if (ImGui::GetIO().WantCaptureKeyboard)
         return;
+      auto applicationView = ApplicationView::GetForCurrentView();
       switch (args.VirtualKey()) {
       case Windows::System::VirtualKey::Escape:
         quit = true;
@@ -67,6 +70,21 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         break;
       case Windows::System::VirtualKey::F1:
         showImgui = !showImgui;
+        break;
+      case Windows::System::VirtualKey::F2:
+
+        // Set the window to fullscreen
+        if (!applicationView.IsFullScreenMode()) {
+          bool success = applicationView.TryEnterFullScreenMode();
+          if (!success) {
+            // Handle the failure case if entering fullscreen mode is not
+            // successful
+            OutputDebugString(L"Failed to enter fullscreen mode.");
+          }
+        } else {
+
+          applicationView.ExitFullScreenMode();
+        }
         break;
 
       default:
