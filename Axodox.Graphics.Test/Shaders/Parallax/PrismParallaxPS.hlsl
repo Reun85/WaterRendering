@@ -259,6 +259,7 @@ ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos, float2 mid, f
         float tan = dat.y;
         float mult = dat.z;
         float slope = mult / tan;
+        //float slope = tan / mult;
         float y = rayp.y + t * rayv.y - h;
         if (y < -0.001)
         {
@@ -272,7 +273,7 @@ ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos, float2 mid, f
         if (any(abs(uv - mid) > halfExtent + eps))
         {
             res.flags = BIT(2);
-            return res;
+            break;
         }
 
         // ensure we atleast reach a new data holding texel.
@@ -330,15 +331,17 @@ output_t main(input_t input)
 
     ConeMarchResult res;
     res = ParallaxConemarch(viewPos - center, input.localPos - center, centerOfPatch, halfExtentOfPatch);
+    float2 planeCoord = res.uv;
+    float3 localPos = float3(res.uv.x, res.height, res.uv.y) + center;
+    float4 screenPos = mul(float4(localPos, 1), camConstants.vpMatrix);
+    float distance = length(viewPos - input.localPos);
+    output.depth = screenPos.z / screenPos.w;
 
     if (res.flags & BIT(4) && has_flag(debugValues.flags, 15))
     {
         output.albedo = float4(0, 0, 1, 1);
         output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
         output.materialValues = float4(0, 0, 0, -1);
-        float3 localPos = float3(res.uv.x, res.height, res.uv.y);
-        float4 screenPos = mul(mul(float4(localPos, 1), mMatrix), camConstants.vpMatrix);
-        output.depth = screenPos.z / screenPos.w;
         return output;
     }
 
@@ -346,13 +349,9 @@ output_t main(input_t input)
     {
         if (has_flag(debugValues.flags, 16))
         {
-            output_t output;
             output.albedo = float4(0, 1, 0, 1);
             output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
             output.materialValues = float4(0, 0, 0, -1);
-            float3 localPos = float3(res.uv.x, res.height, res.uv.y);
-            float4 screenPos = mul(mul(float4(localPos, 1), mMatrix), camConstants.vpMatrix);
-            output.depth = screenPos.z / screenPos.w;
             return output;
         }
         else
@@ -368,13 +367,9 @@ output_t main(input_t input)
         output.albedo = float4(1, 0, 0, 1);
         output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
         output.materialValues = float4(0, 0, 0, -1);
-        float3 localPos = float3(res.uv.x, res.height, res.uv.y);
-        float4 screenPos = mul(mul(float4(localPos, 1), mMatrix), camConstants.vpMatrix);
-        output.depth = screenPos.z / screenPos.w;
         return output;
     }
         
-    float3 localPos = float3(res.uv.x, res.height, res.uv.y);
 #ifdef TESTOUT
     output_t output;
     output.albedo = float4(localPos, 1);
@@ -382,15 +377,10 @@ output_t main(input_t input)
     output.materialValues = float4(0, 0, 0, -1);
     return output;
 #endif
-    float2 planeCoord = localPos.xz;
-    localPos += center;
-    
     float4 grad = readGrad(planeCoord);
 
     // Calculate color based of these attributes
-    float4 screenPos = mul(mul(float4(localPos, 1), mMatrix), camConstants.vpMatrix);
-    float depth = screenPos.z / screenPos.w;
-    output = calculate(grad, localPos, planeCoord, depth);
+    output = calculate(grad, localPos, planeCoord, output.depth);
 
     
     // set depth

@@ -62,13 +62,13 @@ output_t main(input_t input)
     const float2 scaling = instances[instanceID].scaling;
     const float2 offset = instances[instanceID].offset;
 
-    float3 localPos = input.localPos;
-    localPos.xz = localPos.xz * scaling + offset;
+    float3 localPos = float3(0, 0, 0);
+    localPos.xz = input.localPos.xz * scaling + offset;
     float height = PrismHeight;
 
         
     
-    localPos.y = localPos.y > eps ? height : -10;
+    localPos.y = input.localPos.y > eps ? height : -10;
     
 
     output.localPos = localPos + center;
