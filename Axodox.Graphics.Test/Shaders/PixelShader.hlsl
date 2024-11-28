@@ -2,6 +2,10 @@
 Texture2D<float4> _texture : register(t0);
 SamplerState _sampler : register(s0);
 
+Texture2D<float4> gradients1 : register(t3);
+Texture2D<float4> gradients2 : register(t4);
+Texture2D<float4> gradients3 : register(t5);
+
 
 cbuffer CameraBuffer : register(b0)
 {
@@ -22,7 +26,6 @@ struct input_t
     float4 Screen : SV_POSITION;
     float3 localPos : POSITION;
     float2 planeCoord : PLANECOORD;
-    float4 grad : GRADIENTS;
 };
 
 struct output_t
@@ -46,6 +49,20 @@ cbuffer PSProperties : register(b2)
     float _ScatterShadowStrength;
     float _Fresnel;
 };
+float4 readGrad(float2 uv)
+{
+    float4 t1 = float4(0, 0, 0, 0);
+    float4 t2 = float4(0, 0, 0, 0);
+    float4 t3 = float4(0, 0, 0, 0);
+    if (has_flag(debugValues.flags, 3))
+        t1 = gradients1.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.r), 0);
+    if (has_flag(debugValues.flags, 4))
+        t2 = gradients2.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.g), 0);
+    if (has_flag(debugValues.flags, 5))
+        t3 = gradients3.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.b), 0);
+
+    return float4(normalize(t1.rgb + t2.rgb + t3.rgb), t1.w + t2.w + t3.w);
+}
 
 
 
@@ -64,8 +81,9 @@ output_t main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
         output.albedo = text;
         return output;
     }
+    float4 grad = readGrad(input.planeCoord);
         
-    float3 normal = normalize(input.grad.xyz);
+    float3 normal = normalize(grad.xyz);
     
     const float3 viewVec = camConstants.cameraPos - input.localPos;
     float3 viewDir = normalize(viewVec);
@@ -85,7 +103,7 @@ output_t main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
     //    normal *= -1;
     //}
 
-    float Jacobian = input.grad.w;
+    float Jacobian = grad.w;
     if (has_flag(debugValues.flags, 25))
     {
         output.albedo =

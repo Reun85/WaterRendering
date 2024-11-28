@@ -206,10 +206,6 @@ void PrismParallaxDraw::Run(CommandAllocator &allocator, const Inp &inp) const {
   mask.gradientsMedium = *inp.gradients[1];
   mask.gradientsLowest = *inp.gradients[2];
 
-  mask.heightMapHighest = *inp.heightMaps[0];
-  mask.heightMapMedium = *inp.heightMaps[1];
-  mask.heightMapLowest = *inp.heightMaps[2];
-
   mask.waterPBRBuffer = inp.waterPBRBuffers;
 
   mask.debugBuffer = inp.debugBuffers;

@@ -2,11 +2,6 @@
 #include "../common.hlsli"
 
 
-Texture2D<float4> heightMap1 : register(t6);
-Texture2D<float4> heightMap2 : register(t7);
-Texture2D<float4> heightMap3 : register(t8);
-
-SamplerState _sampler : register(s0);
 cbuffer CameraBuffer : register(b0)
 {
     cameraConstants camConstants;

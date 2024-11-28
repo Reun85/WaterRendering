@@ -5,8 +5,7 @@
 #include "Defaults.h"
 #include "QuadTree.h"
 #include <random>
-
-struct NeedToDo;
+#include "Helpers.h"
 
 struct SimulationData {
   u32 N;
@@ -31,6 +30,7 @@ struct SimulationData {
     f32 Depth;
     bool DrawImGui(std::string_view ID);
     PatchData &operator=(const PatchData &other) = default;
+    bool compatibleSim(const PatchData &other);
   };
   float2 windDirection;
   f32 gravity;

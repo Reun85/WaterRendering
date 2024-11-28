@@ -75,6 +75,13 @@ bool SimulationData::PatchData::DrawImGui(std::string_view ID) {
   return change;
 }
 
+bool SimulationData::PatchData::compatibleSim(const PatchData &other) {
+  return N == other.N && M == other.M && windDirection == other.windDirection &&
+         gravity == other.gravity && Depth == other.Depth &&
+         patchSize == other.patchSize && Amplitude == other.Amplitude &&
+         WindForce == other.WindForce;
+}
+
 static SimulationData Preset1() {
   const auto &N = DefaultsValues::Simulation::N;
   const auto &M = DefaultsValues::Simulation::N;

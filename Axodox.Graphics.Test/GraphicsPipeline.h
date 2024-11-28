@@ -124,11 +124,11 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
         heightMapLowest(this, {DescriptorRangeType::ShaderResource, {2}},
                         ShaderVisibility::Domain),
         gradientsHighest(this, {DescriptorRangeType::ShaderResource, {3}},
-                         ShaderVisibility::Domain),
+                         ShaderVisibility::Pixel),
         gradientsMedium(this, {DescriptorRangeType::ShaderResource, {4}},
-                        ShaderVisibility::Domain),
+                        ShaderVisibility::Pixel),
         gradientsLowest(this, {DescriptorRangeType::ShaderResource, {5}},
-                        ShaderVisibility::Domain),
+                        ShaderVisibility::Pixel),
         _textureSampler(this, {0}, Filter::Linear, TextureAddressMode::Wrap,
                         ShaderVisibility::All) {
     Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;

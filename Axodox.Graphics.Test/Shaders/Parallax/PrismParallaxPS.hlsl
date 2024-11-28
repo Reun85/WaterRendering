@@ -173,11 +173,17 @@ float3 readConeMap(
 
 float4 readGrad(float2 uv)
 {
-    float4 t1 = gradients1.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.r), 0);
-    float4 t2 = gradients2.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.g), 0);
-    float4 t3 = gradients3.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.b), 0);
+    float4 t1 = float4(0, 0, 0, 0);
+    float4 t2 = float4(0, 0, 0, 0);
+    float4 t3 = float4(0, 0, 0, 0);
+    if (has_flag(debugValues.flags, 3))
+        t1 = gradients1.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.r), 0);
+    if (has_flag(debugValues.flags, 4))
+        t2 = gradients2.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.g), 0);
+    if (has_flag(debugValues.flags, 5))
+        t3 = gradients3.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.b), 0);
 
-    return normalize(t1 + t2 + t3);
+    return float4(normalize(t1.rgb + t2.rgb + t3.rgb), t1.w + t2.w + t3.w);
 }
 
 
@@ -280,12 +286,14 @@ ConeMarchResult ParallaxConemarch(float3 viewPos, float3 localPos, float2 mid, f
 
         // ensure we atleast reach a new data holding texel.
         float x1 =
-            dcell(GetTextureCoordFromPlaneCoordAndPatch(uv + u, debugValues.patchSizes.r), rayv.xz, DISP_MAP_SIZE) * debugValues.patchSizes.r;
+           dcell(GetTextureCoordFromPlaneCoordAndPatch(uv + u, debugValues.patchSizes.r), rayv.xz, DISP_MAP_SIZE) * debugValues.patchSizes.r;
        // dcell(GetTextureCoordFromPlaneCoordAndPatch(uv, mult), rayv.xz, DISP_MAP_SIZE) * mult;
+        
 
         float x2 =
-         //debugValues.coneStepRelax * ConeApprox(y, sinB, rayv.y, tan);
-            debugValues.coneStepRelax * ConeApprox(y, sinB, rayv.y, slope);
+        // debugValues.coneStepRelax * ConeApprox(y, sinB, rayv.y, 1 / tan);
+          debugValues.coneStepRelax * ConeApprox(y, sinB, rayv.y, slope);
+        
 
         dt = max(x1, x2);
 
@@ -313,13 +321,21 @@ output_t main(input_t input)
 {
     output_t output;
     const float3 viewPos = camConstants.cameraPos;
-       
-    //output.albedo = float4(readConeMap(input.localPos.xz - center.xz).xz / 10., 1, 1);
-    //output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
-    //output.materialValues = float4(0, 0, 0, -1);
-    //output.depth = input.screenPos.z / input.screenPos.w;
-    //return output;
-        
+    //   {
+    
+    //    float3 localPos = input.localPos;
+    //    float2 planeCoord = (localPos - center).xz;
+    //    float4 grad = readGrad(planeCoord);
+
+    //    float4 screenPos = mul(float4(localPos, 1), camConstants.vpMatrix);
+    //    float distance = length(viewPos - input.localPos);
+    //    output.depth = screenPos.z / screenPos.w;
+    //// Calculate color based of these attributes
+    //    output = calculate(grad, localPos, planeCoord, output.depth);
+    //    return output;
+    //}
+    
+            
     float2 centerOfPatch = instances[input.instanceID].offset;
     float2 halfExtentOfPatch = instances[input.instanceID].scaling / 2;
     //if (any(abs(abs((input.localPos - center).xz - centerOfPatch) - halfExtentOfPatch) < 0.001))
@@ -331,6 +347,9 @@ output_t main(input_t input)
     //    return output;
     //}
 
+
+    
+    
     ConeMarchResult res;
     res = ParallaxConemarch(viewPos - center, input.localPos - center, centerOfPatch, halfExtentOfPatch);
     float2 planeCoord = res.uv;

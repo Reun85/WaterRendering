@@ -218,10 +218,6 @@ struct PrismParallaxDraw : ShaderJob {
     RootDescriptorTable<1> gradientsMedium;
     RootDescriptorTable<1> gradientsLowest;
 
-    RootDescriptorTable<1> heightMapHighest;
-    RootDescriptorTable<1> heightMapMedium;
-    RootDescriptorTable<1> heightMapLowest;
-
     StaticSampler _textureSampler;
 
     explicit ShaderMask(const RootSignatureContext &context)
@@ -246,12 +242,6 @@ struct PrismParallaxDraw : ShaderJob {
                           ShaderVisibility::Pixel),
           gradientsLowest(this, {DescriptorRangeType::ShaderResource, {5}},
                           ShaderVisibility::Pixel),
-          heightMapHighest(this, {DescriptorRangeType::ShaderResource, {6}},
-                           ShaderVisibility::All),
-          heightMapMedium(this, {DescriptorRangeType::ShaderResource, {7}},
-                          ShaderVisibility::All),
-          heightMapLowest(this, {DescriptorRangeType::ShaderResource, {8}},
-                          ShaderVisibility::All),
           _textureSampler(this, {0}, Filter::Linear, TextureAddressMode::Wrap,
                           ShaderVisibility::All) {
       Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
@@ -282,7 +272,6 @@ struct PrismParallaxDraw : ShaderJob {
   struct Inp {
     const std::array<ShaderResourceView *const, 3> &coneMaps;
     const std::array<ShaderResourceView *const, 3> &gradients;
-    const std::array<ShaderResourceView *const, 3> &heightMaps;
     std::optional<ShaderResourceView *const> texture;
     GpuVirtualAddress cameraBuffer;
     GpuVirtualAddress debugBuffers;

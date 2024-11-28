@@ -2,9 +2,6 @@
 Texture2D<float4> _heightmap1 : register(t0);
 Texture2D<float4> _heightmap2 : register(t1);
 Texture2D<float4> _heightmap3 : register(t2);
-Texture2D<float4> gradients1 : register(t3);
-Texture2D<float4> gradients2 : register(t4);
-Texture2D<float4> gradients3 : register(t5);
 SamplerState _sampler : register(s0);
 
 cbuffer CameraBuffer : register(b0)
@@ -76,7 +73,6 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
     float highestaccountedfor = 0;
 
     
-    float4 grad = float4(0, 0, 0, 0);
     // Use displacement
     if (has_flag(debugValues.flags, 0))
     {
@@ -110,14 +106,12 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
             highestaccountedfor = HighestMax;
             float2 texCoord = GetTextureCoordFromPlaneCoordAndPatch(planeCoord, debugValues.patchSizes.r);
             disp += _heightmap1.SampleLevel(_sampler, texCoord, 0);
-            grad += gradients1.SampleLevel(_sampler, texCoord, 0);
         }
         if (has_flag(debugValues.flags, 4) && MediumMult > 0)
         {
             highestaccountedfor = MediumMax;
             float2 texCoord = GetTextureCoordFromPlaneCoordAndPatch(planeCoord, debugValues.patchSizes.g);
             disp += _heightmap2.SampleLevel(_sampler, texCoord, 0);
-            grad += gradients2.SampleLevel(_sampler, texCoord, 0);
         }
         if (has_flag(debugValues.flags, 5) && LowestMult > 0)
         {
@@ -125,18 +119,9 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
             highestaccountedfor = LowestMax;
             float2 texCoord = GetTextureCoordFromPlaneCoordAndPatch(planeCoord, debugValues.patchSizes.b);
             disp += _heightmap3.SampleLevel(_sampler, texCoord, 0);
-            grad += gradients3.SampleLevel(_sampler, texCoord, 0);
         }
 
         localPos += disp.xyz;
-    }
-    else
-    {
-        grad = float4(0, 1, 0, 0);
-    }
-    if (viewDistanceSqr > highestaccountedfor)
-    {
-        grad = float4(0, 1, 0, 0);
     }
     
     
@@ -145,7 +130,6 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
     output.Position = position;
     output.TexCoord = planeCoord;
     output.localPos = localPos;
-    output.grad = grad;
     
     return output;
 }

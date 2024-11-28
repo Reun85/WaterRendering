@@ -987,18 +987,6 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                             drawingSimResource.LODs[2]
                                 ->gradients.ShaderResource(allocator),
                         },
-                    .heightMaps =
-                        {
-                            drawingSimResource.LODs[0]
-                                ->mixMaxDisplacementMap.ShaderResource(
-                                    allocator),
-                            drawingSimResource.LODs[1]
-                                ->mixMaxDisplacementMap.ShaderResource(
-                                    allocator),
-                            drawingSimResource.LODs[2]
-                                ->mixMaxDisplacementMap.ShaderResource(
-                                    allocator),
-                        },
                     .texture = usedTextureAddress,
                     .cameraBuffer = cameraConstantBuffer,
                     .debugBuffers = debugConstantBuffer,

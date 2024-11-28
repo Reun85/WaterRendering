@@ -258,9 +258,9 @@ TravelOrder::TravelOrder(const float3 &camForward, const XMMATRIX &mMatrix) {
     // we want high dot and low length
     // we could play around with dot^n and length^(-m)
     float length = XMVectorGetX(XMVector3Length(curr));
-    float dot1 = XMVectorGetX(XMVector3Dot(curr, forwardXZ));
+    float dot = XMVectorGetX(XMVector3Dot(curr, forwardXZ));
 
-    values[i] = (1.f / dot1) / (length * length);
+    values[i] = 1.0f / (dot * length * length);
   }
 
   std::array<ChildrenID, 4> indices = {0, 1, 2, 3};

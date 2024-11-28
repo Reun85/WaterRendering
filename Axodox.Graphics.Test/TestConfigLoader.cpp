@@ -183,6 +183,7 @@ static std::vector<std::pair<std::string, std::filesystem::path>> getFiles() {
 }
 
 void inn(std::ios *s, DebugValues &x, bool v) {
+  filedo(s, x.conecreater, v);
   filedo(s, x.pixelMult, v);
   filedo(s, x.swizzleorder, v);
   filedo(s, x.blendDistances, v);
@@ -209,19 +210,35 @@ void inn(std::ios *s, SimulationData::PatchData &x, bool v) {
   filedo(s, x.foamMinValue, v);
   filedo(s, x.foamBias, v);
   filedo(s, x.foamMult, v);
-  filedo(s, x.N, v);
-  filedo(s, x.M, v);
+  // filedo(s, x.N, v);
+  // filedo(s, x.M, v);
   filedo(s, x.windDirection, v);
   filedo(s, x.gravity, v);
   filedo(s, x.Depth, v);
 };
 
-void inn(std::ios *s, SimulationData &x, bool v) {
+void inn(std::ios *s, SimulationData &x, bool v,
+         std::optional<NeedToDo *> beforeNextFrame = std::nullopt) {
+  SimulationData::PatchData tmp = x.Highest;
   inn(s, x.Highest, v);
+  if (beforeNextFrame) {
+    NeedToDo &b = **beforeNextFrame;
+    b.patchHighestChanged = !x.Highest.compatibleSim(tmp);
+  }
+  tmp = x.Medium;
   inn(s, x.Medium, v);
+  if (beforeNextFrame) {
+    NeedToDo &b = **beforeNextFrame;
+    b.patchMediumChanged = !x.Medium.compatibleSim(tmp);
+  }
+  tmp = x.Lowest;
   inn(s, x.Lowest, v);
-  filedo(s, x.N, v);
-  filedo(s, x.M, v);
+  if (beforeNextFrame) {
+    NeedToDo &b = **beforeNextFrame;
+    b.patchLowestChanged = !x.Lowest.compatibleSim(tmp);
+  }
+  // filedo(s, x.N, v);
+  // filedo(s, x.M, v);
   filedo(s, x.windDirection, v);
   filedo(s, x.gravity, v);
   filedo(s, x.Depth, v);
@@ -283,17 +300,12 @@ void PerformFileOperation(
     RuntimeSettings &settings, Camera &cam, NeedToDo &beforeNextFrame) {
 
   inn(stream, debugValues, save);
-  inn(stream, simData, save);
+  inn(stream, simData, save, &beforeNextFrame);
   inn(stream, waterData, save);
   inn(stream, sunData, save);
   inn(stream, deferredData, save);
   inn(stream, settings, save);
   inn(stream, cam, save);
-  if (!save) {
-    beforeNextFrame.patchHighestChanged = true;
-    beforeNextFrame.patchMediumChanged = true;
-    beforeNextFrame.patchLowestChanged = true;
-  }
 }
 
 void ShowImguiLoaderConfig(
@@ -411,6 +423,7 @@ void ShowImguiLoaderConfig(
     std::ifstream os(files[selectedFile].second);
     PerformFileOperation(&os, false, debugValues, simData, waterData, sunData,
                          deferredData, settings, cam, beforeNextFrame);
+    settings.timeRunning = false;
     os.close();
   }
   if (pressedDelete) {
