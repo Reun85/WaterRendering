@@ -112,7 +112,11 @@ void ParallaxDraw::Run(CommandAllocator &allocator, const Inp &inp) const {
   mask.coneMapHighest = *inp.coneMaps[0];
   mask.coneMapMedium = *inp.coneMaps[1];
   mask.coneMapLowest = *inp.coneMaps[2];
+
   mask.gradientsHighest = *inp.gradients[0];
+  mask.gradientsMedium = *inp.gradients[1];
+  mask.gradientsLowest = *inp.gradients[2];
+
   mask.gradientsMedium = *inp.gradients[1];
   mask.gradientsLowest = *inp.gradients[2];
 
@@ -205,6 +209,10 @@ void PrismParallaxDraw::Run(CommandAllocator &allocator, const Inp &inp) const {
   mask.gradientsHighest = *inp.gradients[0];
   mask.gradientsMedium = *inp.gradients[1];
   mask.gradientsLowest = *inp.gradients[2];
+
+  mask.minMaxHighest = *inp.minMax[0];
+  mask.minMaxMedium = *inp.minMax[1];
+  mask.minMaxLowest = *inp.minMax[2];
 
   mask.waterPBRBuffer = inp.waterPBRBuffers;
 
