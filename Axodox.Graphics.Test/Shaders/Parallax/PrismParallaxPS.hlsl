@@ -338,27 +338,14 @@ output_t main(input_t input)
             
     float2 centerOfPatch = instances[input.instanceID].offset;
     float2 halfExtentOfPatch = instances[input.instanceID].scaling / 2;
-    if (any(abs(abs((input.localPos - center).xz - centerOfPatch) - halfExtentOfPatch) < 0.001))
-    {
-        output_t output;
-        output.albedo = float4(0, 0, 1, 1);
-        output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
-        output.materialValues = float4(0, 0, 0, -1);
-        float4 screenPos = mul(float4(input.localPos, 1), camConstants.vpMatrix);
-        output.depth = screenPos.z / screenPos.w;
-        return output;
-    }
-    else
-    {
-        output_t output;
-        output.albedo = float4(0, 0, 0, 1);
-        output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
-        output.materialValues = float4(0, 0, 0, -1);
-        float4 screenPos = mul(float4(input.localPos, 1), camConstants.vpMatrix);
-        output.depth = screenPos.z / screenPos.w;
-        return output;
-
-    }
+    //if (any(abs(abs((input.localPos - center).xz - centerOfPatch) - halfExtentOfPatch) < 0.001))
+    //{
+    //    output_t output;
+    //    output.albedo = float4(1, 0, 0, 1);
+    //    output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
+    //    output.materialValues = float4(0, 0, 0, -1);
+    //    return output;
+    //}
 
 
     

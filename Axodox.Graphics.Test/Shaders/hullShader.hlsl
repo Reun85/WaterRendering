@@ -1,6 +1,6 @@
 #include "common.hlsli"
 
-cbuffer HullBuffer : register(b3)
+cbuffer HullBuffer : register(b1)
 {
     // zneg,xneg, zpos, xpos
     float4 TessellationFactor[NUM_INSTANCES];
@@ -21,9 +21,6 @@ struct HS_OUTPUT_PATCH
     // The domain shader recalculates the screen position
     float3 localPos : POSITION;
     float2 TexCoord : PLANECOORD;
-
-    uint instanceID : INSTANCEID;
-
 };
 
 // Ran once per control of input patch
@@ -40,7 +37,6 @@ HS_OUTPUT_PATCH main(InputPatch<HS_INPUT_PATCH, 4> patch, uint i : SV_OutputCont
 TexCoord;
     output.localPos = patch[i].
 localPos;
-    output.instanceID = patch[i].instanceID;
     
     return
 output;

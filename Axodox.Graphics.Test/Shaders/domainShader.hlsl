@@ -20,15 +20,12 @@ struct DS_OUTPUT
     float3 localPos : POSITION;
     float2 TexCoord : PLANECOORD;
     float4 grad : GRADIENTS;
-    uint instanceID : INSTANCEID;
 };
 
 struct HS_OUTPUT_PATCH
 {
     float3 localPos : POSITION;
     float2 TexCoord : PLANECOORD;
-
-    uint instanceID : INSTANCEID;
 };
 
 
@@ -124,6 +121,7 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
             disp += _heightmap3.SampleLevel(_sampler, texCoord, 0);
         }
 
+        localPos += disp.xyz;
     }
     
     
@@ -132,7 +130,6 @@ DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT patchConstants,
     output.Position = position;
     output.TexCoord = planeCoord;
     output.localPos = localPos;
-    output.instanceID = patch[0].instanceID;
     
     return output;
 }
