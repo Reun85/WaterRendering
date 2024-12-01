@@ -355,7 +355,6 @@ output_t main(input_t input)
     float2 planeCoord = res.uv;
     float3 localPos = float3(res.uv.x, res.height, res.uv.y) + center;
     float4 screenPos = mul(float4(localPos, 1), camConstants.vpMatrix);
-    float distance = length(viewPos - input.localPos);
     output.depth = screenPos.z / screenPos.w;
 
     if (res.flags & BIT(4) && has_flag(debugValues.flags, 15))

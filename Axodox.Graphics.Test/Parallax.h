@@ -166,6 +166,7 @@ struct ParallaxDraw : ShaderJob {
     float3 center;
     int padding = 0;
     float2 scale;
+    float PrismHeight;
     GpuVirtualAddress Upload(DynamicBufferManager &bufferManager) {
       return bufferManager.AddBuffer(this);
     }

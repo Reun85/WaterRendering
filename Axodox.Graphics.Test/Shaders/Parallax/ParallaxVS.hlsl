@@ -11,6 +11,7 @@ cbuffer ModelBuffer : register(b1)
 {
     float3 center;
     float2 scaling;
+    float PrismHeight;
 };
 struct output_t
 {
@@ -32,8 +33,7 @@ output_t main(input_t input)
     output_t output;
 
     float2 texCoord = input.Position.yx * scaling;
-    
-    float3 position = float3(texCoord.x, 0, texCoord.y) + center;
+    float3 position = float3(texCoord.x, PrismHeight, texCoord.y) + center;
 
     float4 screenPosition = mul(float4(position, 1), camConstants.vpMatrix);
     output.Position = screenPosition;

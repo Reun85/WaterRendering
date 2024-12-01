@@ -18,14 +18,15 @@ cbuffer ModelBuffer : register(b1)
 {
     float3 center;
     float2 scaling;
+    float PrismHeight;
 };
 
 
 struct output_t
 {
-    float4 albedo;
-    float4 normal;
-    float4 materialValues;
+    float4 albedo : SV_Target0;
+    float4 normal : SV_Target1;
+    float4 materialValues : SV_Target2;
 };
 
 
@@ -44,7 +45,7 @@ cbuffer PSProperties : register(b2)
 };
 
 
-output_t calculate(float4 grad, float4 Screen, float3 localPos, float2 planeCoord)
+output_t calculate(float4 grad, float3 localPos, float2 planeCoord, float depth)
 {
 
     output_t output;
@@ -88,10 +89,6 @@ output_t calculate(float4 grad, float4 Screen, float3 localPos, float2 planeCoor
         return output;
     }
     
-    float depth = Screen.z / Screen.w;
-
-				
-
 				
     float foam = 0;
     if (has_flag(debugValues.flags, 2))
@@ -100,15 +97,10 @@ output_t calculate(float4 grad, float4 Screen, float3 localPos, float2 planeCoor
     lerp(0.0f, Jacobian, pow(depth, foamDepthFalloff));
     }
 
-    normal = lerp(normal, float3(0, 1, 0), pow(depth, NormalDepthAttenuation));
-
-
-
+    //normal = lerp(normal, float3(0, 1, 0), pow(depth, NormalDepthAttenuation));
 				
     // Make foam appear rougher
     float a = Roughness + foam * foamRoughnessModifier;
-
-   
     				
     float3 albedo = Albedo;
 
@@ -153,7 +145,8 @@ float3 readConeMap(
         float2 t = _coneMap1.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.x), 0);
         height += t.x;
         float cmult = debugValues.patchSizes.x;
-        if (slope > t.y)
+        
+        if (slope * cmult > t.y * mult)
         {
             slope = t.y;
             mult = cmult;
@@ -164,7 +157,7 @@ float3 readConeMap(
         float2 t = _coneMap2.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.y), 0);
         height += t.x;
         float cmult = debugValues.patchSizes.y;
-        if (slope > t.y)
+        if (slope * cmult > t.y * mult)
         {
             slope = t.y;
             mult = cmult;
@@ -175,7 +168,7 @@ float3 readConeMap(
         float2 t = _coneMap3.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.z), 0);
         height += t.x;
         float cmult = debugValues.patchSizes.z;
-        if (slope > t.y)
+        if (slope * cmult > t.y * mult)
         {
             slope = t.y;
             mult = cmult;
@@ -185,56 +178,122 @@ float3 readConeMap(
     return float3(height, slope, mult);
 }
 
+
 float4 readGrad(float2 uv)
 {
-    float4 t1 = gradients1.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.r), 0);
-    float4 t2 = gradients2.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.g), 0);
-    float4 t3 = gradients3.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.b), 0);
+    float4 t1 = float4(0, 0, 0, 0);
+    float4 t2 = float4(0, 0, 0, 0);
+    float4 t3 = float4(0, 0, 0, 0);
+    if (has_flag(debugValues.flags, 3))
+        t1 = gradients1.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.r), 0);
+    if (has_flag(debugValues.flags, 4))
+        t2 = gradients2.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.g), 0);
+    if (has_flag(debugValues.flags, 5))
+        t3 = gradients3.SampleLevel(_sampler, GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.b), 0);
 
-    return normalize(t1 + t2 + t3);
+    return float4(normalize(t1.rgb + t2.rgb + t3.rgb), t1.w + t2.w + t3.w);
+}
+float ConeApprox(
+float y, float sinB, float cosB, float tanA)
+{
+    return tanA * y / (sinB - cosB * tanA);
 }
 
-
-ConeMarchResult findIntersection_coneStepMapping(float2 uv, float3 viewDirT, uint maxSteps)
+float dcell(float p, float v, float size)
 {
-    float2 HMres = float2(DISP_MAP_SIZE, DISP_MAP_SIZE);
-    float prismHeight = 2.;
-    float2 u2 = uv - viewDirT.xy / viewDirT.z;
+    float x = floor(p * size + 0.5) + 0.5 * sign(v);
+    float vr = 1. / v;
+    float sizer = 1. / size;
+    return (x) * vr * sizer - p * vr;
+}
+// assume rectangular image
+float dcell(float2 p, float2 v, float size)
+{
+    return min(dcell(p.x, v.x, size), dcell(p.y, v.y, size));
+}
+//https://github.com/Bundas102/robust-cone-map/tree/master
+// for planes with normal (0,1,0)
+// and centered around (0,0,0)
 
-    float3 ds = float3(u2 - uv, 1);
-    ds = normalize(ds);
-    float w = prismHeight / HMres.x;
-    float iz = sqrt(1.0 - ds.z * ds.z); // = length(ds.xz)
-    float sc = 0;
-    float3 dat = readConeMap(uv);
-    int stepCount = 0;
-    float zTimesSc = 0.0;
+//#define TESTOUT
 
-    float2 dirSign = float2(ds.x < 0 ? -1 : 1, ds.y < 0 ? -1 : 1) * 0.5 / HMres.xy;
+ 
+#define BIT(x) (1 << x)
+#define CONSERVATIVE_STEP true
 
-    float relax = 0.9;
+
+ConeMarchResult ParallaxConemarch(
+float3 viewPos, float3 localPos)
+{
+    float3 rayp = localPos;
+    float3 rayv = normalize(localPos - viewPos);
     
-    while (prismHeight - ds.z * sc > dat.x && stepCount < maxSteps)
+    float acc = 0;
+    ConeMarchResult res;
+    
+    const uint maxSteps =
+        debugValues.maxConeStep;
+    const float2 u = localPos.xz;
+    const float sinB = sqrt(1. - rayv.y * rayv.y);
+    const float2 eps = 0.3;
+
+    float dt;
+    float2 uv = float2(0, 0);
+    int i;
+    float t = 0;
+    float3 dat;
+
+
+    res.flags = BIT(1);
+    for (i = 0; i <
+maxSteps; ++i)
     {
-        zTimesSc = ds.z * sc;
-#if CONSERVATIVE_STEP
-        const float2 p = uv + ds.xy * sc;
-        const float2 cellCenter = (floor(p * HMres.xy - .5) + 1) / HMres.xy;
-        const float2 wall = cellCenter + dirSign;
-        const float2 stepToCellBorder = (wall - p) / ds.xy;
-        w = min(stepToCellBorder.x, stepToCellBorder.y) * dat.z + 1e-5;
-#endif
-        sc += relax * max(w, (prismHeight - zTimesSc - dat.x) * dat.y / (-dat.y / dat.z * ds.z + iz));
-        //sc += relax * ConeApprox(-(prismHeight - zTimesSc - dat.x), iz, -ds.z, dat.y / dat.z) * dat.z;
-        dat = readConeMap(uv + ds.xy * sc);
-        ++stepCount;
+        dat = readConeMap(uv + u);
+
+        float h = dat.x;
+        float tan = dat.y;
+        float mult = dat.z;
+        float slope = mult / tan;
+       // float slope = tan / mult;
+        float y = rayp.y + t * rayv.y - h;
+        if (y < 0.00001)
+        {
+            res.flags &= ~BIT(1);
+            if (i == 0)
+                res.flags |= BIT(4);
+            break;
+        }
+
+
+        // ensure we atleast reach a new data holding texel.
+        float x1 =
+           dcell(GetTextureCoordFromPlaneCoordAndPatch(uv + u, debugValues.patchSizes.r), rayv.xz, DISP_MAP_SIZE) * debugValues.patchSizes.r;
+       // dcell(GetTextureCoordFromPlaneCoordAndPatch(uv, mult), rayv.xz, DISP_MAP_SIZE) * mult;
+        
+
+        float x2 =
+        // debugValues.coneStepRelax * ConeApprox(y, sinB, rayv.y, 1 / tan);
+          debugValues.coneStepRelax * ConeApprox(y, sinB, rayv.y, slope);
+        
+
+        dt = max(x1, x2);
+
+        acc +=
+dt;
+        t = t + dt;
+        uv = t * rayv.
+xz;
     }
-    
-    ConeMarchResult ret;
-    float tt = ds.z * sc;
-    ret.uv = (1 - tt) * uv + tt * u2;
-    ret.height = tt;
-    return ret;
+
+    res.uv = uv +
+u;
+    res.height = dat.
+x;
+    res.flags |= (i == maxSteps ? BIT(1) : BIT(0));
+
+
+    return
+res;
 }
 
 output_t main(input_t input) : SV_TARGET
@@ -242,31 +301,38 @@ output_t main(input_t input) : SV_TARGET
     
     const float3 viewPos = camConstants.cameraPos;
 
-    float3 localPos = float3(input.planeCoord.x, 0, input.planeCoord.y) + center;
-    float3 viewDirW = normalize(localPos - viewPos);
-    float3 T = float3(1, 0, 0);
-    float3 B = float3(0, 0, 1);
-    float3 N = float3(0, 1, 0);
-
-    float3 viewDirT = mul(viewDirW, transpose(invMat(T, B, N))); // Transform viewDirW to tangent space
+    float3 localPos = float3(input.planeCoord.x, PrismHeight, input.planeCoord.y) + center;
+ 
+    output_t output;
  
         
-    ConeMarchResult res = findIntersection_coneStepMapping(input.planeCoord, viewDirT, debugValues.maxConeStep);
+    ConeMarchResult res = ParallaxConemarch(viewPos - center, localPos - center);
+    float2 planeCoord = res.uv;
     localPos = float3(res.uv.x, res.height, res.uv.y);
-#ifdef TESTOUT
-    output_t output;
-    output.albedo = float4(localPos, 1);
-    output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
-    output.materialValues = float4(0, 0, 0, -1);
-    return output;
-#endif
-    float2 planeCoord = localPos.xz;
-    localPos += center;
+    float4 screenPos = mul(float4(localPos, 1), camConstants.vpMatrix);
+    float depth = screenPos.z / screenPos.w;
+    if (res.flags & BIT(4) && has_flag(debugValues.flags, 15))
+    {
+        output.albedo = float4(0, 0, 1, 1);
+        output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
+        output.materialValues = float4(0, 0, 0, -1);
+        return output;
+    }
+
+    if (res.flags & BIT(1) && has_flag(debugValues.flags, 14))
+    {
+        // miss
+
+        output.albedo = float4(1, 0, 0, 1);
+        output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
+        output.materialValues = float4(0, 0, 0, -1);
+        return output;
+    }
     
     float4 grad = readGrad(planeCoord);
 
     // Calculate color based of these attributes
-    output_t output = calculate(grad, input.Position, localPos, planeCoord);
+    output = calculate(grad, localPos, planeCoord, depth);
 
     return output;
 }
