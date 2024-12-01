@@ -26,6 +26,9 @@ struct input_t
     float4 Screen : SV_POSITION;
     float3 localPos : POSITION;
     float2 planeCoord : PLANECOORD;
+
+    float4 grad : GRADIENTS;
+    uint instanceID : INSTANCEID;
 };
 
 struct output_t
@@ -34,10 +37,18 @@ struct output_t
     float4 normal;
     float4 materialValues;
 };
+struct InstanceData
+{
+    float2 scaling;
+    float2 offset;
+};
+cbuffer VertexBuffer : register(b2)
+{
+    InstanceData instances[NUM_INSTANCES];
+};
 
 
-
-cbuffer PSProperties : register(b2)
+cbuffer PSProperties : register(b4)
 {
     float3 Albedo;
     float Roughness;
@@ -68,7 +79,32 @@ float4 readGrad(float2 uv)
 
 output_t main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
 {
+ 
+            
+    float2 centerOfPatch = instances[input.instanceID].offset;
+    float2 halfExtentOfPatch = instances[input.instanceID].scaling / 2;
+    if (any(abs(abs((input.localPos).xz - centerOfPatch) - halfExtentOfPatch) < 0.2))
+    {
+        output_t output;
+        output.albedo = float4(0, 0, 1, 1);
+        output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
+        output.materialValues = float4(0, 0, 0, -1);
+        return output;
+    }
+    else
+    {
+        output_t output;
+        output.albedo = float4(0, 0, 0, 1);
+        output.normal = float4(OctahedronNormalEncode(float3(0, 1, 0)), 0, 1);
+        output.materialValues = float4(0, 0, 0, -1);
+        return output;
 
+    }
+
+
+    
+    
+    
     output_t output;
     
 	

@@ -108,12 +108,12 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
 
   explicit WaterGraphicRootDescription(const RootSignatureContext &context)
       : RootSignatureMask(context),
-        vertexBuffer(this, {2}, ShaderVisibility::Vertex),
-        hullBuffer(this, {1}, ShaderVisibility::Hull),
+        vertexBuffer(this, {2}, ShaderVisibility::All),
+        hullBuffer(this, {3}, ShaderVisibility::All),
         cameraBuffer(this, {0}, ShaderVisibility::All),
-        modelBuffer(this, {1}, ShaderVisibility::Vertex),
+        modelBuffer(this, {1}, ShaderVisibility::All),
         debugBuffer(this, {9}, ShaderVisibility::All),
-        waterPBRBuffer(this, {2}, ShaderVisibility::Pixel),
+        waterPBRBuffer(this, {4}, ShaderVisibility::All),
 
         texture(this, {DescriptorRangeType::ShaderResource, {0}},
                 ShaderVisibility::Pixel),
