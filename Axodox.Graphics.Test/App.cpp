@@ -14,6 +14,8 @@
 #include "DebugValues.h"
 #include <TestConfigLoader.h>
 
+#include <sstream>
+
 using namespace std;
 using namespace winrt;
 
@@ -32,25 +34,46 @@ using namespace DirectX;
 using namespace DirectX::PackedVector;
 
 using namespace Windows::UI::ViewManagement;
-struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
-  IFrameworkView CreateView() const { return *this; }
-  void Initialize(CoreApplicationView const &) const {
-    // ?
-  }
-
-  void Load(hstring const &) const {
-    // ?
-  }
-
-  void Uninitialize() const {
-    // ?
-  }
 
   struct TimeData {
     float deltaTime;
     float timeSinceLaunch;
   };
 
+
+  inline static ID3D12DescriptorHeap *
+  InitImGui(const Axodox::Graphics::D3D12::GraphicsDevice &device,
+            u8 framesInFlight, const string &iniPath) {
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO &io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    ImGui::StyleColorsDark();
+
+    io.IniFilename = iniPath.c_str();
+
+    // Setup Platform/Renderer bindings
+    ImGui_ImplUwp_InitForCurrentView();
+
+    D3D12_DESCRIPTOR_HEAP_DESC ImGuiDescriptorHeapDesc = {};
+    ImGuiDescriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    ImGuiDescriptorHeapDesc.NumDescriptors = 2;
+    ImGuiDescriptorHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+
+    ID3D12DescriptorHeap *ImGuiDescriptorHeap{};
+    check_hresult(device.get()->CreateDescriptorHeap(
+        &ImGuiDescriptorHeapDesc, IID_PPV_ARGS(&ImGuiDescriptorHeap)));
+    ImGui_ImplDX12_Init(
+        device.get(), static_cast<int>(framesInFlight),
+        DXGI_FORMAT_B8G8R8A8_UNORM, ImGuiDescriptorHeap,
+        ImGuiDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
+        ImGuiDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+    return ImGuiDescriptorHeap;
+  }
+
+
+  
+  // This is a test
   static void SetUpWindowInput(const CoreWindow &window,
                                RuntimeSettings &settings, Camera &cam) {
     bool &timerunning = settings.timeRunning;
@@ -111,37 +134,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         });
   }
 
-  inline static ID3D12DescriptorHeap *
-  InitImGui(const Axodox::Graphics::D3D12::GraphicsDevice &device,
-            u8 framesInFlight, const string &iniPath) {
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO &io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    ImGui::StyleColorsDark();
-
-    io.IniFilename = iniPath.c_str();
-
-    // Setup Platform/Renderer bindings
-    ImGui_ImplUwp_InitForCurrentView();
-
-    D3D12_DESCRIPTOR_HEAP_DESC ImGuiDescriptorHeapDesc = {};
-    ImGuiDescriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    ImGuiDescriptorHeapDesc.NumDescriptors = 2;
-    ImGuiDescriptorHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-
-    ID3D12DescriptorHeap *ImGuiDescriptorHeap{};
-    check_hresult(device.get()->CreateDescriptorHeap(
-        &ImGuiDescriptorHeapDesc, IID_PPV_ARGS(&ImGuiDescriptorHeap)));
-    ImGui_ImplDX12_Init(
-        device.get(), static_cast<int>(framesInFlight),
-        DXGI_FORMAT_B8G8R8A8_UNORM, ImGuiDescriptorHeap,
-        ImGuiDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
-        ImGuiDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-    return ImGuiDescriptorHeap;
-  }
-
-  static void DrawImGuiForPSResources(
+ static void DrawImGuiForPSResources(
       WaterGraphicRootDescription::WaterPixelShaderData &waterData,
       PixelLighting &sunData, DeferredShading::DeferredShaderBuffers &defData,
       bool exclusiveWindow = true) {
@@ -222,15 +215,21 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
       ImGui::End();
   }
 
-  struct RuntimeCPUBuffers {
-    std::vector<WaterGraphicRootDescription::OceanData> oceanData;
-  };
 
-  void Run() const {
-    CoreWindow window = CoreWindow::GetForCurrentThread();
-    window.Activate();
+struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
+  IFrameworkView CreateView() const { return *this; }
+  void Initialize(CoreApplicationView const &view)  {
+    // ?
+    cout << "Init" << std::endl;
+    window = view.CoreWindow();
+    dispatcher = view.Dispatcher();
+  }
 
-    Camera cam;
+  void Load(hstring const &) {
+    // ?
+
+    cout << "Load" << std::endl;
+
     cam.SetView(XMVectorSet(DefaultsValues::Cam::camStartPos.x,
                             DefaultsValues::Cam::camStartPos.y,
                             DefaultsValues::Cam::camStartPos.z, 0),
@@ -238,22 +237,45 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                 XMVectorSet(0.0f, 1.0f, 0.0f, 0));
 
     cam.SetFirstPerson(DefaultsValues::Cam::startFirstPerson);
+
+
+  }
+
+  void Uninitialize()  {
+    // ?
+    cout << "Deinit" << std::endl;
+
+    ImGui_ImplDX12_Shutdown();
+    ImGui_ImplUwp_Shutdown();
+    ImGui::DestroyContext();
+  }
+
+
+
+
+ 
+  struct RuntimeCPUBuffers {
+    std::vector<WaterGraphicRootDescription::OceanData> oceanData;
+  };
+
+  void Suspending() {
+
+  }
+
+  void Run()  {
+ 
+      cout << "Run" << std::endl;
     // Events
 
-    RuntimeSettings settings;
-    DebugValues debugValues;
 
-    SetUpWindowInput(window, settings, cam);
 
-    CoreDispatcher dispatcher = window.Dispatcher();
 
-    GraphicsDevice device{};
     CommandQueue directQueue{device};
-    // CommandQueue computeQueue{device, /* CommandKind::Compute*/};
     CommandQueue &computeQueue = directQueue;
-    CoreSwapChain swapChain{directQueue, window,
+     CoreSwapChain swapChain {directQueue, window,
                             SwapChainFlags::IsTearingAllowed};
     // CoreSwapChain swapChain{directQueue, window, SwapChainFlags::Default};
+
 
     PipelineStateProvider pipelineStateProvider{device};
 
@@ -265,7 +287,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
     HullShader hullShader{app_folder() / L"hullShader.cso"};
     DomainShader domainShader{app_folder() / L"domainShader.cso"};
 
-    auto gBufferFormats = DeferredShading::GBuffer::GetGBufferFormats();
+    auto& gBufferFormats = DeferredShading::GBuffer::GetGBufferFormats();
 
     GraphicsPipelineStateDefinition waterPipelineStateDefinition{
         .RootSignature = &waterRootSignature,
@@ -445,7 +467,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
 
     swapChain.Resizing(
         no_revoke,
-        [&cam, &frameResources, &commonDescriptorHeap](SwapChain const *self) {
+        [this, &frameResources, &commonDescriptorHeap](SwapChain const *self) {
           for (auto &frame : frameResources)
             frame.ScreenResourceView.reset();
           commonDescriptorHeap.Clean();
@@ -586,8 +608,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           first_loop) {
         oceanDataFuture = threadpool_execute<
             std::vector<WaterGraphicRootDescription::OceanData> &>(
-            [&cpuBuffers, cam, simData, &runtimeResults, camChanged,
-             oceanModelMatrix, &debugValues]()
+            [&cpuBuffers, this, simData, &runtimeResults, camChanged,
+             oceanModelMatrix]()
                 -> std::vector<WaterGraphicRootDescription::OceanData> & {
               if (camChanged && !debugValues.lockQuadTree) {
                 cpuBuffers.oceanData.clear();
@@ -1132,6 +1154,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
           ImGui::NewFrame();
 
           if (ImGui::Begin("Application")) {
+            prints += cout.str();
+            cout.str("");
             ImGui::Text("Press ESC to quit");
             ImGui::Text("Press Space to stop time");
             ImGui::Text("frame %d", frameCounter);
@@ -1142,6 +1166,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
                     getTimeSinceStart()));
             ImGui::Text(" %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate,
                         io.Framerate);
+
             settings.DrawImGui(beforeNextFrame);
 
             runtimeResults.DrawImGui(false);
@@ -1158,6 +1183,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
               if (i != 2)
                 ImGui::SameLine();
             }
+
+            ImGui::Text("LOGS:\n---------------------\n%s", prints.c_str());
           }
           ImGui::End();
           debugValues.DrawImGui(beforeNextFrame);
@@ -1208,16 +1235,43 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView> {
         drawingSimResource.Fence.Await(drawingSimResource.FrameDoneMarker);
       }
     }
-    ImGui_ImplDX12_Shutdown();
-    ImGui_ImplUwp_Shutdown();
-    ImGui::DestroyContext();
   }
 
-  void SetWindow(CoreWindow const & /*window*/) const {
-    // ?
+  void SetWindow(CoreWindow const & window){
+    cout << "SetWindow" << std::endl;
+    window.Activate();
+    this->window = window;
+    this->dispatcher = window.Dispatcher();
+
+    SetUpWindowInput(window, settings, cam);
   }
+
+  App(): window(nullptr),dispatcher(nullptr){
+  }
+
+  // Items
+  private: 
+      // WinRT
+      // -----------------
+      CoreWindow window;
+    CoreDispatcher dispatcher;
+      
+      // DirectX
+
+    GraphicsDevice device;
+
+      // App 
+      // -----------------
+    Camera cam;
+    RuntimeSettings settings;
+    DebugValues debugValues;
+      // -----------------
+
+      // debug purposes
+      std::string prints;
+      std::stringstream cout;
 };
 
-int __stdcall wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
+static int __stdcall wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
   CoreApplication::Run(make<App>());
 }

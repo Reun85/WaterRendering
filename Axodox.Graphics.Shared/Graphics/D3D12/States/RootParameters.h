@@ -91,7 +91,7 @@ private:
   InputSlot _slot;
 
   static consteval uint32_t Size() {
-    return uint32_t(size_of(T) / 4 + (size_of(T) % 4 == 0 ? 0 : 1));
+    return (static_cast<uint32_t>(sizeof(T)) + 3) / 4;
   }
 
   static std::array<std::byte, Size()> AsBuffer(T value) {
