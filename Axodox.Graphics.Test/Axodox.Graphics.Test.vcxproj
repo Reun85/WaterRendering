@@ -6,7 +6,7 @@
     <CppWinRTRootNamespaceAutoMerge>true</CppWinRTRootNamespaceAutoMerge>
     <MinimalCoreWin>true</MinimalCoreWin>
     <ProjectGuid>{8e862168-f430-4a67-b9d4-e3d04f59e033}</ProjectGuid>
-    <ProjectName>Axodox.Graphics.Test</ProjectName>
+    <ProjectName>Axodox.Graphics.Desktop</ProjectName>
     <RootNamespace>Axodox_Graphics_Test</RootNamespace>
     <DefaultLanguage>en-US</DefaultLanguage>
     <MinimumVisualStudioVersion>15.0</MinimumVisualStudioVersion>
