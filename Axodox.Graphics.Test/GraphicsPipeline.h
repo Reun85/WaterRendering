@@ -242,8 +242,8 @@ struct ShadowMapping : public RootSignatureMask {
     explicit Textures(const ResourceAllocationContext &context,
                       const u32 N = 1024);
 
-    void MakeCompatible(const RenderTargetView &_,
-                        ResourceAllocationContext &__) override {
+    void MakeCompatible(const RenderTargetView &,
+                        ResourceAllocationContext &) override {
       // No need to allocate
     }
     void Clear(CommandAllocator &allocator) override;
