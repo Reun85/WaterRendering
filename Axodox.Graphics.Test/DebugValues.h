@@ -234,11 +234,12 @@ private:
 };
 
 struct DebugGPUBufferStuff {
-  XMFLOAT4 pixelMult;
-  XMFLOAT4 blendDistances;
-  XMUINT4 swizzleOrder;
-  XMFLOAT4 foamInfo;
-  XMFLOAT3 patchSizes;
+  XMFLOAT4 pixelMult = XMFLOAT4(0, 0, 0, 0);
+  XMFLOAT4 blendDistances = XMFLOAT4(0, 0, 0, 0);
+
+  XMUINT4 swizzleOrder = XMUINT4(0, 0, 0, 0);
+  XMFLOAT4 foamInfo = XMFLOAT4(0, 0, 0, 0);
+  XMFLOAT3 patchSizes = XMFLOAT3(0, 0, 0);
   // 0: use displacement
   // 1: use normal
   // 2: use foam
@@ -248,9 +249,9 @@ struct DebugGPUBufferStuff {
   // 6: display texture instead of shader
   // 7: transform texture values from [-1,1] to [0,1]
   u32 flags = 0; // Its here because padding
-  float EnvMapMult;
-  int maxConeStep;
-  float coneStepRelax;
+  float EnvMapMult = 0.;
+  int maxConeStep = 0;
+  float coneStepRelax = 0.;
 };
 static void set_flag(u32 &flag, u32 flagIndex, bool flagValue = true) {
   if (flagValue) {

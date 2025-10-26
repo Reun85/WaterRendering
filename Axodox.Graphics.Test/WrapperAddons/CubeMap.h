@@ -5,24 +5,24 @@ using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
 
 struct CubeMapPaths {
-  union {
-    struct {
-      std::filesystem::path PosX;
-      std::filesystem::path NegX;
-      std::filesystem::path PosY;
-      std::filesystem::path NegY;
-      std::filesystem::path PosZ;
-      std::filesystem::path NegZ;
-    };
-    std::array<const std::filesystem::path, 6> paths;
-  };
-  ~CubeMapPaths() noexcept {};
+  std::filesystem::path PosX;
+  std::filesystem::path NegX;
+  std::filesystem::path PosY;
+  std::filesystem::path NegY;
+  std::filesystem::path PosZ;
+  std::filesystem::path NegZ;
+  std::array<const std::filesystem::path, 6> AsArray() const {
+    return {PosX, NegX, PosY, NegY, PosZ, NegZ};
+  }
+
+  ~CubeMapPaths() noexcept = default;
 };
 
 /// <summary>
 ///  Represents a cubemap texture.
-/// Supports parsing a equirectangular HDR image to a cubemap texture. BE WARNED, IT IS SLOW. 
-/// You should use a pre-processed cubemap textures instead. but for testing purposes, it works great.
+/// Supports parsing a equirectangular HDR image to a cubemap texture. BE
+/// WARNED, IT IS SLOW. You should use a pre-processed cubemap textures instead.
+/// but for testing purposes, it works great.
 /// </summary>
 class CubeMapTexture {
 public:

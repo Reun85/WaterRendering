@@ -23,7 +23,7 @@ enum class CubeMapFace : u8 {
   NegX = 5
 };
 
-std::tuple<f32, f32, f32>
+static std::tuple<f32, f32, f32>
 FaceCoordinatesToWorldCoordinates(u32 i, u32 j, u32 width, CubeMapFace face) {
   f32 a = 2.0f * static_cast<f32>(i) / static_cast<f32>(width);
   f32 b = 2.0f * static_cast<f32>(j) / static_cast<f32>(width);
@@ -53,7 +53,7 @@ FaceCoordinatesToWorldCoordinates(u32 i, u32 j, u32 width, CubeMapFace face) {
 }
 
 // Lanczos kernel function
-constexpr inline f32 LanczosKernel(f32 x, f32 a = 3.0f) {
+static constexpr inline f32 LanczosKernel(f32 x, f32 a = 3.0f) {
   if (x == 0.0f)
     return 1.0f;
   if (x < -a || x > a)
@@ -252,7 +252,7 @@ CubeMapTexture::CubeMapTexture(const ResourceAllocationContext &context,
 
   std::vector<TextureData> data;
   data.reserve(faceCount);
-  for (const auto &p : inp.paths) {
+  for (const auto &p : inp.AsArray()) {
     data.push_back(TextureData::FromFile(p));
   }
 

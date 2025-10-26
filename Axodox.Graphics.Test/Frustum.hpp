@@ -34,9 +34,9 @@ struct Volume {
   virtual bool isOnFrustum(const Frustum &camFrustum,
                            const XMMATRIX &mMatrix) const = 0;
 };
-
 struct AABB : public Volume {
   // This is padded due to vtable. Cool
+  u64 padding = 0;
   XMVECTOR center{0.f, 0.f, 0.f, 1};
   XMVECTOR extents{0.f, 0.f, 0.f, 1};
 

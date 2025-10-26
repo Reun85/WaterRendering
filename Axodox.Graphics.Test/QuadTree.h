@@ -136,7 +136,7 @@ private:
   std::vector<value_type> nodes;
   NodeID count = 0;
   Depth height = 0;
-  Depth maxDepth;
+  Depth maxDepth = Defaults::maxDepth;
   Depth minDepth = Defaults::minDepth;
   TravelOrder order;
 };
