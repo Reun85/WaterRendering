@@ -107,33 +107,27 @@ class Xorshift128 {
 public:
   using result_type = uint32_t;
 
-  explicit Xorshift128(uint32_t seed = std::random_device{}()) {
-    // Seed the state with a non-zero seed
-    state[0] = seed;
-    state[1] = seed ^ 0x6C8E9CF570932BD5ULL;
-    state[2] = seed ^ 0xDEADBEEFDEADBEEFULL;
-    state[3] = seed ^ 0xBADDCAFEFEEDFACEULL;
+  explicit Xorshift128(result_type seed = std::random_device{}()) {
+    x = seed;
+    // truncate them
+    y = static_cast<result_type>(seed ^ 0x6C8E9CF570932BD5ULL);
+    z = static_cast<result_type>(seed ^ 0xDEADBEEFDEADBEEFULL);
+    w = static_cast<result_type>(seed ^ 0xBADDCAFEFEEDFACEULL);
   }
 
   static constexpr result_type min() { return 0; }
   static constexpr result_type max() { return UINT32_MAX; }
 
-  uint32_t operator()() {
-    // Xorshift128 algorithm
-    uint32_t t = state[3];
-    t ^= t << 11;
-    t ^= t >> 8;
-    state[3] = state[2];
-    state[2] = state[1];
-    state[1] = state[0];
-    t ^= state[0];
-    t ^= state[0] >> 19;
-    state[0] = t;
-    return t;
+  result_type operator()() {
+    result_type t = x ^ (x << 11);
+    x = y;
+    y = z;
+    z = w;
+    return w = w ^ (w >> 19) ^ t ^ (t >> 8);
   }
 
 private:
-  std::array<uint32_t, 4> state;
+  result_type x, y, z, w;
 };
 
 template <typename Prec = float>

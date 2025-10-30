@@ -69,7 +69,7 @@ void ShadowMapping::Textures::Clear(CommandAllocator &allocator) {
 }
 
 ResourceTransitor<1>
-ShadowMapping::Textures::TranslateToTarget(CommandAllocator &allocator) {
+ShadowMapping::Textures::TranslateToTarget(CommandAllocator &allocator) const {
   return ResourceTransitor<1>(
       allocator,
       {
@@ -79,7 +79,7 @@ ShadowMapping::Textures::TranslateToTarget(CommandAllocator &allocator) {
 }
 ResourceTransitor<1>
 ShadowMapping::Textures::TranslateToView(CommandAllocator &allocator,
-                                         const ResourceStates &newState) {
+                                         const ResourceStates &newState) const {
   return ResourceTransitor<1>(
       allocator,
       {
@@ -108,8 +108,7 @@ DeferredShading::GBuffer::GetBuffersAndFormats() {
 }
 
 void DeferredShading::GBuffer::MakeCompatible(
-    const RenderTargetView &finalTarget,
-    ResourceAllocationContext &allocationContext) {
+    const RenderTargetView &finalTarget, ResourceAllocationContext &) {
   auto UpdateTexture = [&finalTarget](MutableTexture &texture,
                                       const Format &format,
                                       const TextureFlags &flags) {
@@ -133,7 +132,7 @@ void DeferredShading::GBuffer::Clear(CommandAllocator &allocator) {
 }
 
 ResourceTransitor<4>
-DeferredShading::GBuffer::TranslateToTarget(CommandAllocator &allocator) {
+DeferredShading::GBuffer::TranslateToTarget(CommandAllocator &allocator) const {
   return ResourceTransitor<4>(
       allocator,
       {
@@ -147,7 +146,7 @@ DeferredShading::GBuffer::TranslateToTarget(CommandAllocator &allocator) {
 }
 
 ResourceTransitor<4>
-DeferredShading::GBuffer::TranslateToView(CommandAllocator &allocator) {
+DeferredShading::GBuffer::TranslateToView(CommandAllocator &allocator) const {
   return ResourceTransitor<4>(
       allocator,
       {
@@ -160,7 +159,7 @@ DeferredShading::GBuffer::TranslateToView(CommandAllocator &allocator) {
       });
 }
 
-std::array<XMVECTOR, 8> GetFrustumCorners(const XMMATRIX invViewProj,
+std::array<XMVECTOR, 8> GetFrustumCorners(const XMMATRIX &invViewProj,
                                           const Camera &cam,
                                           const f32 nearPlane,
                                           const f32 farPlane) {
@@ -350,7 +349,7 @@ WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
           else
             return x;
         };
-        curr->hullConstants.instanceData[curr->N].TesselationFactor = {
+        curr->hullConstants.instanceData[curr->N].AsXMFLOAT4() = {
             l(res.zneg), l(res.xneg), l(res.zpos), l(res.xpos)};
       }
 
@@ -404,7 +403,7 @@ void BasicShader::Pre(CommandAllocator &allocator) const {
   pipeline.Apply(allocator);
 }
 
-void BasicShader::Run(CommandAllocator &allocator, DynamicBufferManager &_,
+void BasicShader::Run(CommandAllocator &allocator, DynamicBufferManager &,
                       const Inp &inp) const {
   auto mask = Signature.Set(allocator, RootSignatureUsage::Graphics);
   mask.camera = inp.camera;

@@ -6,21 +6,9 @@
 #include "Helpers.h"
 #include "Simulation.h"
 
-using namespace std;
-using namespace winrt;
-
-using namespace Windows;
-using namespace Windows::ApplicationModel::Core;
-using namespace Windows::Foundation::Numerics;
-using namespace Windows::UI;
-using namespace Windows::UI::Core;
-using namespace Windows::UI::Composition;
-
-using namespace Axodox::Graphics::D3D12;
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
 using namespace Axodox::Threading;
-using namespace DirectX;
 using namespace DirectX::PackedVector;
 
 struct DebugValues {
@@ -47,38 +35,37 @@ struct DebugValues {
   bool lockQuadTree = false;
   int maxConeStep = 40;
   float prismHeight = 2;
-  float coneStepRelax = 0.9;
+  float coneStepRelax = 0.9f;
   DrawMethod drawMethod = DrawMethod::PrismParallax;
   bool conecreater = false;
   const static constexpr std::initializer_list<
       std::pair<u8, std::optional<const char *>>>
-      DebugBitsDesc = {{2, "Use Foam"},
-                       {3, "Use channel Highest"},
-                       {4, "Use channel Medium"},
-                       {5, "Use channel Lowest"},
-                       {8, "Show albedo"},
-                       {9, "Show normal"},
-                       {10, "Show neg normal"},
-                       {11, "Show worldPos"},
-                       {12, "Show materialValues"},
-                       {13, "Show depth"},
-                       {14, "Per pixel show miss"},
-                       {15, "Per pixel show too low"},
-                       {16, "Per pixel show side usage"},
-                       {24, "Normal overflow"},
-                       {25, "Display Foam"},
+      DebugBitsDesc = {{u8(2), "Use Foam"},
+                       {u8(3), "Use channel Highest"},
+                       {u8(4), "Use channel Medium"},
+                       {u8(5), "Use channel Lowest"},
+                       {u8(8), "Show albedo"},
+                       {u8(9), "Show normal"},
+                       {u8(10), "Show neg normal"},
+                       {u8(11), "Show worldPos"},
+                       {u8(12), "Show materialValues"},
+                       {u8(13), "Show depth"},
+                       {u8(14), "Per pixel show miss"},
+                       {u8(15), "Per pixel show too low"},
+                       {u8(16), "Per pixel show side usage"},
+                       {u8(24), "Normal overflow"},
+                       {u8(25), "Display Foam"},
 
-                       {20, "F"},
-                       {21, "D"},
-                       {22, "G"},
+                       {u8(20), "F"},
+                       {u8(21), "D"},
+                       {u8(22), "G"},
 
-                       {26, std::nullopt},
-                       {27, std::nullopt},
-                       {28, std::nullopt},
-                       {29, std::nullopt},
-                       {30, std::nullopt},
-                       {31, std::nullopt}};
-
+                       {u8(26), std::nullopt},
+                       {u8(27), std::nullopt},
+                       {u8(28), std::nullopt},
+                       {u8(29), std::nullopt},
+                       {u8(30), std::nullopt},
+                       {u8(31), std::nullopt}};
   Mode mode = Mode::Full;
 
   bool calculateParallax() const {
@@ -128,7 +115,7 @@ struct DebugValues {
 
       ImGui::InputInt("Max Cone Step", &maxConeStep);
       for (auto &[id, name] : DebugBitsDesc) {
-        if (name)
+        if (name.has_value())
           ImGui::Checkbox(*name, &DebugBits[id]);
         else
           ImGui::Checkbox(std::format("Debug Bit {}", id).c_str(),
@@ -317,7 +304,6 @@ struct RuntimeSettings {
   bool timeRunning = true;
   bool showImgui = true;
   XMFLOAT4 clearColor = DefaultsValues::App::clearColor;
-  bool quit = false;
   void DrawImGui([[maybe_unused]] NeedToDo &out, bool exclusiveWindow = false) {
     bool cont = true;
     if (exclusiveWindow)

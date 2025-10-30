@@ -26,17 +26,25 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
   };
   struct HullConstants {
     struct InstanceData {
-      // zneg,xneg, zpos, xpos
-      union {
-        struct {
-          f32 zneg;
-          f32 xneg;
-          f32 zpos;
-          f32 xpos;
-        };
-        XMFLOAT4 TesselationFactor;
-      };
+      f32 zneg;
+      f32 xneg;
+      f32 zpos;
+      f32 xpos;
+
+      XMFLOAT4 &AsXMFLOAT4() noexcept {
+        return *reinterpret_cast<XMFLOAT4 *>(this);
+      }
+
+      const XMFLOAT4 &AsXMFLOAT4() const noexcept {
+        return *reinterpret_cast<const XMFLOAT4 *>(this);
+      }
+
+      XMFLOAT4 ToXMFLOAT4() const noexcept { return AsXMFLOAT4(); }
+
+      explicit operator XMFLOAT4() const noexcept { return ToXMFLOAT4(); }
     };
+    static_assert(sizeof(InstanceData) == sizeof(XMFLOAT4),
+                  "InstanceData must be layout-compatible with XMFLOAT4");
     std::array<InstanceData, DefaultsValues::App::maxInstances> instanceData;
   };
   struct OceanData {
@@ -180,8 +188,8 @@ struct DeferredShading : public RootSignatureMask {
                         ResourceAllocationContext &allocationContext) override;
 
     void Clear(CommandAllocator &allocator) override;
-    ResourceTransitor<4> TranslateToTarget(CommandAllocator &allocator);
-    ResourceTransitor<4> TranslateToView(CommandAllocator &allocator);
+    ResourceTransitor<4> TranslateToTarget(CommandAllocator &allocator) const;
+    ResourceTransitor<4> TranslateToView(CommandAllocator &allocator) const;
     ~GBuffer() override = default;
   };
 
@@ -247,10 +255,11 @@ struct ShadowMapping : public RootSignatureMask {
       // No need to allocate
     }
     void Clear(CommandAllocator &allocator) override;
-    ResourceTransitor<1> TranslateToTarget(CommandAllocator &allocator);
-    ResourceTransitor<1> TranslateToView(
-        CommandAllocator &allocator,
-        const ResourceStates &newState = ResourceStates::AllShaderResource);
+    ResourceTransitor<1> TranslateToTarget(CommandAllocator &allocator) const;
+    ResourceTransitor<1>
+    TranslateToView(CommandAllocator &allocator,
+                    const ResourceStates &newState =
+                        ResourceStates::AllShaderResource) const;
     ~Textures() override = default;
   };
 
@@ -408,6 +417,7 @@ struct FrameResources : ShaderBuffers {
   void Clear(CommandAllocator &allocator) override;
 
   explicit FrameResources(const ResourceAllocationContext &context);
+  FrameResources(FrameResources &&) = default;
 
   ~FrameResources() override = default;
 };

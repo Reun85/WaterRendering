@@ -128,8 +128,7 @@ SilhouetteClear ::WithDefaultShaders(PipelineStateProvider &pipelineProvider,
   return SilhouetteClear(pipelineProvider, device, &cs);
 }
 
-void SilhouetteClear::Run(CommandAllocator &allocator,
-                          DynamicBufferManager &buffermanager,
+void SilhouetteClear::Run(CommandAllocator &allocator, DynamicBufferManager &,
                           const Inp &inp) const {
   auto mask = Signature.Set(allocator, RootSignatureUsage::Compute);
   mask.buff = *inp.buffers.EdgeCount.UnorderedAccess();
@@ -237,7 +236,7 @@ SilhouetteDetectorTester SilhouetteDetectorTester::WithDefaultShaders(
 }
 
 void SilhouetteDetectorTester::Run(CommandAllocator &allocator,
-                                   DynamicBufferManager &buffermanager,
+                                   DynamicBufferManager &,
                                    const Inp &inp) const {
   auto mask = Signature.Set(allocator, RootSignatureUsage::Graphics);
 

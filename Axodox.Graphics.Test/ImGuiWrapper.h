@@ -3,24 +3,7 @@
 #include "ComputePipeline.h"
 #include "GraphicsPipeline.h"
 
-using namespace std;
-using namespace winrt;
-
-using namespace Windows;
-using namespace Windows::ApplicationModel::Core;
-using namespace Windows::Foundation::Numerics;
-using namespace Windows::UI;
-using namespace Windows::UI::Core;
-using namespace Windows::UI::Composition;
-
-using namespace Axodox::Graphics::D3D12;
 using namespace Axodox::Infrastructure;
-using namespace Axodox::Storage;
-using namespace Axodox::Threading;
-using namespace DirectX;
-using namespace DirectX::PackedVector;
-
-using namespace Windows::UI::ViewManagement;
 
 inline static ID3D12DescriptorHeap *
 InitImGui(const Axodox::Graphics::D3D12::GraphicsDevice &device,
@@ -51,3 +34,35 @@ InitImGui(const Axodox::Graphics::D3D12::GraphicsDevice &device,
       ImGuiDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
   return ImGuiDescriptorHeap;
 }
+
+struct ImGUIManager {
+
+  ImGUIManager(const Axodox::Graphics::D3D12::GraphicsDevice &device,
+               u8 framesInFlight, const string &iniPath)
+
+  {
+
+    descriptorHeap_ = (InitImGui(device, framesInFlight, iniPath));
+  }
+
+  ImGuiIO &GetIO() { return ImGui::GetIO(); }
+  ~ImGUIManager() {
+    ImGui_ImplDX12_Shutdown();
+    ImGui_ImplUwp_Shutdown();
+    ImGui::DestroyContext();
+    if (descriptorHeap_) {
+      descriptorHeap_->Release();
+      descriptorHeap_ = nullptr;
+    }
+  }
+  void Render(CommandAllocator &allocator) {
+
+    ImGui::Render();
+
+    allocator->SetDescriptorHeaps(1, &descriptorHeap_);
+
+    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), allocator.operator->());
+  }
+  ID3D12DescriptorHeap *descriptorHeap_ = nullptr;
+  // ImGuiIO &io;
+};

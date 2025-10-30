@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "App.hpp"
+#include "App.h"
 
 struct AppWrapper
     : implements<AppWrapper, IFrameworkViewSource, IFrameworkView> {
@@ -12,6 +12,7 @@ struct AppWrapper
   void Load(hstring const &) {
     if (!app) {
       app = std::make_unique<App>(shared_);
+
     } else {
       throw hresult_error(E_FAIL,
                           L"App initialized while already initialized.");
@@ -19,9 +20,8 @@ struct AppWrapper
   }
 
   void Uninitialize() {
-
     if (app) {
-      app = nullptr;
+      App::DeleteApp(app);
     } else {
       throw hresult_error(E_FAIL, L"App uninitialized while not initialized.");
     }
@@ -35,9 +35,18 @@ struct AppWrapper
     }
   }
 
+  void RestartApp() {
+    Uninitialize();
+    Load(hstring());
+    Run();
+  }
+
   void Run() {
     if (app) {
-      app->Run();
+      app->StartRun();
+      if (app->ShouldRestart()) {
+        RestartApp();
+      }
     } else {
       throw hresult_error(E_FAIL, L"App ran while not initialized.");
     }
@@ -62,6 +71,6 @@ private:
   std::unique_ptr<App> app = nullptr;
 };
 
-static int __stdcall wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
+int __stdcall wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
   CoreApplication::Run(make<AppWrapper>());
 }

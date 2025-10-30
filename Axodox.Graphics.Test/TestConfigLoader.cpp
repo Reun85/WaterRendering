@@ -177,7 +177,7 @@ static std::vector<std::pair<std::string, std::filesystem::path>> getFiles() {
         files.emplace_back(entry.path().filename().string(), entry.path());
       }
     }
-  } catch (std::exception &ex) {
+  } catch (std::exception &) {
   }
   return files;
 }
@@ -221,19 +221,19 @@ void inn(std::ios *s, SimulationData &x, bool v,
          std::optional<NeedToDo *> beforeNextFrame = std::nullopt) {
   SimulationData::PatchData tmp = x.Highest;
   inn(s, x.Highest, v);
-  if (beforeNextFrame) {
+  if (beforeNextFrame.has_value()) {
     NeedToDo &b = **beforeNextFrame;
     b.patchHighestChanged = !x.Highest.compatibleSim(tmp);
   }
   tmp = x.Medium;
   inn(s, x.Medium, v);
-  if (beforeNextFrame) {
+  if (beforeNextFrame.has_value()) {
     NeedToDo &b = **beforeNextFrame;
     b.patchMediumChanged = !x.Medium.compatibleSim(tmp);
   }
   tmp = x.Lowest;
   inn(s, x.Lowest, v);
-  if (beforeNextFrame) {
+  if (beforeNextFrame.has_value()) {
     NeedToDo &b = **beforeNextFrame;
     b.patchLowestChanged = !x.Lowest.compatibleSim(tmp);
   }
@@ -336,7 +336,7 @@ void ShowImguiLoaderConfig(
     if (!files.empty()) {
 
       if (ImGui::BeginCombo("File", files[selectedFile].first.c_str())) {
-        for (uint i = 0; i < files.size(); i++) {
+        for (u16 i = 0; i < files.size(); i++) {
           bool isSelected = (selectedFile == i);
           if (ImGui::Selectable(files[i].first.c_str(), isSelected)) {
             selectedFile = i;
@@ -383,12 +383,11 @@ void ShowImguiLoaderConfig(
       std::ofstream os(file);
       os.close();
       files = getFiles();
-      auto it = std::find_if(files.begin(), files.end(), [](const auto &pair) {
-        return pair.first == Text;
-      });
+      auto it = std::ranges::find_if(
+          files, [](const auto &pair) { return pair.first == Text; });
 
       if (it != files.end()) {
-        selectedFile = std::distance(files.begin(), it);
+        selectedFile = static_cast<u16>(std::distance(files.begin(), it));
         pressedSave = true;
       }
     }

@@ -24,7 +24,8 @@ enum class CubeMapFace : u8 {
 };
 
 static std::tuple<f32, f32, f32>
-FaceCoordinatesToWorldCoordinates(u32 i, u32 j, u32 width, CubeMapFace face) {
+FaceCoordinatesToWorldCoordinates(usize i, usize j, usize width,
+                                  CubeMapFace face) {
   f32 a = 2.0f * static_cast<f32>(i) / static_cast<f32>(width);
   f32 b = 2.0f * static_cast<f32>(j) / static_cast<f32>(width);
 
@@ -49,17 +50,19 @@ FaceCoordinatesToWorldCoordinates(u32 i, u32 j, u32 width, CubeMapFace face) {
     return {b - 1.0f, a - 1.0f, -1.0f};
     break;
   }
-  return {0, 0, 0};
+  return {0.f, 0.f, 0.f};
 }
 
 // Lanczos kernel function
-static constexpr inline f32 LanczosKernel(f32 x, f32 a = 3.0f) {
+static constexpr f32 LanczosKernel(f32 x, f32 a = 3.0f) {
   if (x == 0.0f)
     return 1.0f;
   if (x < -a || x > a)
     return 0.0f;
-  return (a * sin(std::numbers::pi * x) * sin(std::numbers::pi * x / a)) /
-         (std::numbers::pi * std::numbers::pi * x * x);
+  f64 res = (a * sin(std::numbers::pi * x) * sin(std::numbers::pi * x / a)) /
+            (std::numbers::pi * std::numbers::pi * x * x);
+
+  return static_cast<f32>(res);
 }
 
 template <typename PixelType>
@@ -102,22 +105,22 @@ LanczosInterpolation(f32 uf, f32 vf, u32 inSizex, u32 inSizey,
 
 template <typename PixelType>
 constexpr PixelType
-BiliniearInterpolation(f32 uf, f32 vf, u32 inSizex, u32 inSizey,
+BiliniearInterpolation(f32 uf, f32 vf, usize inSizex, usize inSizey,
                        const std::span<const PixelType> &src) {
   // Use bilinear interpolation between the four surrounding pixels
-  u32 ui = static_cast<u32>(floor(uf));
+  usize ui = static_cast<usize>(floor(uf));
   // coord of pixel to bottom left
-  u32 vi = static_cast<u32>(floor(vf));
-  u32 u2 = ui + 1;
+  usize vi = static_cast<u32>(floor(vf));
+  usize u2 = ui + 1;
   // coords of pixel to top right
-  u32 v2 = vi + 1;
+  usize v2 = vi + 1;
   f32 mu = uf - static_cast<f32>(ui);
   // fraction of way across pixel
   f32 nu = vf - static_cast<f32>(vi);
-  auto inPix = [&inSizex, &inSizey, &src](u32 u, u32 v) {
-    u32 indx = u % inSizex;
-    u32 indy = clamp(v, 0u, inSizey - 1u);
-    u32 index = (indy * inSizex + indx);
+  auto inPix = [&inSizex, &inSizey, &src](usize u, usize v) {
+    usize indx = u % inSizex;
+    usize indy = clamp(v, (usize)0, inSizey - (usize)1);
+    usize index = (indy * inSizex + indx);
     return src[index];
   };
 
@@ -136,8 +139,8 @@ template <typename PixelType>
 constexpr void
 ConvertEquirectangularToCubeMap(const std::span<const PixelType> &src,
                                 const std::span<PixelType> &dest,
-                                const u32 outSize, const u32 inSizex,
-                                const u32 inSizey, const CubeMapFace &face) {
+                                const usize outSize, const usize inSizex,
+                                const usize inSizey, const CubeMapFace &face) {
   for (u32 i = 0; i < outSize; ++i) {
     for (u32 j = 0; j < outSize; ++j) {
       auto [x, y, z] = FaceCoordinatesToWorldCoordinates(i, j, outSize, face);
@@ -147,9 +150,9 @@ ConvertEquirectangularToCubeMap(const std::span<const PixelType> &src,
 
       // source imgcoords
       f32 uf = (theta + std::numbers::pi_v<f32>)*0.5f *
-               std::numbers::inv_pi_v<f32> * inSizex;
+               std::numbers::inv_pi_v<f32> * static_cast<f32>(inSizex);
       f32 vf = (std::numbers::pi_v<f32> / 2.f - phi) * 0.5f *
-               std::numbers::inv_pi_v<f32> * inSizex;
+               std::numbers::inv_pi_v<f32> * static_cast<f32>(inSizex);
 
       // PixelType ret = LanczosInterpolation(uf, vf, inSizex, inSizey, src);
       PixelType ret = BiliniearInterpolation(uf, vf, inSizex, inSizey, src);
@@ -236,7 +239,7 @@ CubeMapTexture::CubeMapTexture(const ResourceAllocationContext &context,
     srvDesc.Format = static_cast<DXGI_FORMAT>(data.Definition().PixelFormat);
     srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
     srvDesc.TextureCube.MostDetailedMip = 0;
-    srvDesc.TextureCube.MipLevels = -1;
+    srvDesc.TextureCube.MipLevels = std::numeric_limits<UINT>::max();
     srvDesc.TextureCube.ResourceMinLODClamp = 0;
     srvDesc.TextureCube.MostDetailedMip = 0;
     srvDesc.TextureCube.MipLevels = (UINT)-1;
@@ -258,12 +261,14 @@ CubeMapTexture::CubeMapTexture(const ResourceAllocationContext &context,
 
   const TextureHeader &header = data[0].Header();
   for (int i = 0; i < faceCount; i++) {
+    //  Skybox textures must have the same size and format
     assert(header.Width == data[i].Header().Width &&
-               header.Height == data[i].Header().Height &&
-               header.PixelFormat == data[i].Header().PixelFormat,
-           "Skybox textures must have the same size and format");
-    assert(data[i].Header().Depth == 0, "Skybox textures must be 2D");
-    assert(data[i].Header().ArraySize == 0, "Skybox textures must be 2D");
+           header.Height == data[i].Header().Height &&
+           header.PixelFormat == data[i].Header().PixelFormat);
+    //  Skybox textures must be 2D
+    assert(data[i].Header().Depth == 0);
+    //  Skybox textures must be 2D
+    assert(data[i].Header().ArraySize == 0);
   }
 
   TextureData textureData(header.PixelFormat, header.Width, header.Height,
@@ -272,8 +277,8 @@ CubeMapTexture::CubeMapTexture(const ResourceAllocationContext &context,
     std::span<const u8> srcPtr = data[i].AsRawSpan();
     std::span<u8> destPtr = textureData.AsRawSpan(nullptr, i);
 
-    assert(destPtr.size_bytes() == srcPtr.size_bytes(),
-           "Skybox face size mismatch");
+    // Skybox face size mismatch
+    assert(destPtr.size_bytes() == srcPtr.size_bytes());
     std::memcpy(destPtr.data(), srcPtr.data(), srcPtr.size_bytes());
   }
 

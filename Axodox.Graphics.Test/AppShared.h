@@ -16,24 +16,15 @@
 
 #include <sstream>
 
-using namespace std;
-using namespace winrt;
-
-using namespace Windows;
-using namespace Windows::ApplicationModel::Core;
-using namespace Windows::Foundation::Numerics;
-using namespace Windows::UI;
-using namespace Windows::UI::Core;
-using namespace Windows::UI::Composition;
-
-using namespace Axodox::Graphics::D3D12;
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
 using namespace Axodox::Threading;
-using namespace DirectX;
 using namespace DirectX::PackedVector;
 
-using namespace Windows::UI::ViewManagement;
+struct StartUpSettings {
+  u8 framesInFlight = 2;
+  std::string ImGuiIniPath = GetLocalFolder() + "/imgui.ini";
+};
 
 /// <summary>
 ///  Mainly used for WinRT objects that need to be accessed from the wrapper or
@@ -49,4 +40,6 @@ struct AppShared {
   std::string prints = std::string();
   // use this instead of std::cout
   std::stringstream cout = std::stringstream();
+
+  StartUpSettings settings;
 };

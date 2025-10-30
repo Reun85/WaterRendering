@@ -110,7 +110,7 @@
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="App.hpp" />
+    <ClInclude Include="App.h" />
     <ClInclude Include="AppShared.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="ComputePipeline.h" />
@@ -143,6 +143,7 @@
     </AppxManifest>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="App.cpp" />
     <ClCompile Include="AppWrapper.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="ComputePipeline.cpp" />

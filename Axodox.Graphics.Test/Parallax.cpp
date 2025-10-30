@@ -20,7 +20,7 @@ ConeMapCreater::WithDefaultShaders(PipelineStateProvider &pipelineProvider,
   return ConeMapCreater(pipelineProvider, device, &cs);
 }
 
-void ConeMapCreater::Run(CommandAllocator &allocator, DynamicBufferManager &_,
+void ConeMapCreater::Run(CommandAllocator &allocator, DynamicBufferManager &,
                          const Inp &inp) const {
   auto mask = Signature.Set(allocator, RootSignatureUsage::Compute);
 
@@ -149,7 +149,9 @@ void MixMaxCompute::Run(CommandAllocator &allocator,
   auto mask = Signature.Set(allocator, RootSignatureUsage::Compute);
   Buffer buffers{.SrcMipLevel = 0,
                  .NumMipLevels = inp.mipLevels,
-                 .TexelSize = float2(1., 1.) / float2(inp.Extent, inp.Extent)};
+                 .TexelSize =
+                     float2(1., 1.) / float2(static_cast<float>(inp.Extent),
+                                             static_cast<float>(inp.Extent))};
   mask.ComputeConstants = buffermanager.AddBuffer(buffers);
   mask.ReadTexture = *inp.texture;
   mask.MipMap1 = *inp.mipMaps[0];
@@ -234,8 +236,7 @@ DisplacedHeightMapJob DisplacedHeightMapJob::WithDefaultShaders(
 }
 
 void DisplacedHeightMapJob::Run(CommandAllocator &allocator,
-                                DynamicBufferManager &buffermanager,
-                                const Inp &inp) const {
+                                DynamicBufferManager &, const Inp &inp) const {
 
   auto mask = Signature.Set(allocator, RootSignatureUsage::Compute);
   mask.ComputeConstants = inp.ComputeConstants;

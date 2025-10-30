@@ -415,11 +415,13 @@ inline float4x4 XMMatrixToFloat4x4(const XMMATRIX &x) {
   return result;
 }
 
+std::string Utf16ToUtf8(const std::wstring &wstr);
+std::wstring Utf8ToUtf16(const std::string &str);
 inline std::string GetLocalFolder() {
   auto localFolder =
       winrt::Windows::Storage::ApplicationData::Current().LocalFolder().Path();
   std::wstring localFolderWstr = localFolder.c_str();
-  auto path = std::string(localFolderWstr.begin(), localFolderWstr.end());
+  auto path = Utf16ToUtf8(localFolderWstr);
   return path;
 }
 
@@ -439,3 +441,15 @@ struct ShaderJob {
   virtual void Pre(CommandAllocator &allocator) const = 0;
   virtual ~ShaderJob() = default;
 };
+
+template <typename Lambda>
+std::vector<std::invoke_result_t<Lambda>> inline NewVectorByFunction(
+    const usize n, Lambda &&factory) {
+  using T = std::invoke_result_t<Lambda>;
+  std::vector<T> result;
+  result.reserve(n);
+  for (usize i = 0; i < n; i++) {
+    result.push_back(std::forward<T>(factory()));
+  }
+  return result;
+}
