@@ -380,23 +380,13 @@ void App::Run() {
     cam.SetAspect(float(resolution.x) / float(resolution.y));
   });
 
-  // Time counter
-  using SinceTimeStartTimeFrame = std::chrono::nanoseconds;
-  decltype(std::chrono::high_resolution_clock::now()) loopStartTime;
-  auto getTimeSinceStart = [&loopStartTime]() {
-    return std::chrono::duration_cast<SinceTimeStartTimeFrame>(
-        std::chrono::high_resolution_clock::now() - loopStartTime);
-  };
-  float gameTime = 0;
   // Frame counter
-  size_t frameCounter = 0u;
   std::chrono::steady_clock::time_point frameStart =
       std::chrono::high_resolution_clock::now();
 
-  NeedToDo beforeNextFrame;
-  beforeNextFrame.patchHighestChanged = true;
-  beforeNextFrame.patchMediumChanged = true;
-  beforeNextFrame.patchLowestChanged = true;
+  beforeNextFrame_.patchHighestChanged = true;
+  beforeNextFrame_.patchMediumChanged = true;
+  beforeNextFrame_.patchLowestChanged = true;
 
   RuntimeCPUBuffers cpuBuffers;
 
@@ -414,14 +404,14 @@ void App::Run() {
     // Process user input
     dispatcher.ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
 
-    frameCounter++;
+    frameCounter_++;
     // Current frames resources
-    auto &frameResource = frameResources[frameCounter & 0x1u];
+    auto &frameResource = frameResources[frameCounter_ & 0x1u];
     // Simulation resources for drawing.
-    auto &drawingSimResource = simulationResources[frameCounter & 0x1u];
+    auto &drawingSimResource = simulationResources[frameCounter_ & 0x1u];
     // Simulation resources for calculating.
     auto &calculatingSimResource =
-        simulationResources[(frameCounter + 1u) & 0x1u];
+        simulationResources[(frameCounter_ + 1u) & 0x1u];
 
     auto renderTargetView = swapChain.RenderTargetView();
 
@@ -437,23 +427,23 @@ void App::Run() {
 
     NewData newData;
     {
-      if (beforeNextFrame.changeFlag) {
+      if (beforeNextFrame_.changeFlag) {
         waterPipelineStateDefinition.RasterizerState.Flags =
-            *beforeNextFrame.changeFlag;
+            *beforeNextFrame_.changeFlag;
         newData.pipelineState = pipelineStateProvider.CreatePipelineStateAsync(
             waterPipelineStateDefinition);
       }
-      if (beforeNextFrame.patchHighestChanged) {
+      if (beforeNextFrame_.patchHighestChanged) {
         newData.highestData =
             SimulationStage::ConstantGpuSources<>::LODDataSource(
                 mutableAllocationContext, simData.Highest);
       }
-      if (beforeNextFrame.patchMediumChanged) {
+      if (beforeNextFrame_.patchMediumChanged) {
         newData.mediumData =
             SimulationStage::ConstantGpuSources<>::LODDataSource(
                 mutableAllocationContext, simData.Medium);
       }
-      if (beforeNextFrame.patchLowestChanged) {
+      if (beforeNextFrame_.patchLowestChanged) {
         newData.lowestData =
             SimulationStage::ConstantGpuSources<>::LODDataSource(
                 mutableAllocationContext, simData.Lowest);
@@ -467,9 +457,9 @@ void App::Run() {
       drawingSimResource.Fence.Await(drawingSimResource.FrameDoneMarker);
     // This is necessary for the compute queue
 
-    if (beforeNextFrame.changeFlag && newData.pipelineState) {
+    if (beforeNextFrame_.changeFlag && newData.pipelineState) {
       waterPipelineState = newData.pipelineState->get();
-      beforeNextFrame.changeFlag = std::nullopt;
+      beforeNextFrame_.changeFlag = std::nullopt;
     }
 
     // Get DeltaTime
@@ -499,8 +489,6 @@ void App::Run() {
       commonDescriptorHeap.Build();
     }
 
-    RuntimeResults runtimeResults;
-
     auto oceanModelMatrix =
         XMMatrixTranslationFromVector(XMVECTOR{0, -5, 0, 0});
     std::future<std::vector<WaterGraphicRootDescription::OceanData> &>
@@ -510,15 +498,14 @@ void App::Run() {
         first_loop) {
       oceanDataFuture = threadpool_execute<
           std::vector<WaterGraphicRootDescription::OceanData>
-              &>([&cpuBuffers, this, simData, &runtimeResults, camChanged,
-                  oceanModelMatrix]()
+              &>([&cpuBuffers, this, simData, camChanged, oceanModelMatrix]()
                      -> std::vector<WaterGraphicRootDescription::OceanData> & {
         if (camChanged && !debugValues.lockQuadTree) {
           cpuBuffers.oceanData.clear();
           return WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
               cpuBuffers.oceanData, cam, oceanModelMatrix,
               simData.quadTreeDistanceThreshold, simData.maxDepth, debugValues,
-              &runtimeResults);
+              &runtimeResults_);
         }
         return cpuBuffers.oceanData;
       });
@@ -557,15 +544,15 @@ void App::Run() {
             };
         if (newData.highestData) {
           copyLOD(*newData.highestData, simulationConstantSources.Highest);
-          beforeNextFrame.patchHighestChanged = false;
+          beforeNextFrame_.patchHighestChanged = false;
         }
         if (newData.mediumData) {
           copyLOD(*newData.mediumData, simulationConstantSources.Medium);
-          beforeNextFrame.patchMediumChanged = false;
+          beforeNextFrame_.patchMediumChanged = false;
         }
         if (newData.lowestData) {
           copyLOD(*newData.lowestData, simulationConstantSources.Lowest);
-          beforeNextFrame.patchLowestChanged = false;
+          beforeNextFrame_.patchLowestChanged = false;
         }
       }
 
@@ -1045,57 +1032,9 @@ void App::Run() {
       }
 
       auto CPURenderEnd = std::chrono::high_resolution_clock::now();
-      runtimeResults.CPUTime = CPURenderEnd - frameStart;
-      // ImGUI
-      if (settings.showImgui) {
-        ImGui_ImplDX12_NewFrame();
-        ImGui_ImplUwp_NewFrame();
-        ImGui::NewFrame();
-
-        if (ImGui::Begin("Application")) {
-          shared_.prints += shared_.cout.str();
-          shared_.cout.str("");
-          ImGui::Text("Press ESC to quit");
-          ImGui::Text("Press Space to stop time");
-          ImGui::Text("frame %d", frameCounter);
-          ImGui::Text(
-              " %.3f s",
-              GetDurationInFloatWithPrecision<std::chrono::seconds,
-                                              std::chrono::milliseconds>(
-                  getTimeSinceStart()));
-          ImGui::Text(" %.3f ms/frame (%.1f FPS)",
-                      1000.0f / imgui_wrapper_.GetIO().Framerate,
-                      imgui_wrapper_.GetIO().Framerate);
-
-          settings.DrawImGui(beforeNextFrame);
-
-          runtimeResults.DrawImGui(false);
-          cam.DrawImGui(false);
-          for (int i = 0; i < 3; ++i) {
-            ImGui::Text(std::format("{}", i).c_str());
-            ImGui::SameLine();
-            ImGui::Image(
-                (void *)((*drawingSimResource.LODs[i]
-                               ->coneMapBuffer.ShaderResource(allocator))
-                             .GpuHandle()
-                             .ptr),
-                ImVec2(256, 256));
-            if (i != 2)
-              ImGui::SameLine();
-          }
-
-          ImGui::Text("LOGS:\n---------------------\n%s",
-                      shared_.prints.c_str());
-        }
-        ImGui::End();
-        debugValues.DrawImGui(beforeNextFrame);
-        simData.DrawImGui(beforeNextFrame);
-        DrawImGuiForPSResources(waterData, sunData, defData, true);
-
-        ShowImguiLoaderConfig(debugValues, simData, waterData, sunData, defData,
-                              settings, cam, beforeNextFrame, true);
-        imgui_wrapper_.Render(allocator);
-      }
+      runtimeResults_.CPUTime = CPURenderEnd - frameStart;
+      DrawImGuiMenu(allocator, waterData, simData, defData, drawingSimResource,
+                    sunData);
       // End frame command list
       {
         allocator.TransitionResource(*renderTargetView,
@@ -1132,3 +1071,62 @@ void App::Run() {
     }
   }
 }
+void App::DrawImGuiMenu(
+    CommandAllocator &allocator,
+    WaterGraphicRootDescription::WaterPixelShaderData &waterData,
+    SimulationData &simData, DeferredShading::DeferredShaderBuffers &defData,
+    SimulationStage::SimulationResources &drawingSimResource,
+    PixelLighting &sunData) {
+  // ImGUI
+  if (settings.showImgui) {
+    ImGui_ImplDX12_NewFrame();
+    ImGui_ImplUwp_NewFrame();
+    ImGui::NewFrame();
+
+    if (ImGui::Begin("Application")) {
+      shared_.prints += shared_.cout.str();
+      shared_.cout.str("");
+      ImGui::Text("Press ESC to quit");
+      ImGui::Text("Press Space to stop time");
+      ImGui::Text("frame %d", frameCounter_);
+      ImGui::Text(" %.3f s",
+                  GetDurationInFloatWithPrecision<std::chrono::seconds,
+                                                  std::chrono::milliseconds>(
+                      GetTimeSinceStart()));
+      ImGui::Text(" %.3f ms/frame (%.1f FPS)",
+                  1000.0f / imgui_wrapper_.GetIO().Framerate,
+                  imgui_wrapper_.GetIO().Framerate);
+
+      settings.DrawImGui(beforeNextFrame_);
+
+      runtimeResults_.DrawImGui(false);
+      cam.DrawImGui(false);
+      for (int i = 0; i < 3; ++i) {
+        ImGui::Text(std::format("{}", i).c_str());
+        ImGui::SameLine();
+        ImGui::Image(
+            (void *)((*drawingSimResource.LODs[i]->coneMapBuffer.ShaderResource(
+                          allocator))
+                         .GpuHandle()
+                         .ptr),
+            ImVec2(256, 256));
+        if (i != 2)
+          ImGui::SameLine();
+      }
+
+      ImGui::Text("LOGS:\n---------------------\n%s", shared_.prints.c_str());
+    }
+    ImGui::End();
+    debugValues.DrawImGui(beforeNextFrame_);
+    simData.DrawImGui(beforeNextFrame_);
+    DrawImGuiForPSResources(waterData, sunData, defData, true);
+
+    ShowImguiLoaderConfig(debugValues, simData, waterData, sunData, defData,
+                          settings, cam, beforeNextFrame_, true);
+    imgui_wrapper_.Render(allocator);
+  }
+}
+App::SinceTimeStartTimeFrame App::GetTimeSinceStart() {
+  return std::chrono::duration_cast<SinceTimeStartTimeFrame>(
+      std::chrono::high_resolution_clock::now() - loopStartTime);
+};

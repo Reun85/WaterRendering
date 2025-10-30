@@ -14,10 +14,10 @@ struct CubeMapPaths {
 
   using reinterpretable_as = std::array<const std::filesystem::path, 6>;
   reinterpretable_as &AsArray() {
-    return *reinterpret_cast<reinterpretable_as *>(this);
+    return reinterpret_cast<reinterpretable_as &>(*this);
   }
   const reinterpretable_as &AsArray() const {
-    return *reinterpret_cast<const reinterpretable_as *>(this);
+    return reinterpret_cast<const reinterpretable_as &>(*this);
   }
 
   reinterpretable_as ToArray() const noexcept { return AsArray(); }

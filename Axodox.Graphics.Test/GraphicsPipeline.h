@@ -4,7 +4,6 @@
 #include "Helpers.h"
 #include "DebugValues.h"
 
-using namespace DirectX;
 using namespace DirectX::PackedVector;
 
 using namespace Axodox::Infrastructure;
@@ -32,11 +31,11 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
       f32 xpos;
 
       XMFLOAT4 &AsXMFLOAT4() noexcept {
-        return *reinterpret_cast<XMFLOAT4 *>(this);
+        return reinterpret_cast<XMFLOAT4 &>(*this);
       }
 
       const XMFLOAT4 &AsXMFLOAT4() const noexcept {
-        return *reinterpret_cast<const XMFLOAT4 *>(this);
+        return reinterpret_cast<const XMFLOAT4 &>(*this);
       }
 
       XMFLOAT4 ToXMFLOAT4() const noexcept { return AsXMFLOAT4(); }

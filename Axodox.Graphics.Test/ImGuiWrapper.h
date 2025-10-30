@@ -55,7 +55,7 @@ struct ImGUIManager {
       descriptorHeap_ = nullptr;
     }
   }
-  void Render(CommandAllocator &allocator) {
+  void Render(CommandAllocator &allocator) const {
 
     ImGui::Render();
 

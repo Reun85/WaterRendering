@@ -54,6 +54,11 @@ struct App {
 
 private:
   void Run();
+  void DrawImGuiMenu(CommandAllocator &allocator,
+                     WaterGraphicRootDescription::WaterPixelShaderData &,
+                     SimulationData &, DeferredShading::DeferredShaderBuffers &,
+                     SimulationStage::SimulationResources &, PixelLighting &);
+
   /// From Outer AppWrapper
   AppShared &shared_;
 
@@ -61,20 +66,37 @@ private:
   // -----------------
   GraphicsDevice device;
   CommandQueue directQueue{device};
+  // CommandQueue computeQueue{device};
   CommandQueue &computeQueue = directQueue;
   CoreSwapChain swapChain;
 
   ImGUIManager imgui_wrapper_;
 
-  // AppData
+  // ApplicationData
   // -----------------
-  Camera cam = Camera();
-  RuntimeSettings settings = RuntimeSettings{};
-  DebugValues debugValues = DebugValues{};
+  usize frameCounter_ = 0;
   bool isRunning_ = false;
   bool shouldStop_ = false;
   bool quitRequested_ = false;
   // The app is requesting an internal shutdown and restart
   bool internalRestartRequest_ = false;
   // -----------------
+
+  // AppData
+  //---------------
+
+  // Timing
+  float gameTime = 0.f;
+  using SinceTimeStartTimeFrame = std::chrono::nanoseconds;
+  decltype(std::chrono::high_resolution_clock::now()) loopStartTime;
+  SinceTimeStartTimeFrame GetTimeSinceStart();
+
+  // Camera
+  Camera cam = Camera();
+  RuntimeSettings settings = RuntimeSettings{};
+  DebugValues debugValues = DebugValues{};
+
+  // Per Frame data
+  NeedToDo beforeNextFrame_;
+  RuntimeResults runtimeResults_;
 };

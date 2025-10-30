@@ -40,7 +40,7 @@ template <typename DataType>
 TextureData constexpr CreateTextureData(const Format &f, const u32 width,
                                         const u32 height, const u16 arraySize,
                                         const std::vector<DataType> &data) {
-  const u8 *dataPtr = reinterpret_cast<const u8 *>(data.data());
+  const auto *dataPtr = reinterpret_cast<const u8 *>(data.data());
 
   std::size_t byteSize = data.size() * sizeof(DataType);
 
@@ -168,7 +168,7 @@ inline MeshDescription CreateBackwardsPlane(float size,
         ytexstep = 1.f / (subdivisions.y - 1), ystart = -size / 2.f;
   uint32_t vertexCount = subdivisions.x * subdivisions.y;
 
-  VertexPositionNormalTexture *pVertex;
+  VertexPositionNormalTexture *pVertex = nullptr;
   result.Vertices = BufferData(vertexCount, pVertex);
 
   for (uint32_t j = 0; j < subdivisions.y; j++) {
@@ -184,7 +184,7 @@ inline MeshDescription CreateBackwardsPlane(float size,
            triangleHeight = subdivisions.y - 1;
   uint32_t indexCount = triangleWidth * triangleHeight * 6;
 
-  uint32_t *pIndex;
+  uint32_t *pIndex = nullptr;
   result.Indices = BufferData(indexCount, pIndex);
 
   for (uint32_t j = 0; j < triangleHeight; j++) {
@@ -210,7 +210,7 @@ CreateCubeWithoutBottom(float size, XMFLOAT3 offset = XMFLOAT3{0, 0, 0}) {
   size = size / 2;
 
   // Vertices
-  VertexPosition *pVertex;
+  VertexPosition *pVertex = nullptr;
   result.Vertices = BufferData(8, pVertex);
 
   *pVertex++ = VertexPosition{XMFLOAT3{size, size, -size}};
@@ -229,7 +229,7 @@ CreateCubeWithoutBottom(float size, XMFLOAT3 offset = XMFLOAT3{0, 0, 0}) {
   }
 
   // Indices
-  uint32_t *pIndex;
+  uint32_t *pIndex = nullptr;
   result.Indices = BufferData(5 * 2 * 3, pIndex);
 
   // Top Face (1, 2, 3, 4)
@@ -282,7 +282,7 @@ inline MeshDescription CreateBoxInVSMesh() {
   MeshDescription result;
 
   // Indices
-  uint32_t *pIndex;
+  uint32_t *pIndex = nullptr;
   // 3 indices per 2 triangle per 3 face
   result.Indices = BufferData(3 * 2 * 3, pIndex);
 
@@ -396,7 +396,7 @@ struct RuntimeResults {
       ImGui::Text(
           "CPU time %.3f ms/frame",
           GetDurationInFloatWithPrecision<std::chrono::milliseconds,
-                                          std::chrono::nanoseconds>((CPUTime)));
+                                          std::chrono::nanoseconds>(CPUTime));
     }
     if (exclusiveWindow)
       ImGui::End();

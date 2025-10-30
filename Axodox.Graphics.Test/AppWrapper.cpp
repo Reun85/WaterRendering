@@ -1,6 +1,9 @@
 #include "pch.h"
 #include "App.h"
 
+using namespace Windows::ApplicationModel;
+using namespace Windows::ApplicationModel::Core;
+
 struct AppWrapper
     : implements<AppWrapper, IFrameworkViewSource, IFrameworkView> {
   IFrameworkView CreateView() const { return *this; }
