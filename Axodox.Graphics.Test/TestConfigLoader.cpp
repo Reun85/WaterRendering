@@ -9,45 +9,109 @@
 
 #include "Helpers.h"
 
+// Helper streams
+// -----------------------------------------------------------------------------
+struct DataOutStream {
+  DataOutStream(ostream &os) : os(os) {}
+  ostream &operator*() { return os; }
+  ostream *operator->() { return &os; }
+
+private:
+  ostream &os;
+};
+
+struct DataInStream {
+  DataInStream(istream &is) : is(is) {}
+
+  istream &operator*() { return is; }
+  istream *operator->() { return &is; }
+
+private:
+  istream &is;
+};
+
+template <typename T>
+concept MyStream = Either<T, DataOutStream, DataInStream>;
+
+// -----------------------------------------------------------------------------
+
+// If it has a default stream operator, just use that.
+// -----------------------------------------------------------------------------
+template <typename T>
+concept OStreamWritable = requires(std::ostream &os, T value) {
+  { os << value } -> std::same_as<std::ostream &>;
+};
+
+template <OStreamWritable T>
+DataOutStream &operator<<(DataOutStream &os, const T &x) {
+  *os << x;
+  return os;
+}
+
+template <typename T>
+concept IStreamReadable = requires(std::istream &is, T &value) {
+  { is >> value } -> std::same_as<std::istream &>;
+};
+template <IStreamReadable T> DataInStream &operator>>(DataInStream &is, T &x) {
+  (*is) >> x;
+  return is;
+}
+
+template <typename T>
+concept MyStreamWriteable = requires(DataOutStream &os, const T &value) {
+  { os << value } -> std::same_as<DataOutStream &>;
+};
+template <typename T>
+concept MyStreamReadable = requires(DataInStream &is, T &value) {
+  { is >> value } -> std::same_as<DataInStream &>;
+};
+
+template <typename T>
+concept Streamable = MyStreamWriteable<T> && MyStreamReadable<T>;
+// -----------------------------------------------------------------------------
+
+// Enum serialization
+// -----------------------------------------------------------------------------
 template <typename T>
 concept EnumType = std::is_enum_v<T>;
 
 template <EnumType Enum>
-std::ostream &operator<<(std::ostream &os, const Enum &value) {
+DataOutStream &operator<<(DataOutStream &os, const Enum &value) {
   using UnderlyingType = std::underlying_type_t<Enum>;
-  os << static_cast<UnderlyingType>(value);
+  *os << static_cast<UnderlyingType>(value);
   return os;
 }
 
 template <EnumType Enum>
-std::istream &operator>>(std::istream &is, Enum &value) {
+DataInStream &operator>>(DataInStream &is, Enum &value) {
   using UnderlyingType = std::underlying_type_t<Enum>;
   UnderlyingType temp;
-  is >> temp;
+  *is >> temp;
   value = static_cast<Enum>(temp); // Cast back to Enum type
   return is;
 }
 
+// Optional enum type
 template <EnumType Enum> class AsShiftedOptionalEnum {
 public:
   using UnderlyingType = std::underlying_type_t<Enum>;
-  AsShiftedOptionalEnum(std::optional<Enum> &val) : val_(val) {}
+  explicit AsShiftedOptionalEnum(std::optional<Enum> &val) : val_(val) {}
 
-  friend std::ostream &operator<<(std::ostream &os,
-                                  const AsShiftedOptionalEnum<Enum> &inp) {
+  friend DataOutStream &operator<<(DataOutStream &os,
+                                   const AsShiftedOptionalEnum<Enum> &inp) {
 
     if (inp.val_.has_value()) {
       const auto val = inp.val_.value();
       const auto underlying = static_cast<UnderlyingType>(val);
       const auto printed = underlying + 1;
-      os << printed;
+      *os << printed;
     } else {
-      os << 0;
+      *os << 0;
     }
     return os;
   }
 
-  friend std::istream &operator>>(std::istream &is,
+  friend DataInStream &operator>>(DataInStream &is,
                                   AsShiftedOptionalEnum<Enum> &inp) {
 
     auto &value = inp.val_;
@@ -69,43 +133,12 @@ private:
   std::optional<Enum> &val_;
 };
 
-// template <EnumType Enum>
-// std::ostream &operator<<(std::ostream &os,
-//                          const AsShiftedOptionalEnum<Enum> &inp) {
-//   using UnderlyingType = AsShiftedOptionalEnum<Enum>::UnderlyingType;
-//
-//   const auto &value = inp.val_;
-//   if (value.has_value()) {
-//     const auto val = value.value() + 1;
-//     os << static_cast<UnderlyingType>(val);
-//   } else {
-//     os << 0;
-//   }
-//   return os;
-// }
-//
-// template <EnumType Enum>
-// std::istream &operator>>(std::istream &is, AsShiftedOptionalEnum<Enum> &inp)
-// {
-//   using UnderlyingType = AsShiftedOptionalEnum<Enum>::UnderlyingType;
-//
-//   const auto &value = inp.val_;
-//   // 0 is definitely inside the UnderlyingType range
-//   UnderlyingType temp;
-//   is >> temp;
-//   if (temp == 0) {
-//     value = std::nullopt;
-//   }
-//
-//   else {
-//     temp -= 1;
-//     value = Enum(temp); // Cast back to Enum type
-//   }
-//   return is;
-// }
+// -----------------------------------------------------------------------------
 
+// Collection serialization
+// -----------------------------------------------------------------------------
 template <typename T>
-std::istream &operator>>(std::istream &is, std::vector<T> &v) {
+DataInStream &operator>>(DataInStream &is, std::vector<T> &v) {
   for (auto &el : v) {
     is >> el;
   }
@@ -113,7 +146,7 @@ std::istream &operator>>(std::istream &is, std::vector<T> &v) {
 }
 
 template <typename T>
-std::ostream &operator<<(std::ostream &os, const std::vector<T> &v) {
+DataOutStream &operator<<(DataOutStream &os, const std::vector<T> &v) {
   for (auto &el : v) {
     os << el << " ";
   }
@@ -121,7 +154,7 @@ std::ostream &operator<<(std::ostream &os, const std::vector<T> &v) {
 }
 
 template <typename T, const u32 N>
-std::istream &operator>>(std::istream &is, std::array<T, N> &v) {
+DataInStream &operator>>(DataInStream &is, std::array<T, N> &v) {
   for (auto &el : v) {
     is >> el;
   }
@@ -129,72 +162,76 @@ std::istream &operator>>(std::istream &is, std::array<T, N> &v) {
 }
 
 template <typename T, const u32 N>
-std::ostream &operator<<(std::ostream &os, const std::array<T, N> &v) {
+DataOutStream &operator<<(DataOutStream &os, const std::array<T, N> &v) {
   for (auto &el : v) {
     os << el << " ";
   }
   return os;
 }
 
-std::istream &operator>>(std::istream &is, float2 &x) {
+// -----------------------------------------------------------------------------
+
+// DirectX / WinRT types
+// -----------------------------------------------------------------------------
+DataInStream &operator>>(DataInStream &is, float2 &x) {
   is >> x.x >> x.y;
   return is;
 }
 
-std::ostream &operator<<(std::ostream &os, const float2 &x) {
+DataOutStream &operator<<(DataOutStream &os, const float2 &x) {
   os << x.x << " " << x.y;
   return os;
 }
-std::istream &operator>>(std::istream &is, float3 &x) {
+DataInStream &operator>>(DataInStream &is, float3 &x) {
   is >> x.x >> x.y >> x.z;
   return is;
 }
 
-std::ostream &operator<<(std::ostream &os, const float3 &x) {
+DataOutStream &operator<<(DataOutStream &os, const float3 &x) {
   os << x.x << " " << x.y << " " << x.z;
   return os;
 }
 
-std::istream &operator>>(std::istream &is, float4 &x) {
+DataInStream &operator>>(DataInStream &is, float4 &x) {
   is >> x.x >> x.y >> x.z >> x.w;
   return is;
 }
 
-std::ostream &operator<<(std::ostream &os, const float4 &x) {
+DataOutStream &operator<<(DataOutStream &os, const float4 &x) {
   os << x.x << " " << x.y << " " << x.z << " " << x.w;
   return os;
 }
 
-std::istream &operator>>(std::istream &is, XMFLOAT3 &x) {
+DataInStream &operator>>(DataInStream &is, XMFLOAT3 &x) {
   is >> x.x >> x.y >> x.z;
   return is;
 }
 
-std::ostream &operator<<(std::ostream &os, const XMFLOAT3 &x) {
+DataOutStream &operator<<(DataOutStream &os, const XMFLOAT3 &x) {
   os << x.x << " " << x.y << " " << x.z;
   return os;
 }
-std::istream &operator>>(std::istream &is, XMFLOAT4 &x) {
+DataInStream &operator>>(DataInStream &is, XMFLOAT4 &x) {
   is >> x.x >> x.y >> x.z >> x.w;
   return is;
 }
 
-std::ostream &operator<<(std::ostream &os, const XMFLOAT4 &x) {
+DataOutStream &operator<<(DataOutStream &os, const XMFLOAT4 &x) {
   os << x.x << " " << x.y << " " << x.z << " " << x.w;
   return os;
 }
 
-std::istream &operator>>(std::istream &is, XMUINT4 &x) {
+DataInStream &operator>>(DataInStream &is, XMUINT4 &x) {
   is >> x.x >> x.y >> x.z >> x.w;
   return is;
 }
 
-std::ostream &operator<<(std::ostream &os, const XMUINT4 &x) {
+DataOutStream &operator<<(DataOutStream &os, const XMUINT4 &x) {
   os << x.x << " " << x.y << " " << x.z << " " << x.w;
   return os;
 }
 
-std::istream &operator>>(std::istream &is, XMVECTOR &y) {
+DataInStream &operator>>(DataInStream &is, XMVECTOR &y) {
   XMFLOAT4 x;
   XMStoreFloat4(&x, y);
   is >> x.x >> x.y >> x.z >> x.w;
@@ -202,49 +239,23 @@ std::istream &operator>>(std::istream &is, XMVECTOR &y) {
   return is;
 }
 
-std::ostream &operator<<(std::ostream &os, const XMVECTOR &y) {
+DataOutStream &operator<<(DataOutStream &os, const XMVECTOR &y) {
   XMFLOAT4 x;
   XMStoreFloat4(&x, y);
   os << x.x << " " << x.y << " " << x.z << " " << x.w;
   return os;
 }
-template <typename T>
-concept OStreamWritable = requires(std::ostream &os, T value) {
-  { os << value } -> std::same_as<std::ostream &>;
-};
 
-// Concept to check if a type T has a `>>` operator with std::istream
-template <typename T>
-concept IStreamReadable = requires(std::istream &is, T &value) {
-  { is >> value } -> std::same_as<std::istream &>;
-};
+// -----------------------------------------------------------------------------
 
-// Combined concept for both ostream and istream compatibility
-template <typename T>
-concept Streamable = OStreamWritable<T> && IStreamReadable<T>;
-
-template <Streamable T> void filedo(std::ios *os, T &val, bool write = false) {
-  if (write) {
-    auto *output = dynamic_cast<std::ofstream *>(os);
-    if (output) {
-      *output << val << "\n";
-    } else {
-      throw std::invalid_argument(
-          "Invalid stream type: expected ofstream for writing");
-    }
-  } else {
-    auto *input = dynamic_cast<std::ifstream *>(os);
-    if (input) {
-      *input >> val;
-    } else {
-      throw std::invalid_argument(
-          "Invalid stream type: expected ifstream for reading");
-    }
-  }
+template <Streamable T> void streamdo(DataOutStream &os, T &val) {
+  os << val << "\n";
 }
+template <Streamable T> void streamdo(DataInStream &os, T &val) { os >> val; }
 
-template <Streamable T> void filedo(std::ios *os, T &&val, bool write = false) {
-  filedo(os, val, write);
+template <MyStream OS, Streamable T> void streamdo(OS &os, T &&val) {
+  T &v = val;
+  streamdo(os, v);
 }
 static std::vector<std::pair<std::string, std::filesystem::path>> getFiles() {
   std::vector<std::pair<std::string, std::filesystem::path>> files;
@@ -261,131 +272,132 @@ static std::vector<std::pair<std::string, std::filesystem::path>> getFiles() {
   }
   return files;
 }
-
-void inn(std::ios *s, DebugValues &x, bool v) {
-  filedo(s, x.conecreater, v);
-  filedo(s, x.pixelMult, v);
-  filedo(s, x.swizzleorder, v);
-  filedo(s, x.blendDistances, v);
-  filedo(s, x.foamColor, v);
-  filedo(s, x.DebugBits, v);
-  filedo(s, x.enableSSR, v);
-  filedo(s, x.lockQuadTree, v);
-  filedo(s, x.maxConeStep, v);
-  filedo(s, x.prismHeight, v);
-  filedo(s, x.coneStepRelax, v);
-  filedo(s, x.drawMethod, v);
-  filedo(s, AsShiftedOptionalEnum(x.debugTextureMode), v);
-  filedo(s, x.rasterizerFlags, v);
+template <MyStream OS> void HandleDebugValues(OS &s, DebugValues &x) {
+  streamdo(s, x.conecreater);
+  streamdo(s, x.pixelMult);
+  streamdo(s, x.swizzleorder);
+  streamdo(s, x.blendDistances);
+  streamdo(s, x.foamColor);
+  streamdo(s, x.DebugBits);
+  streamdo(s, x.enableSSR);
+  streamdo(s, x.lockQuadTree);
+  streamdo(s, x.maxConeStep);
+  streamdo(s, x.prismHeight);
+  streamdo(s, x.coneStepRelax);
+  streamdo(s, x.drawMethod);
+  streamdo(s, AsShiftedOptionalEnum(x.debugTextureMode));
+  streamdo(s, x.rasterizerFlags);
 }
+template <MyStream OS>
+void HandlesPatchData(OS &s, SimulationData::PatchData &x) {
 
-void inn(std::ios *s, SimulationData::PatchData &x, bool v) {
-
-  filedo(s, x.displacementLambda, v);
-  filedo(s, x.patchSize, v);
-  filedo(s, x.patchExtent, v);
-  filedo(s, x.foamExponentialDecay, v);
-  filedo(s, x.Amplitude, v);
-  filedo(s, x.WindForce, v);
-  filedo(s, x.foamMinValue, v);
-  filedo(s, x.foamBias, v);
-  filedo(s, x.foamMult, v);
-  // filedo(s, x.N, v);
-  // filedo(s, x.M, v);
-  filedo(s, x.windDirection, v);
-  filedo(s, x.gravity, v);
-  filedo(s, x.Depth, v);
+  streamdo(s, x.displacementLambda);
+  streamdo(s, x.patchSize);
+  streamdo(s, x.patchExtent);
+  streamdo(s, x.foamExponentialDecay);
+  streamdo(s, x.Amplitude);
+  streamdo(s, x.WindForce);
+  streamdo(s, x.foamMinValue);
+  streamdo(s, x.foamBias);
+  streamdo(s, x.foamMult);
+  // streamdo(s, x.N);
+  // streamdo(s, x.M);
+  streamdo(s, x.windDirection);
+  streamdo(s, x.gravity);
+  streamdo(s, x.Depth);
 };
-
-void inn(std::ios *s, SimulationData &x, bool v,
-         std::optional<NeedToDo *> beforeNextFrame = std::nullopt) {
+template <MyStream OS>
+void HandleSimulationData(
+    OS &s, SimulationData &x,
+    std::optional<NeedToDo *> beforeNextFrame = std::nullopt) {
   SimulationData::PatchData tmp = x.Highest;
-  inn(s, x.Highest, v);
+  HandlesPatchData(s, x.Highest);
   if (beforeNextFrame.has_value()) {
     NeedToDo &b = **beforeNextFrame;
     b.patchHighestChanged = !x.Highest.compatibleSim(tmp);
   }
   tmp = x.Medium;
-  inn(s, x.Medium, v);
+  HandlesPatchData(s, x.Medium);
   if (beforeNextFrame.has_value()) {
     NeedToDo &b = **beforeNextFrame;
     b.patchMediumChanged = !x.Medium.compatibleSim(tmp);
   }
   tmp = x.Lowest;
-  inn(s, x.Lowest, v);
+  HandlesPatchData(s, x.Lowest);
   if (beforeNextFrame.has_value()) {
     NeedToDo &b = **beforeNextFrame;
     b.patchLowestChanged = !x.Lowest.compatibleSim(tmp);
   }
-  // filedo(s, x.N, v);
-  // filedo(s, x.M, v);
-  filedo(s, x.windDirection, v);
-  filedo(s, x.gravity, v);
-  filedo(s, x.Depth, v);
-  filedo(s, x.quadTreeDistanceThreshold, v);
-  filedo(s, x.maxDepth, v);
+  // streamdo(s, x.N, v);
+  // streamdo(s, x.M, v);
+  streamdo(s, x.windDirection);
+  streamdo(s, x.gravity);
+  streamdo(s, x.Depth);
+  streamdo(s, x.quadTreeDistanceThreshold);
+  streamdo(s, x.maxDepth);
 }
-void inn(std::ios *s, WaterGraphicRootDescription::WaterPixelShaderData &x,
-         bool v) {
+template <MyStream OS>
+void HandleWaterPixelShaderData(
+    OS &s, WaterGraphicRootDescription::WaterPixelShaderData &x) {
 
-  filedo(s, x.AlbedoColor, v);
-  filedo(s, x.Roughness, v);
-  filedo(s, x.foamDepthFalloff, v);
-  filedo(s, x.foamRoughnessModifier, v);
-  filedo(s, x.NormalDepthAttenuation, v);
-  filedo(s, x._HeightModifier, v);
-  filedo(s, x._WavePeakScatterStrength, v);
-  filedo(s, x._ScatterShadowStrength, v);
-  filedo(s, x._Fresnel, v);
+  streamdo(s, x.AlbedoColor);
+  streamdo(s, x.Roughness);
+  streamdo(s, x.foamDepthFalloff);
+  streamdo(s, x.foamRoughnessModifier);
+  streamdo(s, x.NormalDepthAttenuation);
+  streamdo(s, x._HeightModifier);
+  streamdo(s, x._WavePeakScatterStrength);
+  streamdo(s, x._ScatterShadowStrength);
+  streamdo(s, x._Fresnel);
 }
-void inn(std::ios *s, PixelLighting &x, bool v) {
-  filedo(s, x.lightCount, v);
+template <MyStream OS> void HandlePixelLighting(OS &s, PixelLighting &x) {
+  streamdo(s, x.lightCount);
   for (auto &el : x.lights) {
-    filedo(s, el.lightPos, v);
-    filedo(s, el.lightColor, v);
-    filedo(s, el.AmbientColor, v);
+    streamdo(s, el.lightPos);
+    streamdo(s, el.lightColor);
+    streamdo(s, el.AmbientColor);
   }
 }
-void inn(std::ios *s, DeferredShading::DeferredShaderBuffers &x, bool v) {
+template <MyStream OS>
+void HandleDeferredShader(OS &s, DeferredShading::DeferredShaderBuffers &x) {
 
-  filedo(s, x._TipColor, v);
-  filedo(s, x.EnvMapMult, v);
+  streamdo(s, x._TipColor);
+  streamdo(s, x.EnvMapMult);
 }
-
-void inn(std::ios *s, RuntimeSettings &x, bool v) {
-  filedo(s, x.timeRunning, v);
-  filedo(s, x.showImgui, v);
-  filedo(s, x.clearColor, v);
+template <MyStream OS> void HandleRuntimeSettings(OS &s, RuntimeSettings &x) {
+  streamdo(s, x.timeRunning);
+  streamdo(s, x.showImgui);
+  streamdo(s, x.clearColor);
 }
-void inn(std::ios *s, Camera &x, bool v) {
+template <MyStream OS> void HandleCamera(OS &s, Camera &x) {
   bool firstPerson = x.GetFirstPerson();
   auto eye = x.GetEye();
   auto at = x.GetAt();
   auto distance = x.GetDistance();
-  filedo(s, firstPerson, v);
-  filedo(s, eye, v);
-  filedo(s, at, v);
-  filedo(s, distance, v);
+  streamdo(s, firstPerson);
+  streamdo(s, eye);
+  streamdo(s, at);
+  streamdo(s, distance);
   x.SetFirstPerson(firstPerson);
   x.SetDistanceFromAt(distance);
   x.SetView(eye, at, x.GetWorldUp());
 }
 
+template <MyStream OS>
 void PerformFileOperation(
-    std::ios *stream, bool save, DebugValues &debugValues,
-    SimulationData &simData,
+    OS &stream, DebugValues &debugValues, SimulationData &simData,
     WaterGraphicRootDescription::WaterPixelShaderData &waterData,
     PixelLighting &sunData,
     DeferredShading::DeferredShaderBuffers &deferredData,
     RuntimeSettings &settings, Camera &cam, NeedToDo &beforeNextFrame) {
 
-  inn(stream, debugValues, save);
-  inn(stream, simData, save, &beforeNextFrame);
-  inn(stream, waterData, save);
-  inn(stream, sunData, save);
-  inn(stream, deferredData, save);
-  inn(stream, settings, save);
-  inn(stream, cam, save);
+  HandleDebugValues(stream, debugValues);
+  HandleSimulationData(stream, simData, &beforeNextFrame);
+  HandleWaterPixelShaderData(stream, waterData);
+  HandlePixelLighting(stream, sunData);
+  HandleDeferredShader(stream, deferredData);
+  HandleRuntimeSettings(stream, settings);
+  HandleCamera(stream, cam);
 }
 
 void ShowImguiLoaderConfig(
@@ -494,20 +506,19 @@ void ShowImguiLoaderConfig(
 
   if (pressedSave) {
     std::ofstream os(files[selectedFile].second);
-    PerformFileOperation(&os, true, debugValues, simData, waterData, sunData,
+    DataOutStream s(os);
+    PerformFileOperation(s, debugValues, simData, waterData, sunData,
                          deferredData, settings, cam, beforeNextFrame);
-    os.close();
   }
   if (pressedLoad) {
     std::ifstream os(files[selectedFile].second);
-    PerformFileOperation(&os, false, debugValues, simData, waterData, sunData,
+    DataInStream s(os);
+    PerformFileOperation(s, debugValues, simData, waterData, sunData,
                          deferredData, settings, cam, beforeNextFrame);
     settings.timeRunning = false;
-    os.close();
   }
   if (pressedDelete) {
-    namespace fs = std::filesystem;
-    fs::remove(files[selectedFile].second);
+    std::filesystem::remove(files[selectedFile].second);
     files = getFiles();
   }
 }

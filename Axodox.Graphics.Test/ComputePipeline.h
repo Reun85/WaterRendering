@@ -12,9 +12,6 @@ using namespace DirectX::PackedVector;
 namespace SimulationStage {
 struct ConeMapCreater;
 
-template <typename T, typename TypeA, typename TypeB>
-concept Either = std::same_as<T, TypeA> || std::same_as<T, TypeB>;
-
 struct LODComputeBuffer {
   float4 displacementLambda;
   float patchSize;

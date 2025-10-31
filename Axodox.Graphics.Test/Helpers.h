@@ -9,6 +9,9 @@ using namespace Axodox::Graphics::D3D12;
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
 
+template <typename T, typename TypeA, typename TypeB>
+concept Either = std::same_as<T, TypeA> || std::same_as<T, TypeB>;
+
 template <typename T>
 concept IsRatio = std::is_same_v<T, std::ratio<T::num, T::den>>;
 template <typename T>

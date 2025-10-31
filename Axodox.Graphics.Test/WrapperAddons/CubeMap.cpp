@@ -25,9 +25,7 @@ CubeMapPaths::reinterpretable_as CubeMapPaths::ToArray() const noexcept {
   return AsArray();
 }
 
-explicit CubeMapPaths::operator reinterpretable_as() const noexcept {
-  return ToArray();
-}
+CubeMapPaths::operator reinterpretable_as() const noexcept { return ToArray(); }
 
 static_assert(sizeof(CubeMapPaths) == sizeof(CubeMapPaths::reinterpretable_as),
               "Type being reinterpretable must be of same size");
