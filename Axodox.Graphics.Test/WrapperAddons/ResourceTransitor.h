@@ -12,7 +12,7 @@ template <u64 N> class ResourceTransitor {
     union {
       ResourceTransition x;
     };
-    Data(){};
+    Data() {};
   };
   CommandAllocator &allocator;
   std::array<Data, N> arr;

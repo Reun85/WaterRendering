@@ -40,18 +40,11 @@ template <typename DataType>
 TextureData constexpr CreateTextureData(const Format &f, const u32 width,
                                         const u32 height, const u16 arraySize,
                                         const std::vector<DataType> &data) {
-  const auto *dataPtr = reinterpret_cast<const u8 *>(data.data());
+  const auto *dataPtr = reinterpret_cast<const std::byte *>(data.data());
 
-  std::size_t byteSize = data.size() * sizeof(DataType);
+  usize byteSize = data.size() * sizeof(DataType);
 
-  const auto span = std::span<const u8>(dataPtr, byteSize);
-  return TextureData(f, width, height, arraySize, span);
-}
-
-template <typename DataType>
-TextureData constexpr CreateTextureData(const Format &f, const u32 width,
-                                        const u32 height, const u16 arraySize,
-                                        std::span<const u8> span) {
+  auto span = std::span<const u8>((u8 *)dataPtr, byteSize);
   return TextureData(f, width, height, arraySize, span);
 }
 
@@ -452,4 +445,12 @@ std::vector<std::invoke_result_t<Lambda>> inline NewVectorByFunction(
     result.push_back(std::forward<T>(factory()));
   }
   return result;
+}
+
+static void set_flag(u32 &flag, u32 flagIndex, bool flagValue = true) {
+  if (flagValue) {
+    flag |= 1 << flagIndex;
+  } else {
+    flag &= ~(1 << flagIndex);
+  }
 }

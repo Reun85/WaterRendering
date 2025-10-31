@@ -14,6 +14,24 @@ using namespace winrt;
 
 using namespace Windows::Foundation::Numerics;
 
+CubeMapPaths::reinterpretable_as &CubeMapPaths::AsArray() {
+  return reinterpret_cast<reinterpretable_as &>(*this);
+}
+const CubeMapPaths::reinterpretable_as &CubeMapPaths::AsArray() const {
+  return reinterpret_cast<const reinterpretable_as &>(*this);
+}
+
+CubeMapPaths::reinterpretable_as CubeMapPaths::ToArray() const noexcept {
+  return AsArray();
+}
+
+explicit CubeMapPaths::operator reinterpretable_as() const noexcept {
+  return ToArray();
+}
+
+static_assert(sizeof(CubeMapPaths) == sizeof(CubeMapPaths::reinterpretable_as),
+              "Type being reinterpretable must be of same size");
+
 enum class CubeMapFace : u8 {
   PosZ = 0,
   NegZ = 1,
@@ -165,7 +183,6 @@ ConvertEquirectangularToCubeMap(const std::span<const PixelType> &src,
 CubeMapTexture::CubeMapTexture(const ResourceAllocationContext &context,
                                const std::filesystem::path &hdrImagePath,
                                const std::optional<const u32> &size) {
-  // Initialize the DirectXTex scratch image that will hold the HDR data
   DirectX::ScratchImage LoadedImage;
 
   // Load the .hdr file

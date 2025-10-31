@@ -13,7 +13,7 @@ template <typename T>
 concept EnumType = std::is_enum_v<T>;
 
 template <EnumType Enum>
-std::ostream &operator<<(std::ostream &os, Enum value) {
+std::ostream &operator<<(std::ostream &os, const Enum &value) {
   using UnderlyingType = std::underlying_type_t<Enum>;
   os << static_cast<UnderlyingType>(value);
   return os;
@@ -27,6 +27,82 @@ std::istream &operator>>(std::istream &is, Enum &value) {
   value = static_cast<Enum>(temp); // Cast back to Enum type
   return is;
 }
+
+template <EnumType Enum> class AsShiftedOptionalEnum {
+public:
+  using UnderlyingType = std::underlying_type_t<Enum>;
+  AsShiftedOptionalEnum(std::optional<Enum> &val) : val_(val) {}
+
+  friend std::ostream &operator<<(std::ostream &os,
+                                  const AsShiftedOptionalEnum<Enum> &inp) {
+
+    if (inp.val_.has_value()) {
+      const auto val = inp.val_.value();
+      const auto underlying = static_cast<UnderlyingType>(val);
+      const auto printed = underlying + 1;
+      os << printed;
+    } else {
+      os << 0;
+    }
+    return os;
+  }
+
+  friend std::istream &operator>>(std::istream &is,
+                                  AsShiftedOptionalEnum<Enum> &inp) {
+
+    auto &value = inp.val_;
+    // 0 is definitely inside the UnderlyingType range
+    UnderlyingType temp;
+    is >> temp;
+    if (temp == 0) {
+      value = std::nullopt;
+    }
+
+    else {
+      temp -= 1;
+      value = Enum(temp); // Cast back to Enum type
+    }
+    return is;
+  }
+
+private:
+  std::optional<Enum> &val_;
+};
+
+// template <EnumType Enum>
+// std::ostream &operator<<(std::ostream &os,
+//                          const AsShiftedOptionalEnum<Enum> &inp) {
+//   using UnderlyingType = AsShiftedOptionalEnum<Enum>::UnderlyingType;
+//
+//   const auto &value = inp.val_;
+//   if (value.has_value()) {
+//     const auto val = value.value() + 1;
+//     os << static_cast<UnderlyingType>(val);
+//   } else {
+//     os << 0;
+//   }
+//   return os;
+// }
+//
+// template <EnumType Enum>
+// std::istream &operator>>(std::istream &is, AsShiftedOptionalEnum<Enum> &inp)
+// {
+//   using UnderlyingType = AsShiftedOptionalEnum<Enum>::UnderlyingType;
+//
+//   const auto &value = inp.val_;
+//   // 0 is definitely inside the UnderlyingType range
+//   UnderlyingType temp;
+//   is >> temp;
+//   if (temp == 0) {
+//     value = std::nullopt;
+//   }
+//
+//   else {
+//     temp -= 1;
+//     value = Enum(temp); // Cast back to Enum type
+//   }
+//   return is;
+// }
 
 template <typename T>
 std::istream &operator>>(std::istream &is, std::vector<T> &v) {
@@ -166,6 +242,10 @@ template <Streamable T> void filedo(std::ios *os, T &val, bool write = false) {
     }
   }
 }
+
+template <Streamable T> void filedo(std::ios *os, T &&val, bool write = false) {
+  filedo(os, val, write);
+}
 static std::vector<std::pair<std::string, std::filesystem::path>> getFiles() {
   std::vector<std::pair<std::string, std::filesystem::path>> files;
 
@@ -195,7 +275,7 @@ void inn(std::ios *s, DebugValues &x, bool v) {
   filedo(s, x.prismHeight, v);
   filedo(s, x.coneStepRelax, v);
   filedo(s, x.drawMethod, v);
-  filedo(s, x.mode, v);
+  filedo(s, AsShiftedOptionalEnum(x.debugTextureMode), v);
   filedo(s, x.rasterizerFlags, v);
 }
 

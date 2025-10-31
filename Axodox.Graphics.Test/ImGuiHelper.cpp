@@ -1,11 +1,7 @@
 #include "pch.h"
-#include <string.h>
-#include "ComputePipeline.h"
-#include "GraphicsPipeline.h"
+#include "ImGuiHelper.h"
 
-using namespace Axodox::Infrastructure;
-
-inline static ID3D12DescriptorHeap *
+ID3D12DescriptorHeap *
 InitImGui(const Axodox::Graphics::D3D12::GraphicsDevice &device,
           u8 framesInFlight, const string &iniPath) {
   IMGUI_CHECKVERSION();
@@ -35,34 +31,30 @@ InitImGui(const Axodox::Graphics::D3D12::GraphicsDevice &device,
   return ImGuiDescriptorHeap;
 }
 
-struct ImGUIManager {
+ImGUIManager::ImGUIManager(
+    const Axodox::Graphics::D3D12::GraphicsDevice &device, u8 framesInFlight,
+    const string &iniPath)
 
-  ImGUIManager(const Axodox::Graphics::D3D12::GraphicsDevice &device,
-               u8 framesInFlight, const string &iniPath)
+{
 
-  {
+  descriptorHeap_ = (InitImGui(device, framesInFlight, iniPath));
+}
 
-    descriptorHeap_ = (InitImGui(device, framesInFlight, iniPath));
+ImGuiIO &ImGUIManager::GetIO() { return ImGui::GetIO(); }
+ImGUIManager::~ImGUIManager() {
+  ImGui_ImplDX12_Shutdown();
+  ImGui_ImplUwp_Shutdown();
+  ImGui::DestroyContext();
+  if (descriptorHeap_) {
+    descriptorHeap_->Release();
+    descriptorHeap_ = nullptr;
   }
+}
+void ImGUIManager::Render(CommandAllocator &allocator) const {
 
-  ImGuiIO &GetIO() { return ImGui::GetIO(); }
-  ~ImGUIManager() {
-    ImGui_ImplDX12_Shutdown();
-    ImGui_ImplUwp_Shutdown();
-    ImGui::DestroyContext();
-    if (descriptorHeap_) {
-      descriptorHeap_->Release();
-      descriptorHeap_ = nullptr;
-    }
-  }
-  void Render(CommandAllocator &allocator) const {
+  ImGui::Render();
 
-    ImGui::Render();
+  allocator->SetDescriptorHeaps(1, &descriptorHeap_);
 
-    allocator->SetDescriptorHeaps(1, &descriptorHeap_);
-
-    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), allocator.operator->());
-  }
-  ID3D12DescriptorHeap *descriptorHeap_ = nullptr;
-  // ImGuiIO &io;
-};
+  ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), allocator.operator->());
+}

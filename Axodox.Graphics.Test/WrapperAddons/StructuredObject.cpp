@@ -40,9 +40,9 @@ Axodox::Graphics::D3D12::StructuredObjectViews::StructuredObjectViews(
   });
 }
 
-MeshSpecificBuffers::MeshSpecificBuffers(
-    ResourceAllocationContext &context, const ImmutableMesh &mesh,
-    u32 VertexByteSize, u32 IndexByteSize)
+MeshSpecificBuffers::MeshSpecificBuffers(ResourceAllocationContext &context,
+                                         const ImmutableMesh &mesh,
+                                         u32 VertexByteSize, u32 IndexByteSize)
 
     : Vertex(context, &*mesh.GetVertexBuffer(),
              BufferViewDefinitions{
@@ -71,8 +71,8 @@ MeshSpecificBuffers::MeshSpecificBuffers(
 
 {}
 
-MeshSpecificBuffers::MeshSpecificBuffers(
-    ResourceAllocationContext &context, const ImmutableMesh &mesh)
+MeshSpecificBuffers::MeshSpecificBuffers(ResourceAllocationContext &context,
+                                         const ImmutableMesh &mesh)
 
     : Vertex(context, &*mesh.GetVertexBuffer(),
              BufferViewDefinitions{
@@ -114,9 +114,8 @@ MeshSpecificBuffers::MeshSpecificBuffers(
 
 {}
 
-StructuredObject::StructuredObject(
-    ResourceAllocationContext &context,
-    const BufferDefinition &bufferDefinitions,
+StructuredObject::StructuredObject(ResourceAllocationContext &context,
+                                   const BufferDefinition &bufferDefinitions,
                                    const BufferViewDefinitions &viewDefinitions)
     : _buff(context.ResourceAllocator->CreateBuffer(bufferDefinitions)),
       StructuredObjectViews(context, &*_buff, viewDefinitions)

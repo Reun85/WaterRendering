@@ -1,5 +1,7 @@
+#pragma once
 #include "pch.h"
 #include "App.h"
+
 App::App(AppShared &shared)
     : shared_(shared),
       swapChain{directQueue, shared_.window, SwapChainFlags::IsTearingAllowed},
@@ -493,8 +495,8 @@ void App::Run() {
         XMMatrixTranslationFromVector(XMVECTOR{0, -5, 0, 0});
     std::future<std::vector<WaterGraphicRootDescription::OceanData> &>
         oceanDataFuture;
-    if (debugValues.drawMethod == DebugValues::DrawMethod::Tesselation ||
-        debugValues.drawMethod == DebugValues::DrawMethod::PrismParallax ||
+    if (debugValues.drawMethod == DebugValues::DrawTechnology::Tesselation ||
+        debugValues.drawMethod == DebugValues::DrawTechnology::PrismParallax ||
         first_loop) {
       oceanDataFuture = threadpool_execute<
           std::vector<WaterGraphicRootDescription::OceanData>
@@ -639,27 +641,28 @@ void App::Run() {
         // Start Draw pass
         // Debug Data
         {
-          switch (debugValues.mode) {
-          case DebugValues::Mode::DisplacementHighest:
-            usedTexture = &drawingSimResource.HighestBuffer.displacementMap;
-            break;
-          case DebugValues::Mode::GradientsHighest:
-            usedTexture = &drawingSimResource.HighestBuffer.gradients;
-            break;
-          case DebugValues::Mode::DisplacementMedium:
-            usedTexture = &drawingSimResource.MediumBuffer.displacementMap;
-            break;
-          case DebugValues::Mode::GradientsMedium:
-            usedTexture = &drawingSimResource.MediumBuffer.gradients;
-            break;
-          case DebugValues::Mode::DisplacementLowest:
-            usedTexture = &drawingSimResource.LowestBuffer.displacementMap;
-            break;
-          case DebugValues::Mode::GradientsLowest:
-            usedTexture = &drawingSimResource.LowestBuffer.gradients;
-            break;
-          default:
-            break;
+          if (debugValues.debugTextureMode.has_value()) {
+            const auto val = debugValues.debugTextureMode.value();
+            switch (val) {
+            case DebugValues::DebugTextureDisplay::DisplacementHighest:
+              usedTexture = &drawingSimResource.HighestBuffer.displacementMap;
+              break;
+            case DebugValues::DebugTextureDisplay::GradientsHighest:
+              usedTexture = &drawingSimResource.HighestBuffer.gradients;
+              break;
+            case DebugValues::DebugTextureDisplay::DisplacementMedium:
+              usedTexture = &drawingSimResource.MediumBuffer.displacementMap;
+              break;
+            case DebugValues::DebugTextureDisplay::GradientsMedium:
+              usedTexture = &drawingSimResource.MediumBuffer.gradients;
+              break;
+            case DebugValues::DebugTextureDisplay::DisplacementLowest:
+              usedTexture = &drawingSimResource.LowestBuffer.displacementMap;
+              break;
+            case DebugValues::DebugTextureDisplay::GradientsLowest:
+              usedTexture = &drawingSimResource.LowestBuffer.gradients;
+              break;
+            }
           }
 
           if (usedTexture.has_value()) {
@@ -774,7 +777,7 @@ void App::Run() {
           // Water
           {
             if (debugValues.drawMethod ==
-                DebugValues::DrawMethod::Tesselation) {
+                DebugValues::DrawTechnology::Tesselation) {
 
               // Ocean Buffers
               WaterGraphicRootDescription::ModelConstants modelConstants{};
@@ -794,7 +797,7 @@ void App::Run() {
                 auto mask = waterRootSignature.Set(
                     allocator, RootSignatureUsage::Graphics);
 
-                if (usedTextureAddress)
+                if (usedTextureAddress.has_value())
                   mask.texture = **usedTextureAddress;
 
                 mask.heightMapHighest = displacementMapAddressHighest;
@@ -817,7 +820,7 @@ void App::Run() {
                 planeMesh.Draw(allocator, curr.N);
               }
             } else if (debugValues.drawMethod ==
-                       DebugValues::DrawMethod::Parallax) {
+                       DebugValues::DrawTechnology::Parallax) {
 
               // Ocean Buffers
               ParallaxDraw::ModelBuffers modelConstants{};
@@ -862,7 +865,7 @@ void App::Run() {
             }
 
             else if (debugValues.drawMethod ==
-                     DebugValues::DrawMethod::PrismParallax) {
+                     DebugValues::DrawTechnology::PrismParallax) {
 
               // Ocean Buffers
               PrismParallaxDraw::ModelBuffers modelConstants{};

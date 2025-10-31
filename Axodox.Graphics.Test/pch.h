@@ -1,5 +1,6 @@
 ﻿#pragma once
 #define NOMINMAX
+#define PLATFORM_WINDOWS
 
 #include <windows.h>
 #include <winrt/Windows.Foundation.h>
@@ -11,10 +12,10 @@
 #include <winrt/Windows.UI.Input.h>
 #include <winrt/Windows.Storage.h>
 
-#define PLATFORM_WINDOWS
 #include "../Axodox.Graphics.Shared/Include/Axodox.Graphics.D3D12.h"
 
 #include "../ImGUI/Includes/includes.h"
 
+// Own
 #include "Typedefs.h"
 #include "WrapperAddons/includes.h"

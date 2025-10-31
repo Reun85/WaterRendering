@@ -1,4 +1,10 @@
+#pragma once
 #include "pch.h"
+#include <pix3.h>
+#include <iostream>
+#include <sstream>
+#include <string.h>
+
 #include "Camera.h"
 #include "ComputePipeline.h"
 #include "DebugValues.h"
@@ -6,18 +12,14 @@
 #include "GraphicsPipeline.h"
 #include "Helpers.h"
 #include "Parallax.h"
-#include "pix3.h"
 #include "QuadTree.h"
 #include "ShadowVolume.h"
 #include "Simulation.h"
 #include "SkyboxPipeline.hpp"
-#include <ImGuiWrapper.h>
-#include <string.h>
-#include <TestConfigLoader.h>
+#include "TestConfigLoader.h"
 
-#include <AppShared.h>
-#include <iostream>
-#include <sstream>
+#include "AppShared.h"
+#include "ImGuiHelper.h"
 
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
@@ -66,7 +68,7 @@ private:
   // -----------------
   GraphicsDevice device;
   CommandQueue directQueue{device};
-  // CommandQueue computeQueue{device};
+  // TODO: why does this not work? CommandQueue computeQueue{device};
   CommandQueue &computeQueue = directQueue;
   CoreSwapChain swapChain;
 

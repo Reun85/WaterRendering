@@ -27,6 +27,7 @@ public:
       const ResourceAllocationContext &context,
       const TextureDefinition &definition,
       const std::optional<TextureViewDefinitions> &viewDefinitions);
+
   MutableTextureWithViews(
       const ResourceAllocationContext &context, const TextureData &startingData,
       const std::optional<TextureViewDefinitions> &viewDefinitions);

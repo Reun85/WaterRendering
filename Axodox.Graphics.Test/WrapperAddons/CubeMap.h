@@ -13,19 +13,11 @@ struct CubeMapPaths {
   std::filesystem::path NegZ;
 
   using reinterpretable_as = std::array<const std::filesystem::path, 6>;
-  reinterpretable_as &AsArray() {
-    return reinterpret_cast<reinterpretable_as &>(*this);
-  }
-  const reinterpretable_as &AsArray() const {
-    return reinterpret_cast<const reinterpretable_as &>(*this);
-  }
-
-  reinterpretable_as ToArray() const noexcept { return AsArray(); }
-
-  explicit operator reinterpretable_as() const noexcept { return ToArray(); }
+  reinterpretable_as &AsArray();
+  const reinterpretable_as &AsArray() const;
+  reinterpretable_as ToArray() const noexcept;
+  explicit operator reinterpretable_as() const noexcept;
 };
-static_assert(sizeof(CubeMapPaths) == sizeof(CubeMapPaths::reinterpretable_as),
-              "Type being reinterpretable must be of same size");
 
 /// <summary>
 ///  Represents a cubemap texture.

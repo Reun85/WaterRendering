@@ -120,7 +120,7 @@
     <ClInclude Include="Frustum.hpp" />
     <ClInclude Include="GraphicsPipeline.h" />
     <ClInclude Include="Helpers.h" />
-    <ClInclude Include="ImGuiWrapper.h" />
+    <ClInclude Include="ImGuiHelper.h" />
     <ClInclude Include="oldstuff.h" />
     <ClInclude Include="Parallax.h" />
     <ClInclude Include="pch.h" />
@@ -147,8 +147,10 @@
     <ClCompile Include="AppWrapper.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="ComputePipeline.cpp" />
+    <ClCompile Include="DebugValues.cpp" />
     <ClCompile Include="GraphicsPipeline.cpp" />
     <ClCompile Include="Helpers.cpp" />
+    <ClCompile Include="ImGuiHelper.cpp" />
     <ClCompile Include="Parallax.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
