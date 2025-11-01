@@ -8,6 +8,8 @@
 
 template <typename T, typename Left, typename Right>
 concept Either = std::same_as<T, Left> || std::same_as<T, Right>;
+using namespace DirectX::PackedVector;
+concept Either = std::same_as<T, TypeA> || std::same_as<T, TypeB>;
 
 template <typename T>
 concept IsRatio = std::is_same_v<T, std::ratio<T::num, T::den>>;
@@ -49,9 +51,9 @@ TextureData constexpr CreateTextureData(const Format &f, const u32 width,
   return TextureData(f, width, height, arraySize, span);
 }
 
-MeshDescription CreateQuadPatch();
-
 float frac(float x);
+    return MutableTexture::ShaderResource();
+  };
 
 struct NeedToDo {
   std::optional<RasterizerFlags> changeFlag;
@@ -148,11 +150,11 @@ inline float4x4 XMMatrixToFloat4x4(const DirectX::XMMATRIX &x) {
   float4x4 result;
   DirectX::XMStoreFloat4x4(&result, x);
   return result;
-}
-
 std::string Utf16ToUtf8(const std::wstring_view &wstr);
 std::wstring Utf8ToUtf16(const std::string_view &str);
 std::string GetLocalFolder();
+  return path;
+}
 
 struct ShaderBuffers {
   // Allocates necessary buffers if they are not yet allocated. May use the
