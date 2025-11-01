@@ -3,6 +3,10 @@
 #include "Camera.h"
 #include "QuadTree.h"
 
+void FrameResources::Wait() {
+  if (Marker)
+    Fence.Await(Marker);
+}
 void FrameResources::MakeCompatible(
     const RenderTargetView &finalTarget,
     ResourceAllocationContext &allocationContext) {
@@ -413,3 +417,112 @@ void BasicShader::Run(CommandAllocator &allocator, DynamicBufferManager &,
 
   inp.mesh.Draw(allocator);
 }
+
+// RenderPipeline
+// RenderPipeline::Create(ResourceAllocationContext &context,
+//                        PipelineStateProvider &pipelineStateProvider,
+//                        CreateSettings settings) {
+//
+//   GraphicsDevice &device = *context.Device;
+//   RootSignature<WaterGraphicRootDescription> waterRootSignature{device};
+//
+//   VertexShader simpleVertexShader{app_folder() / L"VertexShader.cso"};
+//   PixelShader simplePixelShader{app_folder() / L"PixelShader.cso"};
+//   HullShader hullShader{app_folder() / L"hullShader.cso"};
+//   DomainShader domainShader{app_folder() / L"domainShader.cso"};
+//
+//   auto &gBufferFormats = DeferredShading::GBuffer::GetGBufferFormats();
+//
+//   GraphicsPipelineStateDefinition waterPipelineStateDefinition{
+//       .RootSignature = &waterRootSignature,
+//       .VertexShader = &simpleVertexShader,
+//       .DomainShader = &domainShader,
+//       .HullShader = &hullShader,
+//       .PixelShader = &simplePixelShader,
+//       .RasterizerState = settings.rasterizerState,
+//       .DepthStencilState = DepthStencilMode::WriteDepth,
+//       .InputLayout = VertexPosition::Layout,
+//       .TopologyType = PrimitiveTopologyType::Patch,
+//       .RenderTargetFormats =
+//           std::initializer_list(std::to_address(gBufferFormats.begin()),
+//                                 std::to_address(gBufferFormats.end())),
+//       .DepthStencilFormat = Format::D32_Float};
+//
+//   Axodox::Graphics::D3D12::PipelineState waterPipelineState =
+//       pipelineStateProvider
+//           .CreatePipelineStateAsync(waterPipelineStateDefinition)
+//           .get();
+//
+//   VertexShader atmosphereVS{app_folder() / L"AtmosphereVS.cso"};
+//   PixelShader atmospherePS{app_folder() / L"AtmospherePS.cso"};
+//   RootSignature<SkyboxRootDescription> skyboxRootSignature{device};
+//   DepthStencilState skyboxDepthStencilState{DepthStencilMode::WriteDepth};
+//   skyboxDepthStencilState.Comparison = ComparisonFunction::LessOrEqual;
+//
+//   GraphicsPipelineStateDefinition skyboxPipelineStateDefinition{
+//       .RootSignature = &skyboxRootSignature,
+//       .VertexShader = &atmosphereVS,
+//       .PixelShader = &atmospherePS,
+//       .RasterizerState = RasterizerFlags::CullNone,
+//       .DepthStencilState = skyboxDepthStencilState,
+//       .InputLayout = VertexPositionNormalTexture::Layout,
+//       .RenderTargetFormats =
+//           std::initializer_list(std::to_address(gBufferFormats.begin()),
+//                                 std::to_address(gBufferFormats.end())),
+//
+//       .DepthStencilFormat = Format::D32_Float};
+//   Axodox::Graphics::D3D12::PipelineState skyboxPipelineState =
+//       pipelineStateProvider
+//           .CreatePipelineStateAsync(skyboxPipelineStateDefinition)
+//           .get();
+//
+//   VertexShader deferredShadingVS{app_folder() / L"DeferredShadingVS.cso"};
+//   PixelShader deferredShadingPS{app_folder() / L"DeferredShadingPS.cso"};
+//   RootSignature<DeferredShading> deferredShadingRootSignature{device};
+//
+//   GraphicsPipelineStateDefinition deferredShadingPipelineStateDefinition{
+//       .RootSignature = &deferredShadingRootSignature,
+//       .VertexShader = &deferredShadingVS,
+//       .PixelShader = &deferredShadingPS,
+//       .BlendState = {BlendType::Additive, BlendType::AlphaBlend},
+//       .RasterizerState = RasterizerFlags::CullCounterClockwise,
+//       .InputLayout = VertexPositionNormalTexture::Layout,
+//       .TopologyType = PrimitiveTopologyType::Triangle,
+//       .RenderTargetFormats = {Format::B8G8R8A8_UNorm},
+//   };
+//   Axodox::Graphics::D3D12::PipelineState deferredShadingPipelineState =
+//       pipelineStateProvider
+//           .CreatePipelineStateAsync(deferredShadingPipelineStateDefinition)
+//           .get();
+//
+//   RootSignature<SSRPostProcessing> postProcessingRootSignature{device};
+//   ComputeShader postProcessingComputeShader{app_folder() /
+//                                             L"SSRPostProcessingShader.cso"};
+//   ComputePipelineStateDefinition postProcessingStateDefinition{
+//       .RootSignature = &postProcessingRootSignature,
+//       .ComputeShader = &postProcessingComputeShader};
+//   auto postProcessingPipelineState =
+//       pipelineStateProvider
+//           .CreatePipelineStateAsync(postProcessingStateDefinition)
+//           .get();
+//
+//   BasicShader basicShader =
+//       BasicShader::WithDefaultShaders(pipelineStateProvider, device);
+//
+//   // SilhouetteDetector silhouetteDetector =
+//   //     SilhouetteDetector::WithDefaultShaders(pipelineStateProvider,
+//   //     device);
+//
+//   // SilhouetteClear silhouetteClear =
+//   //     SilhouetteClear::WithDefaultShaders(pipelineStateProvider, device);
+//
+//   // SilhouetteDetectorTester silhouetteTester =
+//   //     SilhouetteDetectorTester::WithDefaultShaders(pipelineStateProvider,
+//   //                                                  device);
+//
+//   ParallaxDraw parallaxDraw =
+//       ParallaxDraw::WithDefaultShaders(pipelineStateProvider, device);
+//
+//   PrismParallaxDraw prismParallaxDraw =
+//       PrismParallaxDraw::WithDefaultShaders(pipelineStateProvider, device);
+// }

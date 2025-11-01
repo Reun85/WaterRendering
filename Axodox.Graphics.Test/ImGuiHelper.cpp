@@ -3,14 +3,14 @@
 
 ID3D12DescriptorHeap *
 InitImGui(const Axodox::Graphics::D3D12::GraphicsDevice &device,
-          u8 framesInFlight, const string &iniPath) {
+          u8 framesInFlight, const std ::string &iniPath) {
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGuiIO &io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
   ImGui::StyleColorsDark();
 
-  io.IniFilename = iniPath.c_str();
+  io.IniFilename = (const char *)iniPath.c_str();
 
   // Setup Platform/Renderer bindings
   ImGui_ImplUwp_InitForCurrentView();
@@ -33,10 +33,7 @@ InitImGui(const Axodox::Graphics::D3D12::GraphicsDevice &device,
 
 ImGUIManager::ImGUIManager(
     const Axodox::Graphics::D3D12::GraphicsDevice &device, u8 framesInFlight,
-    const string &iniPath)
-
-{
-
+    const std::string &iniPath) {
   descriptorHeap_ = (InitImGui(device, framesInFlight, iniPath));
 }
 

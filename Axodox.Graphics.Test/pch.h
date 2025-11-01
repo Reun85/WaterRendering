@@ -19,3 +19,4 @@
 // Own
 #include "Typedefs.h"
 #include "WrapperAddons/includes.h"
+#include "Helpers.h"

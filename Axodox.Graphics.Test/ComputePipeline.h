@@ -221,6 +221,8 @@ struct SimulationResources {
         Fence(*context.Device), DynamicBuffer(*context.Device),
         HighestBuffer(context, N, M), MediumBuffer(context, N, M),
         LowestBuffer(context, N, M) {}
+
+  void Wait();
 };
 
 template <typename TextureTy = MutableTexture>
@@ -246,8 +248,8 @@ struct ConstantGpuSources {
                                                           &Lowest};
   ConstantGpuSources(ResourceAllocationContext &context,
                      const SimulationData &inp)
-      : Highest(context, inp.Highest), Medium(context, inp.Medium),
-        Lowest(context, inp.Lowest) {}
+      : Highest(context, inp.highest), Medium(context, inp.medium),
+        Lowest(context, inp.lowest) {}
 };
 
 struct MutableGpuSources {

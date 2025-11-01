@@ -53,7 +53,7 @@ concept IStreamReadable = requires(std::istream &is, T &value) {
   { is >> value } -> std::same_as<std::istream &>;
 };
 template <IStreamReadable T> DataInStream &operator>>(DataInStream &is, T &x) {
-  (*is) >> x;
+  *is >> x;
   return is;
 }
 
@@ -66,8 +66,6 @@ concept MyStreamReadable = requires(DataInStream &is, T &value) {
   { is >> value } -> std::same_as<DataInStream &>;
 };
 
-template <typename T>
-concept Streamable = MyStreamWriteable<T> && MyStreamReadable<T>;
 // -----------------------------------------------------------------------------
 
 // Enum serialization
@@ -248,15 +246,20 @@ DataOutStream &operator<<(DataOutStream &os, const XMVECTOR &y) {
 
 // -----------------------------------------------------------------------------
 
-template <Streamable T> void streamdo(DataOutStream &os, T &val) {
+template <MyStreamWriteable T> void streamdo(DataOutStream &os, const T &val) {
   os << val << "\n";
 }
-template <Streamable T> void streamdo(DataInStream &os, T &val) { os >> val; }
-
-template <MyStream OS, Streamable T> void streamdo(OS &os, T &&val) {
-  T &v = val;
-  streamdo(os, v);
+template <MyStreamReadable T> void streamdo(DataInStream &is, T &val) {
+  is >> val;
 }
+
+template <MyStreamWriteable T> void streamdo(DataOutStream &os, const T &&val) {
+  os << val << "\n";
+}
+template <MyStreamReadable T> void streamdo(DataInStream &is, T &&val) {
+  is >> val;
+}
+
 static std::vector<std::pair<std::string, std::filesystem::path>> getFiles() {
   std::vector<std::pair<std::string, std::filesystem::path>> files;
 
@@ -295,8 +298,8 @@ void HandlesPatchData(OS &s, SimulationData::PatchData &x) {
   streamdo(s, x.patchSize);
   streamdo(s, x.patchExtent);
   streamdo(s, x.foamExponentialDecay);
-  streamdo(s, x.Amplitude);
-  streamdo(s, x.WindForce);
+  streamdo(s, x.amplitude);
+  streamdo(s, x.windForce);
   streamdo(s, x.foamMinValue);
   streamdo(s, x.foamBias);
   streamdo(s, x.foamMult);
@@ -304,35 +307,35 @@ void HandlesPatchData(OS &s, SimulationData::PatchData &x) {
   // streamdo(s, x.M);
   streamdo(s, x.windDirection);
   streamdo(s, x.gravity);
-  streamdo(s, x.Depth);
+  streamdo(s, x.depth);
 };
 template <MyStream OS>
 void HandleSimulationData(
     OS &s, SimulationData &x,
     std::optional<NeedToDo *> beforeNextFrame = std::nullopt) {
-  SimulationData::PatchData tmp = x.Highest;
-  HandlesPatchData(s, x.Highest);
+  SimulationData::PatchData tmp = x.highest;
+  HandlesPatchData(s, x.highest);
   if (beforeNextFrame.has_value()) {
     NeedToDo &b = **beforeNextFrame;
-    b.patchHighestChanged = !x.Highest.compatibleSim(tmp);
+    b.patchHighestChanged = !x.highest.compatibleSim(tmp);
   }
-  tmp = x.Medium;
-  HandlesPatchData(s, x.Medium);
+  tmp = x.medium;
+  HandlesPatchData(s, x.medium);
   if (beforeNextFrame.has_value()) {
     NeedToDo &b = **beforeNextFrame;
-    b.patchMediumChanged = !x.Medium.compatibleSim(tmp);
+    b.patchMediumChanged = !x.medium.compatibleSim(tmp);
   }
-  tmp = x.Lowest;
-  HandlesPatchData(s, x.Lowest);
+  tmp = x.lowest;
+  HandlesPatchData(s, x.lowest);
   if (beforeNextFrame.has_value()) {
     NeedToDo &b = **beforeNextFrame;
-    b.patchLowestChanged = !x.Lowest.compatibleSim(tmp);
+    b.patchLowestChanged = !x.lowest.compatibleSim(tmp);
   }
   // streamdo(s, x.N, v);
   // streamdo(s, x.M, v);
   streamdo(s, x.windDirection);
   streamdo(s, x.gravity);
-  streamdo(s, x.Depth);
+  streamdo(s, x.depth);
   streamdo(s, x.quadTreeDistanceThreshold);
   streamdo(s, x.maxDepth);
 }
@@ -504,6 +507,7 @@ void ShowImguiLoaderConfig(
   if (exclusiveWindow)
     ImGui::End();
 
+  // Do the chosen operations
   if (pressedSave) {
     std::ofstream os(files[selectedFile].second);
     DataOutStream s(os);

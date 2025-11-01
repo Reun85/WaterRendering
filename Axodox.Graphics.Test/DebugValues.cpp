@@ -87,7 +87,7 @@ void DebugValues::CullingImGuiDraw(NeedToDo &out) {
        {"CullNone", CullNone},
        {"WireFrame", Wireframe}}};
 
-  const auto new_val = DisplayComboBox<RasterizerFlags>(
+  const auto new_val = ImGuiHelpers::DisplayComboBox<RasterizerFlags>(
       "Render State", std::span(items), rasterizerFlags);
   if (new_val.has_value()) {
     out.changeFlag = new_val.value();
@@ -111,8 +111,8 @@ void DebugValues::useTextureImGuiDraw() {
         index = (usize)debugTextureMode.value() + 1;
       else
         index = 0;
-      const auto chosen =
-          DisplayComboBoxByIndex("Debug Texture Mode", std::span(items), index);
+      const auto chosen = ImGuiHelpers::DisplayComboBoxByIndex(
+          "Debug Texture Mode", std::span(items), index);
       if (chosen.has_value()) {
         const auto val = chosen.value();
         if (val == 0) {
@@ -144,7 +144,7 @@ void DebugValues::useTextureImGuiDraw() {
         ImGui::SameLine();
 
         const auto selectedIndex = *vals[i];
-        const auto chosen = DisplayComboBoxByIndex(
+        const auto chosen = ImGuiHelpers::DisplayComboBoxByIndex(
             id.c_str(), std::span(swizzleitems), selectedIndex);
 
         if (chosen.has_value()) {
@@ -163,8 +163,8 @@ DebugGPUBufferStuff From(const DebugValues &deb,
   res.swizzleOrder = XMUINT4(deb.swizzleorder.x, deb.swizzleorder.y,
                              deb.swizzleorder.z, deb.swizzleorder.w);
   res.blendDistances = deb.blendDistances;
-  res.patchSizes = XMFLOAT3(simData.Highest.patchSize, simData.Medium.patchSize,
-                            simData.Lowest.patchSize);
+  res.patchSizes = XMFLOAT3(simData.highest.patchSize, simData.medium.patchSize,
+                            simData.lowest.patchSize);
   res.maxConeStep = deb.maxConeStep;
   res.coneStepRelax = deb.coneStepRelax;
   for (int i = 0; i < deb.DebugBits.size(); i++) {

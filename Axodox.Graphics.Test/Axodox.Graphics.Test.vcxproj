@@ -121,6 +121,7 @@
     <ClInclude Include="GraphicsPipeline.h" />
     <ClInclude Include="Helpers.h" />
     <ClInclude Include="ImGuiHelper.h" />
+    <ClInclude Include="MutableTextureWithState.hpp" />
     <ClInclude Include="oldstuff.h" />
     <ClInclude Include="Parallax.h" />
     <ClInclude Include="pch.h" />

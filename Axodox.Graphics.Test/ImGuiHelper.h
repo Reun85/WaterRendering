@@ -6,6 +6,7 @@
 
 using namespace Axodox::Infrastructure;
 
+namespace ImGuiHelpers {
 inline std::optional<usize>
 DisplayComboBoxByIndex(const char *label,
                        const std::span<const char *const> &items,
@@ -93,11 +94,12 @@ DisplayComboBox(const char *label,
     return std::nullopt;
   }
 }
+} // namespace ImGuiHelpers
 
 struct ImGUIManager {
 
   ImGUIManager(const Axodox::Graphics::D3D12::GraphicsDevice &device,
-               u8 framesInFlight, const string &iniPath);
+               u8 framesInFlight, const std::string &iniPath);
 
   ImGuiIO &GetIO();
   ~ImGUIManager();

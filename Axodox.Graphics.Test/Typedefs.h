@@ -12,3 +12,29 @@ using usize = size_t;
 
 using f32 = float;
 using f64 = double;
+
+namespace DirectXTypes {
+using typename DirectX::XMINT2;
+using typename DirectX::XMINT3;
+using typename DirectX::XMINT4;
+using typename DirectX::XMMATRIX;
+
+using typename DirectX::XMFLOAT3X3;
+using typename DirectX::XMFLOAT4X4;
+using typename DirectX::XMVECTOR;
+
+using typename DirectX::XMUINT2;
+using typename DirectX::XMUINT3;
+using typename DirectX::XMUINT4;
+
+using typename DirectX::XMFLOAT2;
+using typename DirectX::XMFLOAT3;
+using typename DirectX::XMFLOAT4;
+
+using typename DirectX::PackedVector::XMBYTEN4;
+using typename DirectX::PackedVector::XMUSHORTN2;
+
+} // namespace DirectXTypes
+
+using namespace DirectXTypes;
+using namespace winrt::Windows::Foundation::Numerics;

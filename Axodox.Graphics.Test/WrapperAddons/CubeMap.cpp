@@ -309,7 +309,8 @@ CubeMapTexture::CubeMapTexture(const ResourceAllocationContext &context,
     srvDesc.Format = static_cast<DXGI_FORMAT>(data.Definition().PixelFormat);
     srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
     srvDesc.TextureCube.MostDetailedMip = 0;
-    srvDesc.TextureCube.MipLevels = -1;
+    // explicit overwrapping. Set all bits to 1
+    srvDesc.TextureCube.MipLevels = UINT(-1);
     srvDesc.TextureCube.ResourceMinLODClamp = 0;
     srvDesc.TextureCube.MostDetailedMip = 0;
     srvDesc.TextureCube.MipLevels = (UINT)-1;

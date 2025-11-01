@@ -72,6 +72,10 @@ private:
   CommandQueue &computeQueue = directQueue;
   CoreSwapChain swapChain;
 
+  ResourceAllocationContext immutableResourceAllocationContext_;
+  ResourceAllocationContext mutableResourceAllocationContext_;
+  RenderPipeline renderStage_;
+
   ImGUIManager imgui_wrapper_;
 
   // ApplicationData
