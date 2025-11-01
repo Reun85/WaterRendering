@@ -171,8 +171,6 @@ void DrawImGuiForPSResources(
 
 void App::Run() {
 
-  // Events
-
   PipelineStateProvider pipelineStateProvider{device};
 
   // Graphics pipeline
@@ -292,7 +290,8 @@ void App::Run() {
   // Group together allocations
   GroupedResourceAllocator groupedResourceAllocator{device};
   ResourceUploader resourceUploader{device};
-  CommonDescriptorHeap commonDescriptorHeap{device, 2};
+  CommonDescriptorHeap commonDescriptorHeap{device,
+                                            shared_.settings.framesInFlight};
   DepthStencilDescriptorHeap depthStencilDescriptorHeap{device};
   RenderTargetDescriptorHeap renderTargetDescriptorHeap{device};
   ResourceAllocationContext immutableAllocationContext{
@@ -347,8 +346,6 @@ void App::Run() {
 
   // SilhouetteDetector::Buffers silhouetteDetectorBuffers(
   //     mutableAllocationContext, Box.GetIndexCount() * 4);
-
-  // TODO: this is not good
 
   std::array<FrameResources, 2> frameResources{
       FrameResources(mutableAllocationContext),
@@ -438,25 +435,23 @@ void App::Run() {
       if (beforeNextFrame_.patchHighestChanged) {
         newData.highestData =
             SimulationStage::ConstantGpuSources<>::LODDataSource(
-                mutableAllocationContext, simData.Highest);
+                mutableAllocationContext, simData.highest);
       }
       if (beforeNextFrame_.patchMediumChanged) {
         newData.mediumData =
             SimulationStage::ConstantGpuSources<>::LODDataSource(
-                mutableAllocationContext, simData.Medium);
+                mutableAllocationContext, simData.medium);
       }
       if (beforeNextFrame_.patchLowestChanged) {
         newData.lowestData =
             SimulationStage::ConstantGpuSources<>::LODDataSource(
-                mutableAllocationContext, simData.Lowest);
+                mutableAllocationContext, simData.lowest);
       }
     }
 
     // Wait until buffers can be used
-    if (frameResource.Marker)
-      frameResource.Fence.Await(frameResource.Marker);
-    if (drawingSimResource.FrameDoneMarker)
-      drawingSimResource.Fence.Await(drawingSimResource.FrameDoneMarker);
+    frameResource.Wait();
+    calculatingSimResource.Wait();
     // This is necessary for the compute queue
 
     if (beforeNextFrame_.changeFlag && newData.pipelineState) {

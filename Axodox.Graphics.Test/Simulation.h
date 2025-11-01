@@ -17,8 +17,8 @@ struct SimulationData {
     // used for display
     f32 patchSize;
     f32 foamExponentialDecay;
-    f32 Amplitude;
-    f32 WindForce;
+    f32 amplitude;
+    f32 windForce;
 
     f32 foamMinValue;
     f32 foamBias;
@@ -27,17 +27,17 @@ struct SimulationData {
     u32 M;
     float2 windDirection;
     f32 gravity;
-    f32 Depth;
+    f32 depth;
     bool DrawImGui(std::string_view ID);
     PatchData &operator=(const PatchData &other) = default;
-    bool compatibleSim(const PatchData &other);
+    bool compatibleSim(const PatchData &other) const;
   };
   float2 windDirection;
   f32 gravity;
-  f32 Depth;
-  PatchData Highest;
-  PatchData Medium;
-  PatchData Lowest;
+  f32 depth;
+  PatchData highest;
+  PatchData medium;
+  PatchData lowest;
   float quadTreeDistanceThreshold = QuadTree::Defaults::DistanceThreshold;
   u32 maxDepth = QuadTree::Defaults::maxDepth;
   SimulationData &operator=(const SimulationData &other) = default;
@@ -51,14 +51,14 @@ public:
 namespace Inner {
 template <typename Prec = f32>
   requires std::is_floating_point_v<Prec>
-constexpr Prec PhilipsSpektrum(const float2 &k, const Prec &Amplitude,
+constexpr Prec PhilipsSpektrum(const float2 &k, const Prec &amplitude,
                                const Prec &largestHeight, const float2 &wind) {
   // Smaller than these waves
   const float l = largestHeight / 1000.f;
 
   const float kdotw = dot(k, normalize(wind));
   const float klengthsq = dot(k, k);
-  float P_h = Amplitude *
+  float P_h = amplitude *
               (std::expf(-1.0f / (klengthsq * largestHeight * largestHeight))) /
               (klengthsq * klengthsq * klengthsq) * (kdotw * kdotw);
 
@@ -74,15 +74,16 @@ template <typename Prec = f32>
   requires std::is_floating_point_v<Prec>
 constexpr std::complex<Prec>
 tilde_h0(const float2 &k, const Prec &xi_real, const Prec &xi_im,
-         const Prec &Amplitude, const Prec &largestHeight, const float2 &wind) {
-  constexpr static const Prec one_over_sqrt_2 = 1 / std::numbers::sqrt2_v<Prec>;
+         const Prec &amplitude, const Prec &largestHeight, const float2 &wind) {
+  constexpr static const Prec one_over_sqrt_2 =
+      static_cast<Prec>(1) / std::numbers::sqrt2_v<Prec>;
 
   std::complex res = std::complex<Prec>(xi_real, xi_im);
 
   Prec sqrt_Ph = 0;
   if (k.x != 0.f || k.y != 0.f) {
     sqrt_Ph =
-        std::sqrtf(PhilipsSpektrum<Prec>(k, Amplitude, largestHeight, wind));
+        std::sqrtf(PhilipsSpektrum<Prec>(k, amplitude, largestHeight, wind));
   }
 
   res *= sqrt_Ph;
@@ -138,8 +139,8 @@ CalculateTildeh0(const SimulationData::PatchData &dat) {
   const auto M = (i32)dat.M;
   const auto &wind = normalize(dat.windDirection);
   const auto &gravity = dat.gravity;
-  const auto &WindForce = dat.WindForce;
-  const auto &Amplitude = dat.Amplitude;
+  const auto &windForce = dat.windForce;
+  const auto &amplitude = dat.amplitude;
   const auto &L = dat.patchSize;
 
   std::random_device rd;
@@ -157,8 +158,8 @@ CalculateTildeh0(const SimulationData::PatchData &dat) {
 
       const auto index = Inner::Indexing(i, j, N, M);
 
-      res[index] = Inner::tilde_h0<Prec>(k, dis(gen), dis(gen), Amplitude,
-                                         WindForce * WindForce / gravity, wind);
+      res[index] = Inner::tilde_h0<Prec>(k, dis(gen), dis(gen), amplitude,
+                                         windForce * windForce / gravity, wind);
     }
   }
 
@@ -171,7 +172,7 @@ constexpr std::vector<Prec>
 CalculateFrequencies(const SimulationData::PatchData &dat) {
   // w^2(k) = gktanh(kD)
   const auto &gravity = dat.gravity;
-  const auto &D = dat.Depth;
+  const auto &D = dat.depth;
   const auto &L = dat.patchSize;
 
   const i32 N = (i32)dat.N;

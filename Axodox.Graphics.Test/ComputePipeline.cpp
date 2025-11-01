@@ -104,20 +104,20 @@ void SimulationStage::WaterSimulationComputeShader(
         simResource.HighestBuffer, simulationConstantSources.Highest,
         simulationMutableSources.Highest.Foam,
         simResource.DynamicBuffer.AddBuffer(
-            SimulationStage::LODComputeBuffer(simData.Highest)));
+            SimulationStage::LODComputeBuffer(simData.highest)));
   if (useLod[1])
     lodData.emplace_back(
         simResource.MediumBuffer, simulationConstantSources.Medium,
         simulationMutableSources.Medium.Foam,
         simResource.DynamicBuffer.AddBuffer(
-            SimulationStage::LODComputeBuffer(simData.Medium)));
+            SimulationStage::LODComputeBuffer(simData.medium)));
 
   if (useLod[2])
     lodData.emplace_back(
         simResource.LowestBuffer, simulationConstantSources.Lowest,
         simulationMutableSources.Lowest.Foam,
         simResource.DynamicBuffer.AddBuffer(
-            SimulationStage::LODComputeBuffer(simData.Lowest)));
+            SimulationStage::LODComputeBuffer(simData.lowest)));
 
   // Spektrums
   fullSimPipeline.spektrumPipeline.Apply(computeAllocator);
@@ -339,5 +339,9 @@ void SimulationStage::WaterSimulationComputeShader(
            N});
     }
   }
+}
+void SimulationResources::Wait() {
+  if (FrameDoneMarker)
+    Fence.Await(FrameDoneMarker);
 }
 } // namespace SimulationStage

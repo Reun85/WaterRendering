@@ -30,15 +30,15 @@ void SimulationData::DrawImGui(NeedToDo &out, bool exclusiveWindow) {
     }
     change |= ImGui::InputFloat2("Wind Direction", &windDirection.x);
     change |= ImGui::InputFloat("Gravity", &gravity);
-    change |= ImGui::InputFloat("Depth", &Depth);
+    change |= ImGui::InputFloat("Depth", &depth);
     ImGui::Text("Highest");
-    bool hig = Highest.DrawImGui("Highest");
+    bool hig = highest.DrawImGui("Highest");
     ImGui::Separator();
     ImGui::Text("Medium");
-    bool med = Medium.DrawImGui("Medium");
+    bool med = medium.DrawImGui("Medium");
     ImGui::Separator();
     ImGui::Text("Lowest");
-    bool low = Lowest.DrawImGui("Lowest");
+    bool low = lowest.DrawImGui("Lowest");
     ImGui::Separator();
     ImGui::InputFloat("QuadTree distanceThreshold", &quadTreeDistanceThreshold);
     i32 x = (i32)maxDepth;
@@ -63,9 +63,9 @@ bool SimulationData::PatchData::DrawImGui(std::string_view ID) {
   const std::string text3 = "Displacement Lambda##" + std::string(ID);
   change |= ImGui::InputFloat3(text3.c_str(), (float *)&displacementLambda);
   const std::string text4 = "Amplitude##" + std::string(ID);
-  change |= ImGui::InputFloat(text4.c_str(), &Amplitude, 0, 0, "%.5f");
+  change |= ImGui::InputFloat(text4.c_str(), &amplitude, 0, 0, "%.5f");
   const std::string text5 = "WindForce##" + std::string(ID);
-  change |= ImGui::InputFloat(text5.c_str(), &WindForce);
+  change |= ImGui::InputFloat(text5.c_str(), &windForce);
   const std::string text6 = "Foam Min Value##" + std::string(ID);
   change |= ImGui::InputFloat(text6.c_str(), &foamMinValue);
   const std::string text7 = "Foam Bias##" + std::string(ID);
@@ -75,11 +75,11 @@ bool SimulationData::PatchData::DrawImGui(std::string_view ID) {
   return change;
 }
 
-bool SimulationData::PatchData::compatibleSim(const PatchData &other) {
+bool SimulationData::PatchData::compatibleSim(const PatchData &other) const {
   return N == other.N && M == other.M && windDirection == other.windDirection &&
-         gravity == other.gravity && Depth == other.Depth &&
-         patchSize == other.patchSize && Amplitude == other.Amplitude &&
-         WindForce == other.WindForce;
+         gravity == other.gravity && depth == other.depth &&
+         patchSize == other.patchSize && amplitude == other.amplitude &&
+         windForce == other.windForce;
 }
 
 static SimulationData Preset1() {
@@ -90,16 +90,16 @@ static SimulationData Preset1() {
                      .M = M,
                      .windDirection = float2(-1, 1),
                      .gravity = 9.81f,
-                     .Depth = 100.f,
-                     .Highest =
+                     .depth = 100.f,
+                     .highest =
                          {
                              .displacementLambda = float3(0.f, 0.9f, 0.0f),
                              .patchExtent = 5.f,
 
                              .patchSize = 5.f,
                              .foamExponentialDecay = 0.320f,
-                             .Amplitude = 0.009f,
-                             .WindForce = 9,
+                             .amplitude = 0.009f,
+                             .windForce = 9,
                              .foamMinValue = 0.4f,
                              .foamBias = 0.2f,
                              .foamMult = 1,
@@ -107,16 +107,16 @@ static SimulationData Preset1() {
                              .M = res.M,
                              .windDirection = res.windDirection,
                              .gravity = res.gravity,
-                             .Depth = res.Depth,
+                             .depth = res.depth,
                          },
-                     .Medium =
+                     .medium =
                          {
                              .displacementLambda = float3(0.0f, 1.3f, 0.0f),
                              .patchExtent = 91.f,
                              .patchSize = 91.f,
                              .foamExponentialDecay = 0.17f,
-                             .Amplitude = 0.00001f,
-                             .WindForce = 9,
+                             .amplitude = 0.00001f,
+                             .windForce = 9,
                              .foamMinValue = 0.4f,
                              .foamBias = 0.2f,
                              .foamMult = 1,
@@ -124,15 +124,15 @@ static SimulationData Preset1() {
                              .M = res.M,
                              .windDirection = res.windDirection,
                              .gravity = res.gravity,
-                             .Depth = res.Depth,
+                             .depth = res.depth,
                          },
-                     .Lowest = {
+                     .lowest = {
                          .displacementLambda = float3(0.0f, 0.7f, 0.0f),
                          .patchExtent = 383.f,
                          .patchSize = 383,
                          .foamExponentialDecay = 0.023f,
-                         .Amplitude = 0.00001f,
-                         .WindForce = 6,
+                         .amplitude = 0.00001f,
+                         .windForce = 6,
                          .foamMinValue = 0.4f,
                          .foamBias = -.4f,
                          .foamMult = 1.f,
@@ -140,7 +140,7 @@ static SimulationData Preset1() {
                          .M = res.M,
                          .windDirection = res.windDirection,
                          .gravity = res.gravity,
-                         .Depth = res.Depth,
+                         .depth = res.depth,
                      }};
   return res;
 }
@@ -155,15 +155,15 @@ SimulationData OldPreset() {
                      .M = M,
                      .windDirection = wind,
                      .gravity = gravity,
-                     .Depth = Depth,
-                     .Highest =
+                     .depth = Depth,
+                     .highest =
                          {
                              .displacementLambda = float3(0.0f, 0.5, 0.0f),
                              .patchExtent = 13.f,
                              .patchSize = 13.f,
                              .foamExponentialDecay = 0.1f,
-                             .Amplitude = 0.4e-3f,
-                             .WindForce = 3,
+                             .amplitude = 0.4e-3f,
+                             .windForce = 3,
                              .foamMinValue = 0.4f,
                              .foamBias = 0.2f,
                              .foamMult = 1,
@@ -171,16 +171,16 @@ SimulationData OldPreset() {
                              .M = res.M,
                              .windDirection = res.windDirection,
                              .gravity = res.gravity,
-                             .Depth = res.Depth,
+                             .depth = res.depth,
                          },
-                     .Medium =
+                     .medium =
                          {
                              .displacementLambda = float3(0.0f, 0.5, 0.0f),
                              .patchExtent = 91.f,
                              .patchSize = 91.f,
                              .foamExponentialDecay = 0.1f,
-                             .Amplitude = 0.15e-3f,
-                             .WindForce = 3,
+                             .amplitude = 0.15e-3f,
+                             .windForce = 3,
                              .foamMinValue = 0.4f,
                              .foamBias = 0.2f,
                              .foamMult = 1,
@@ -188,15 +188,15 @@ SimulationData OldPreset() {
                              .M = res.M,
                              .windDirection = res.windDirection,
                              .gravity = res.gravity,
-                             .Depth = res.Depth,
+                             .depth = res.depth,
                          },
-                     .Lowest = {
+                     .lowest = {
                          .displacementLambda = float3(0.0f, 0.5, 0.0f),
                          .patchExtent = 383.f,
                          .patchSize = 383,
                          .foamExponentialDecay = 0.1f,
-                         .Amplitude = 0.1e-4f,
-                         .WindForce = 6,
+                         .amplitude = 0.1e-4f,
+                         .windForce = 6,
                          .foamMinValue = 0.4f,
                          .foamBias = 0.2f,
                          .foamMult = 1,
@@ -204,7 +204,7 @@ SimulationData OldPreset() {
                          .M = res.M,
                          .windDirection = res.windDirection,
                          .gravity = res.gravity,
-                         .Depth = res.Depth,
+                         .depth = res.depth,
                      }};
 
   return res;
@@ -228,15 +228,15 @@ SimulationData SimulationData::Default() {
                      .M = M,
                      .windDirection = wind,
                      .gravity = gravity,
-                     .Depth = Depth,
-                     .Highest =
+                     .depth = Depth,
+                     .highest =
                          {
                              .displacementLambda = float3(0.f, 2.0f, 0.0f),
                              .patchExtent = 12.f,
                              .patchSize = 12.f,
                              .foamExponentialDecay = 0.320f,
-                             .Amplitude = 0.005f,
-                             .WindForce = 9,
+                             .amplitude = 0.005f,
+                             .windForce = 9,
                              .foamMinValue = 0.4f,
                              .foamBias = 0.2f,
                              .foamMult = 1,
@@ -244,16 +244,16 @@ SimulationData SimulationData::Default() {
                              .M = res.M,
                              .windDirection = res.windDirection,
                              .gravity = res.gravity,
-                             .Depth = res.Depth,
+                             .depth = res.depth,
                          },
-                     .Medium =
+                     .medium =
                          {
                              .displacementLambda = float3(0.0f, 1.3f, 0.0f),
                              .patchExtent = 91.f,
                              .patchSize = 91.f,
                              .foamExponentialDecay = 0.17f,
-                             .Amplitude = 0.00003f,
-                             .WindForce = 9,
+                             .amplitude = 0.00003f,
+                             .windForce = 9,
                              .foamMinValue = 0.4f,
                              .foamBias = 0.2f,
                              .foamMult = 1,
@@ -261,15 +261,15 @@ SimulationData SimulationData::Default() {
                              .M = res.M,
                              .windDirection = res.windDirection,
                              .gravity = res.gravity,
-                             .Depth = res.Depth,
+                             .depth = res.depth,
                          },
-                     .Lowest = {
+                     .lowest = {
                          .displacementLambda = float3(0.0f, 1.0f, 0.0f),
                          .patchExtent = 383.f,
                          .patchSize = 383,
                          .foamExponentialDecay = 0.023f,
-                         .Amplitude = 0.000002f,
-                         .WindForce = 15,
+                         .amplitude = 0.000002f,
+                         .windForce = 15,
                          .foamMinValue = 0.4f,
                          .foamBias = -0.4f,
                          .foamMult = 1,
@@ -277,7 +277,7 @@ SimulationData SimulationData::Default() {
                          .M = res.M,
                          .windDirection = res.windDirection,
                          .gravity = res.gravity,
-                         .Depth = res.Depth,
+                         .depth = res.depth,
                      }};
 
   return res;

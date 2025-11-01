@@ -4,6 +4,9 @@
 #include "Helpers.h"
 #include "DebugValues.h"
 
+#include "SkyboxPipeline.hpp"
+#include "Parallax.h"
+
 using namespace DirectX::PackedVector;
 
 using namespace Axodox::Infrastructure;
@@ -396,7 +399,7 @@ struct BasicShader : ShaderJob {
            const Inp &inp) const;
   ~BasicShader() override = default;
 };
-
+/// @brief All resources that may be used by a single frame rendering.
 struct FrameResources : ShaderBuffers {
   CommandAllocator Allocator;
   CommandFence Fence;
@@ -413,10 +416,32 @@ struct FrameResources : ShaderBuffers {
   void MakeCompatible(const RenderTargetView &finalTarget,
                       ResourceAllocationContext &allocationContext) override;
 
+  void Wait();
+
   void Clear(CommandAllocator &allocator) override;
 
   explicit FrameResources(const ResourceAllocationContext &context);
   FrameResources(FrameResources &&) = default;
 
   ~FrameResources() override = default;
+};
+
+/// @brief All tools needed to render a frame.
+struct RenderFrameContext {
+  FrameResources &frameResources;
+  /// If you have more available command queues, you can add them here
+  std::span<CommandQueue> commandQueue;
+
+  void Begin();
+  void Finish();
+};
+
+struct RenderPipeline {
+  struct CreateSettings {
+    RasterizerFlags rasterizerState;
+  };
+  void Execute(RenderFrameContext &context);
+  static RenderPipeline Create(ResourceAllocationContext &context,
+                               PipelineStateProvider &provider,
+                               CreateSettings settings);
 };

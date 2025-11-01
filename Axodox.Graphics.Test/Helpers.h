@@ -1,7 +1,6 @@
 #pragma once
 #include "pch.h"
 
-using namespace std;
 using namespace DirectX;
 using namespace DirectX::PackedVector;
 
@@ -9,8 +8,8 @@ using namespace Axodox::Graphics::D3D12;
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
 
-template <typename T, typename TypeA, typename TypeB>
-concept Either = std::same_as<T, TypeA> || std::same_as<T, TypeB>;
+template <typename T, typename Left, typename Right>
+concept Either = std::same_as<T, Left> || std::same_as<T, Right>;
 
 template <typename T>
 concept IsRatio = std::is_same_v<T, std::ratio<T::num, T::den>>;
@@ -28,6 +27,7 @@ GetDurationInFloatWithPrecision(const std::chrono::duration<T, Q> &inp) {
   return static_cast<float>(count) * static_cast<float>(Result::num) /
          static_cast<float>(Result::den);
 }
+
 template <typename TimeRepTimeFrame, typename PrecisionTimeFrame, typename T,
           typename Q>
   requires HasRatioPeriod<TimeRepTimeFrame> &&
@@ -66,7 +66,8 @@ inline MeshDescription CreateQuadPatch() {
   return result;
 }
 
-static ResourceStates GetResourceStateFromFlags(const TextureFlags &flags) {
+static inline ResourceStates
+GetResourceStateFromFlags(const TextureFlags &flags) {
   if (has_flag(flags, TextureFlags::RenderTarget)) {
     return ResourceStates::RenderTarget;
   } else if (has_flag(flags, TextureFlags::DepthStencil)) {
@@ -411,8 +412,8 @@ inline float4x4 XMMatrixToFloat4x4(const XMMATRIX &x) {
   return result;
 }
 
-std::string Utf16ToUtf8(const std::wstring &wstr);
-std::wstring Utf8ToUtf16(const std::string &str);
+std::string Utf16ToUtf8(const std::wstring_view &wstr);
+std::wstring Utf8ToUtf16(const std::string_view &str);
 inline std::string GetLocalFolder() {
   auto localFolder =
       winrt::Windows::Storage::ApplicationData::Current().LocalFolder().Path();

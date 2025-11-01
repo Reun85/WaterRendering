@@ -1,6 +1,7 @@
+#pragma once
 #include "pch.h"
 
-std::string Utf16ToUtf8(const std::wstring &wstr) {
+std::string Utf16ToUtf8(const std::wstring_view &wstr) {
   if (wstr.empty())
     return {};
   // Calculat the size
@@ -13,7 +14,7 @@ std::string Utf16ToUtf8(const std::wstring &wstr) {
                       size_needed, nullptr, nullptr);
   return str;
 }
-std::wstring Utf8ToUtf16(const std::string &str) {
+std::wstring Utf8ToUtf16(const std::string_view &str) {
   if (str.empty())
     return {};
   // Calculat the size
