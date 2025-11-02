@@ -1,7 +1,7 @@
 #pragma once
 #include "pch.h"
-#include <DirectXMath.h>
 
+using namespace DirectX;
 struct Plane {
   // unit vector
   XMVECTOR normal = {0.f, 1.f, 0.f};

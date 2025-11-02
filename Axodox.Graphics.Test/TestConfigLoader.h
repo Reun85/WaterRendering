@@ -1,10 +1,19 @@
 #pragma once
-#include "GraphicsPipeline.h"
-#include "DebugValues.h"
-#include "Camera.h"
+#include "pch.h"
+
+struct DebugValues;
+struct WaterGraphicRootDescription;
+struct WaterGraphicRootDescription::WaterPixelShaderData;
+
+struct PixelLighting;
+class Camera;
 struct RuntimeValues;
+struct RuntimeSettings;
 struct SimulationData;
 struct NeedToDo;
+struct DeferredShading;
+struct DeferredShading::DeferredShaderBuffers;
+
 /// <summary>
 /// uses static data
 /// </summary>

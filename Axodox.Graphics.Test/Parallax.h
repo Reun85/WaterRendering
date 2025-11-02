@@ -1,14 +1,8 @@
 #pragma once
 #include "pch.h"
-#include "Defaults.h"
-#include "Helpers.h"
-
-using namespace DirectX;
-using namespace DirectX::PackedVector;
 
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
-using namespace DirectX::PackedVector;
 class Camera;
 
 namespace SimulationStage {

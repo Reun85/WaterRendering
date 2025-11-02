@@ -2,6 +2,23 @@
 #define NOMINMAX
 #define PLATFORM_WINDOWS
 
+#include <vector>
+#include <string>
+#include <cstdint>
+#include <optional>
+#include <span>
+#include <memory>
+#include <algorithm>
+#include <stdexcept>
+#include <math.h>
+#include <chrono>
+#include <random>
+#include <complex>
+#include <numbers>
+#include <sstream>
+#include <array>
+#include <ranges>
+
 #include <windows.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
@@ -19,4 +36,8 @@
 // Own
 #include "Typedefs.h"
 #include "WrapperAddons/includes.h"
+#include "constants.h"
+#include "Defaults.h"
 #include "Helpers.h"
+#include "Camera.h"
+#include "ImGuiHelper.h"

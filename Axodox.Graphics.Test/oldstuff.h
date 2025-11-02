@@ -1,7 +1,6 @@
 #include "pch.h"
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
-using namespace DirectX::PackedVector;
 
 struct oldWaterPixelShaderData {
 

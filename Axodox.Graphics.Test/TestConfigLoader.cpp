@@ -1,33 +1,33 @@
 #include "pch.h"
-#include "TestConfigLoader.h"
-#include "Simulation.h"
-#include "GraphicsPipeline.h"
 #include <filesystem>
 #include <iostream>
 #include <fstream>
+
+#include "Simulation.h"
+#include "GraphicsPipeline.h"
 #include "DebugValues.h"
 
-#include "Helpers.h"
+#include "TestConfigLoader.h"
 
 // Helper streams
 // -----------------------------------------------------------------------------
 struct DataOutStream {
-  DataOutStream(ostream &os) : os(os) {}
-  ostream &operator*() { return os; }
-  ostream *operator->() { return &os; }
+  explicit DataOutStream(std::ostream &os) : os(os) {}
+  std::ostream &operator*() { return os; }
+  std::ostream *operator->() { return &os; }
 
 private:
-  ostream &os;
+  std::ostream &os;
 };
 
 struct DataInStream {
-  DataInStream(istream &is) : is(is) {}
+  explicit DataInStream(std::istream &is) : is(is) {}
 
-  istream &operator*() { return is; }
-  istream *operator->() { return &is; }
+  std::istream &operator*() { return is; }
+  std::istream *operator->() { return &is; }
 
 private:
-  istream &is;
+  std::istream &is;
 };
 
 template <typename T>

@@ -159,4 +159,11 @@ void CommandAllocator::Dispatch(uint32_t x, uint32_t y, uint32_t z) {
 }
 
 void CommandAllocator::Reset() { _allocator->Reset(); }
+
+void CommandAllocator::SetDescriptorHeaps(
+    const std::span<ID3D12DescriptorHeap *const> heaps) {
+
+  ID3D12DescriptorHeap *const *heapPtrs = heaps.data();
+  operator->()->SetDescriptorHeaps(heaps.size(), heapPtrs);
+}
 } // namespace Axodox::Graphics::D3D12

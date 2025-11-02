@@ -1,18 +1,11 @@
 #include "pch.h"
-#include "../pch.h"
 #include "CubeMap.h"
 #include <DirectXTex.h>
-#include <ranges>
-#include <algorithm>
 
-#include <numbers>
-using namespace std;
 using namespace Axodox::Graphics::D3D12;
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
-using namespace winrt;
-
-using namespace Windows::Foundation::Numerics;
+using namespace DirectX;
 
 CubeMapPaths::reinterpretable_as &CubeMapPaths::AsArray() {
   return reinterpret_cast<reinterpretable_as &>(*this);
@@ -95,7 +88,7 @@ LanczosInterpolation(f32 uf, f32 vf, u32 inSizex, u32 inSizey,
   u32 vEnd = static_cast<u32>(floor(vf + a));
   auto inPix = [&inSizex, &inSizey, &src](u32 u, u32 v) {
     u32 indx = u % inSizex;
-    u32 indy = clamp(v, 0u, inSizey - 1u);
+    u32 indy = std::clamp(v, 0u, inSizey - 1u);
     u32 index = (indy * inSizex + indx);
     return src[index];
   };
@@ -135,7 +128,7 @@ BiliniearInterpolation(f32 uf, f32 vf, usize inSizex, usize inSizey,
   f32 nu = vf - static_cast<f32>(vi);
   auto inPix = [&inSizex, &inSizey, &src](usize u, usize v) {
     usize indx = u % inSizex;
-    usize indy = clamp(v, (usize)0, inSizey - (usize)1);
+    usize indy = std::clamp(v, (usize)0, inSizey - (usize)1);
     usize index = (indy * inSizex + indx);
     return src[index];
   };
@@ -245,7 +238,7 @@ CubeMapTexture::CubeMapTexture(const ResourceAllocationContext &context,
   _texture = context.ResourceAllocator->CreateTexture(textureData.Definition());
 
   _allocatedSubscription = _texture->Allocated([this, context,
-                                                data = move(textureData)](
+                                                data = std::move(textureData)](
                                                    Resource *resource) {
     context.ResourceUploader->EnqueueUploadTask(resource, &data);
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -300,7 +293,7 @@ CubeMapTexture::CubeMapTexture(const ResourceAllocationContext &context,
   _texture = context.ResourceAllocator->CreateTexture(textureData.Definition());
 
   _allocatedSubscription = _texture->Allocated([this, context,
-                                                data = move(textureData)](
+                                                data = std::move(textureData)](
                                                    Resource *resource) {
     context.ResourceUploader->EnqueueUploadTask(resource, &data);
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};

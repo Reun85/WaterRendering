@@ -1,29 +1,21 @@
 #pragma once
 #include "pch.h"
-#include <pix3.h>
-#include <iostream>
-#include <sstream>
-#include <string.h>
 
-#include "Camera.h"
 #include "ComputePipeline.h"
 #include "DebugValues.h"
-#include "Defaults.h"
 #include "GraphicsPipeline.h"
-#include "Helpers.h"
 #include "Parallax.h"
 #include "QuadTree.h"
 #include "ShadowVolume.h"
 #include "Simulation.h"
 #include "SkyboxPipeline.hpp"
-#include "TestConfigLoader.h"
 
 #include "AppShared.h"
-#include "ImGuiHelper.h"
 
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
 using namespace Axodox::Threading;
+using namespace winrt::Windows::UI::Core;
 
 struct TimeData {
   float deltaTime;
@@ -72,9 +64,9 @@ private:
   CommandQueue &computeQueue = directQueue;
   CoreSwapChain swapChain;
 
-  ResourceAllocationContext immutableResourceAllocationContext_;
-  ResourceAllocationContext mutableResourceAllocationContext_;
-  RenderPipeline renderStage_;
+  // ResourceAllocationContext immutableResourceAllocationContext_;
+  // ResourceAllocationContext mutableResourceAllocationContext_;
+  // RenderPipeline renderStage_;
 
   ImGUIManager imgui_wrapper_;
 

@@ -24,8 +24,9 @@
 #define AXODOX_GRAPHICS_API __declspec(dllexport)
 #else
 #define AXODOX_GRAPHICS_API __declspec(dllimport)
-#pragma comment (lib,"Axodox.Graphics.lib")
+#pragma comment(lib, "Axodox.Graphics.lib")
 #endif
 
-#pragma comment (lib, "dxgi.lib")
-#pragma comment (lib, "d3d12.lib")
+#pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "dxguid.lib")
+#pragma comment(lib, "d3d12.lib")

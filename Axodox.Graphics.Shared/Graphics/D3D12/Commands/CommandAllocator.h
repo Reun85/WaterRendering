@@ -52,6 +52,8 @@ public:
 
   void Reset();
 
+  void SetDescriptorHeaps(const std::span<ID3D12DescriptorHeap *const> heaps);
+
 private:
   GraphicsDevice _device;
   CommandKind _type;

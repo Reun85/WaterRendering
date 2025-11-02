@@ -1,6 +1,5 @@
 #pragma once
 #include "pch.h"
-#include <string.h>
 #include "ComputePipeline.h"
 #include "GraphicsPipeline.h"
 
@@ -103,9 +102,11 @@ struct ImGUIManager {
 
   ImGuiIO &GetIO();
   ~ImGUIManager();
+
+  ID3D12DescriptorHeap *GetHeap();
+  void Pre(CommandAllocator &allocator) const;
   void Render(CommandAllocator &allocator) const;
 
 private:
   ID3D12DescriptorHeap *descriptorHeap_ = nullptr;
-  // ImGuiIO &io;
 };

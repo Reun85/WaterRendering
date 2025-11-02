@@ -3,7 +3,6 @@
 #include "Infrastructure/BitwiseOperations.h"
 
 using namespace Axodox::Infrastructure;
-using namespace std;
 
 namespace Axodox::Graphics::D3D12 {
 MutableTextureWithViews::MutableTextureWithViews(
@@ -27,8 +26,9 @@ MutableTextureWithViews::MutableTextureWithViews(
   TextureData x = textureData;
   _texture = context.ResourceAllocator->CreateTexture(x.Definition());
 
-  _allocatedSubscription = _texture->Allocated(
-      [this, context, viewDefinitions, data = move(x)](Resource *resource) {
+  _allocatedSubscription =
+      _texture->Allocated([this, context, viewDefinitions,
+                           data = std::move(x)](Resource *resource) {
         context.ResourceUploader->EnqueueUploadTask(resource, &data);
         OnAllocated(resource, viewDefinitions);
       });
@@ -47,7 +47,7 @@ void MutableTextureWithViews::Allocate(
 }
 void MutableTextureWithViews::OnAllocated(
     Resource *resource, std::optional<TextureViewDefinitions> viewDefs) {
-  _definition = make_unique<TextureDefinition>(resource->Description());
+  _definition = std::make_unique<TextureDefinition>(resource->Description());
   auto flags = D3D12_RESOURCE_FLAGS(_definition->Flags);
   auto texture = static_cast<Texture *>(resource);
 

@@ -1,17 +1,12 @@
 #pragma once
 #include "pch.h"
-#include "Defaults.h"
-#include "Helpers.h"
 #include "DebugValues.h"
 
 #include "SkyboxPipeline.hpp"
 #include "Parallax.h"
 
-using namespace DirectX::PackedVector;
-
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
-using namespace DirectX::PackedVector;
 class Camera;
 
 struct WaterGraphicRootDescription : public RootSignatureMask {

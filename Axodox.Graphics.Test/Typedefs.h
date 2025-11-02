@@ -13,7 +13,7 @@ using usize = size_t;
 using f32 = float;
 using f64 = double;
 
-namespace DirectXTypes {
+namespace DirX {
 using typename DirectX::XMINT2;
 using typename DirectX::XMINT3;
 using typename DirectX::XMINT4;
@@ -34,7 +34,11 @@ using typename DirectX::XMFLOAT4;
 using typename DirectX::PackedVector::XMBYTEN4;
 using typename DirectX::PackedVector::XMUSHORTN2;
 
-} // namespace DirectXTypes
+} // namespace DirX
 
-using namespace DirectXTypes;
+using namespace DirX;
+
+namespace Win {
 using namespace winrt::Windows::Foundation::Numerics;
+}
+using namespace Win;

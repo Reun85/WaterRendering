@@ -1,6 +1,6 @@
 #include <pch.h>
 #include "QuadTree.h"
-#include <array>
+using namespace DirectX;
 
 ConstQuadTreeLeafIteratorDepthFirst::ConstQuadTreeLeafIteratorDepthFirst(
     const NodeID node, const Depth maxDepth, const QuadTree &_tree,
@@ -62,7 +62,7 @@ constexpr float IsSmaller(NeighborDirection &directions, const QuadTree &tree,
 }
 template <const NeighborDirection &directions>
 constexpr float
-IsSmallerTemplated(const QuadTree &tree, const std::vector<int> &path,
+IsSmallerTemplated(const QuadTree &tree, const std::vector<ChildrenID> &path,
                    std::vector<ChildrenID> &buff, const Node *node) {
   buff.clear();
 
@@ -108,14 +108,22 @@ IsSmallerTemplated(const QuadTree &tree, const std::vector<int> &path,
 
 ConstQuadTreeLeafIteratorDepthFirst::SmallerNeighborRatio
 ConstQuadTreeLeafIteratorDepthFirst::GetSmallerNeighbor() const {
-  static constexpr NeighborDirection xpos = {
-      {{2, false}, {3, false}, {0, true}, {1, true}}};
-  static constexpr NeighborDirection xneg = {
-      {{2, true}, {3, true}, {0, false}, {1, false}}};
-  static constexpr NeighborDirection zneg = {
-      {{1, true}, {0, false}, {3, true}, {2, false}}};
-  static constexpr NeighborDirection zpos = {
-      {{1, false}, {0, true}, {3, false}, {2, true}}};
+  static constexpr NeighborDirection xpos = {{{ChildrenID(2), false},
+                                              {ChildrenID(3), false},
+                                              {ChildrenID(0), true},
+                                              {ChildrenID(1), true}}};
+  static constexpr NeighborDirection xneg = {{{ChildrenID(2), true},
+                                              {ChildrenID(3), true},
+                                              {ChildrenID(0), false},
+                                              {ChildrenID(1), false}}};
+  static constexpr NeighborDirection zneg = {{{ChildrenID(1), true},
+                                              {ChildrenID(0), false},
+                                              {ChildrenID(3), true},
+                                              {ChildrenID(2), false}}};
+  static constexpr NeighborDirection zpos = {{{ChildrenID(1), false},
+                                              {ChildrenID(0), true},
+                                              {ChildrenID(3), false},
+                                              {ChildrenID(2), true}}};
 
   std::vector<ChildrenID> buff(path.size());
   SmallerNeighborRatio res{};
@@ -268,7 +276,7 @@ TravelOrder::TravelOrder(const float3 &camForward, const XMMATRIX &mMatrix) {
   std::ranges::sort(indices,
                     [&values](int a, int b) { return values[a] > values[b]; });
 
-  directionStart = indices[0];
+  directionStart = (u8)indices[0];
   for (int i = 0; i < 3; ++i) {
     directions[indices[i]] = indices[i + 1];
   }

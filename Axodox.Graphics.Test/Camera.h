@@ -1,8 +1,6 @@
 #pragma once
 
 #include "pch.h"
-using namespace winrt::Windows::UI::Core;
-using namespace DirectX;
 
 struct Frustum;
 
@@ -13,6 +11,7 @@ struct ViewFrustumCoordinates {
 };
 
 class Camera {
+
 public:
   Camera();
   Camera(XMVECTOR _eye, XMVECTOR _at, XMVECTOR _worldup);
@@ -66,10 +65,10 @@ public:
   void SetFirstPerson(bool _firstperson);
   bool GetFirstPerson() const { return firstperson; }
 
-  void KeyboardDown(const KeyEventArgs &key);
-  void KeyboardUp(const KeyEventArgs &key);
-  void MouseMove(const PointerEventArgs &mouse);
-  void MouseWheel(const PointerEventArgs &wheel);
+  void KeyboardDown(const winrt::Windows::UI::Core::KeyEventArgs &key);
+  void KeyboardUp(const winrt::Windows::UI::Core::KeyEventArgs &key);
+  void MouseMove(const winrt::Windows::UI::Core::PointerEventArgs &mouse);
+  void MouseWheel(const winrt::Windows::UI::Core::PointerEventArgs &wheel);
 
   void DrawImGui(bool exclusiveWindow = true);
 
@@ -144,7 +143,7 @@ private:
   float m_zNear = 0.1f;
   float m_zFar = 1000.0f;
 
-  float m_angle = XMConvertToRadians(27.0f);
+  float m_angle = DirectX::XMConvertToRadians(27.0f);
   float m_aspect = 640.0f / 480.0f;
 
   // projection matrix needs recomputation

@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "DescriptorHeap.h"
+#include <d3d12sdklayers.h>
 
 using namespace Axodox::Infrastructure;
 using namespace std;
@@ -85,4 +86,5 @@ void DescriptorHeap::Clean() {
 
   _reclaimables.clear();
 }
+
 } // namespace Axodox::Graphics::D3D12

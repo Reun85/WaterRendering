@@ -2,8 +2,10 @@
 #include "pch.h"
 #include "App.h"
 
+using namespace winrt;
 using namespace Windows::ApplicationModel;
 using namespace Windows::ApplicationModel::Core;
+using namespace Windows::UI::Core;
 
 struct AppWrapper
     : implements<AppWrapper, IFrameworkViewSource, IFrameworkView> {

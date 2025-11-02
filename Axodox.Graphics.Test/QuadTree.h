@@ -1,8 +1,5 @@
 #pragma once
 #include <pch.h>
-#include <winrt/Windows.UI.Core.h>
-#include <array>
-#include "Defaults.h"
 #include "Frustum.hpp"
 
 using uint = uint32_t;
@@ -10,7 +7,7 @@ using NodeID = uint;
 using NodeCenter = float2;
 using NodeSize = float2;
 // -1 means root
-using ChildrenID = int;
+using ChildrenID = i8;
 using Depth = uint;
 
 struct Node {

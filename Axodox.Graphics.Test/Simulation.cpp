@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "Simulation.h"
-#include "Helpers.h"
 
 void SimulationData::DrawImGui(NeedToDo &out, bool exclusiveWindow) {
   bool cont = true;
@@ -209,8 +208,8 @@ SimulationData OldPreset() {
 
   return res;
 }
-std::vector<std::pair<string, SimulationData>> SimulationData::Presets() {
-  std::vector<std::pair<string, SimulationData>> res;
+std::vector<std::pair<std::string, SimulationData>> SimulationData::Presets() {
+  std::vector<std::pair<std::string, SimulationData>> res;
   res.emplace_back("Large", SimulationData::Default());
   res.emplace_back("Medium", Preset1());
   res.emplace_back("Weak", OldPreset());

@@ -1,19 +1,5 @@
 #pragma once
 #include "pch.h"
-#include <numbers>
-#include <pch.h>
-#include <winrt/Windows.UI.Core.h>
-
-#include "constants.h"
-
-using namespace std;
-using namespace winrt;
-
-using namespace Windows;
-using namespace Windows::Foundation::Numerics;
-
-using namespace DirectX;
-using namespace DirectX::PackedVector;
 
 // These variables are only used on the CPU side.
 #define QUALIFIER static const constexpr

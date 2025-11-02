@@ -1,11 +1,6 @@
 #pragma once
 #include "pch.h"
-#include <complex>
-#include <numbers>
-#include "Defaults.h"
 #include "QuadTree.h"
-#include <random>
-#include "Helpers.h"
 
 struct SimulationData {
   u32 N;

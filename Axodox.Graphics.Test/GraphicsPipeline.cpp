@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "GraphicsPipeline.h"
-#include "Camera.h"
 #include "QuadTree.h"
 
 void FrameResources::Wait() {

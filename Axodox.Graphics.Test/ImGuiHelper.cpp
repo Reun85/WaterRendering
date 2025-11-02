@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "ImGuiHelper.h"
 
+using namespace winrt;
+
 ID3D12DescriptorHeap *
 InitImGui(const Axodox::Graphics::D3D12::GraphicsDevice &device,
           u8 framesInFlight, const std ::string &iniPath) {
@@ -10,7 +12,7 @@ InitImGui(const Axodox::Graphics::D3D12::GraphicsDevice &device,
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
   ImGui::StyleColorsDark();
 
-  io.IniFilename = (const char *)iniPath.c_str();
+  io.IniFilename = iniPath.c_str();
 
   // Setup Platform/Renderer bindings
   ImGui_ImplUwp_InitForCurrentView();
@@ -23,6 +25,9 @@ InitImGui(const Axodox::Graphics::D3D12::GraphicsDevice &device,
   ID3D12DescriptorHeap *ImGuiDescriptorHeap{};
   check_hresult(device.get()->CreateDescriptorHeap(
       &ImGuiDescriptorHeapDesc, IID_PPV_ARGS(&ImGuiDescriptorHeap)));
+  static const char *debugName = "ImGui Descriptor Heap";
+  ImGuiDescriptorHeap->SetPrivateData(WKPDID_D3DDebugObjectName,
+                                      UINT(strlen(debugName)), debugName);
   ImGui_ImplDX12_Init(
       device.get(), static_cast<int>(framesInFlight),
       DXGI_FORMAT_B8G8R8A8_UNORM, ImGuiDescriptorHeap,
@@ -47,11 +52,16 @@ ImGUIManager::~ImGUIManager() {
     descriptorHeap_ = nullptr;
   }
 }
+ID3D12DescriptorHeap *ImGUIManager::GetHeap() { return descriptorHeap_; }
+void ImGUIManager::Pre(CommandAllocator &allocator) const {
+  allocator->SetDescriptorHeaps(1, &descriptorHeap_);
+  ImGui_ImplDX12_NewFrame();
+  ImGui_ImplUwp_NewFrame();
+  ImGui::NewFrame();
+}
 void ImGUIManager::Render(CommandAllocator &allocator) const {
 
   ImGui::Render();
-
-  allocator->SetDescriptorHeaps(1, &descriptorHeap_);
 
   ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), allocator.operator->());
 }

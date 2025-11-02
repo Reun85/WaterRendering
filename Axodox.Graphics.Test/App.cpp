@@ -1,6 +1,10 @@
 #pragma once
 #include "pch.h"
 #include "App.h"
+#include "TestConfigLoader.h"
+using namespace winrt;
+using namespace Windows;
+using namespace Windows::UI::Core;
 
 App::App(AppShared &shared)
     : shared_(shared),
@@ -368,6 +372,7 @@ void App::Run() {
   //}
 
   committedResourceAllocator.Build();
+
   const u32 &N = simData.N;
 
   swapChain.Resizing(no_revoke, [this, &frameResources,
@@ -396,6 +401,7 @@ void App::Run() {
   loopStartTime = std::chrono::high_resolution_clock::now();
 
   const auto &dispatcher = shared_.dispatcher;
+
   // Main loop
   // ------------------------------------------------
   while (!quitRequested_ && !shouldStop_ && !internalRestartRequest_) {
@@ -587,7 +593,11 @@ void App::Run() {
         allocator.BeginList();
         allocator.TransitionResource(*renderTargetView, ResourceStates::Present,
                                      ResourceStates::RenderTarget);
+
         commonDescriptorHeap.Set(allocator);
+        // std::array<ID3D12DescriptorHeap *const, 2> heaps = {
+        //     commonDescriptorHeap.GetCurrentHeap(), imgui_wrapper_.GetHeap()};
+        // allocator.SetDescriptorHeaps(heaps);
 
         renderTargetView->Clear(allocator, settings.clearColor);
         frameResource.Clear(allocator);
@@ -1033,7 +1043,8 @@ void App::Run() {
       runtimeResults_.CPUTime = CPURenderEnd - frameStart;
       DrawImGuiMenu(allocator, waterData, simData, defData, drawingSimResource,
                     sunData);
-      // End frame command list
+
+      //  End frame command list
       {
         allocator.TransitionResource(*renderTargetView,
                                      ResourceStates::RenderTarget,
@@ -1047,8 +1058,8 @@ void App::Run() {
 
         directQueue.Execute(initCommandList);
         directQueue.Execute(drawCommandList);
-        frameResource.Marker = frameResource.Fence.EnqueueSignal(directQueue);
       }
+      frameResource.Marker = frameResource.Fence.EnqueueSignal(directQueue);
     }
 
     // Present frame
@@ -1077,9 +1088,7 @@ void App::DrawImGuiMenu(
     PixelLighting &sunData) {
   // ImGUI
   if (settings.showImgui) {
-    ImGui_ImplDX12_NewFrame();
-    ImGui_ImplUwp_NewFrame();
-    ImGui::NewFrame();
+    imgui_wrapper_.Pre(allocator);
 
     if (ImGui::Begin("Application")) {
       shared_.prints += shared_.cout.str();

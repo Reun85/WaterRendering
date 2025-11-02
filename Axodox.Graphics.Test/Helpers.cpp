@@ -1,6 +1,5 @@
 #pragma once
 #include "pch.h"
-#include "Helpers.h"
 
 std::string Utf16ToUtf8(const std::wstring_view &wstr) {
   if (wstr.empty())

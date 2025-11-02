@@ -1,14 +1,11 @@
 #pragma once
-
 #include "pch.h"
 #include "Simulation.h"
-#include "Helpers.h"
 #include "Parallax.h"
 #include "DebugValues.h"
 
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
-using namespace DirectX::PackedVector;
 namespace SimulationStage {
 struct ConeMapCreater;
 

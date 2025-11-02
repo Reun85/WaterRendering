@@ -1,13 +1,11 @@
 #pragma once
 #include "pch.h"
 #include "Defaults.h"
-#include "Helpers.h"
 #include "Simulation.h"
 
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
 using namespace Axodox::Threading;
-using namespace DirectX::PackedVector;
 
 struct DebugValues {
   enum class DebugTextureDisplay : u8 {

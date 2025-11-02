@@ -1,8 +1,8 @@
 #include "pch.h"
-#include "Camera.h"
 #include "Frustum.hpp"
-#include <DirectXMath.h>
 
+using namespace winrt::Windows::UI::Core;
+using namespace DirectX;
 Camera::Camera() {
   SetView(XMVectorSet(0.0f, 20.0f, 20.0f, 0), XMVectorSet(0.0f, 0.0f, 0.0f, 0),
           XMVectorSet(0.0f, 1.0f, 0.0f, 0));
