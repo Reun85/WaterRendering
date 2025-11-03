@@ -1079,6 +1079,10 @@ void App::Run() {
       drawingSimResource.Fence.Await(drawingSimResource.FrameDoneMarker);
     }
   }
+  // hijack a fence and marker to use as last final shutdown sync
+  auto &x = frameResources.front();
+  x.Marker = x.Fence.EnqueueSignal(directQueue);
+  x.Fence.Await(x.Marker);
 }
 void App::DrawImGuiMenu(
     CommandAllocator &allocator,
