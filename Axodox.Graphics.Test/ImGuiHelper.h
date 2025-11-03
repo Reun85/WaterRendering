@@ -108,5 +108,5 @@ struct ImGUIManager {
   void Render(CommandAllocator &allocator) const;
 
 private:
-  ID3D12DescriptorHeap *descriptorHeap_ = nullptr;
+  winrt::com_ptr<ID3D12DescriptorHeap> descriptorHeap_ = nullptr;
 };
