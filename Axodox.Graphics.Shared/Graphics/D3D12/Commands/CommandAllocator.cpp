@@ -164,6 +164,6 @@ void CommandAllocator::SetDescriptorHeaps(
     const std::span<ID3D12DescriptorHeap *const> heaps) {
 
   ID3D12DescriptorHeap *const *heapPtrs = heaps.data();
-  operator->()->SetDescriptorHeaps(heaps.size(), heapPtrs);
+  operator->()->SetDescriptorHeaps((UINT)heaps.size(), heapPtrs);
 }
 } // namespace Axodox::Graphics::D3D12
