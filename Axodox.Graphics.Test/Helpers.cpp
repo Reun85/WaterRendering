@@ -1,6 +1,12 @@
 #pragma once
 #include "pch.h"
 
+std::string Utf16ToUtf8(const std::string_view &wstr) {
+  return std::string(wstr);
+}
+std::wstring Utf8ToUtf16(const std::wstring_view &wstr) {
+  return std::wstring(wstr);
+}
 std::string Utf16ToUtf8(const std::wstring_view &wstr) {
   if (wstr.empty())
     return {};
@@ -49,7 +55,22 @@ MeshDescription CreateQuadPatch() {
 
   return result;
 }
-std::string GetLocalFolder() {
+
+float3 XMVECTORToFloat3(const DirectX::XMVECTOR &x) {
+  float3 result;
+  DirectX::XMStoreFloat3(&result, x);
+  return result;
+}
+
+std::filesystem::path GetCacheFolder() {
+  auto localFolder = winrt::Windows::Storage::ApplicationData::Current()
+                         .LocalCacheFolder()
+                         .Path();
+  std::wstring Wstr = localFolder.c_str();
+  return std::filesystem::path(Wstr);
+}
+
+std::filesystem::path GetLocalFolder() {
   auto localFolder =
       winrt::Windows::Storage::ApplicationData::Current().LocalFolder().Path();
   std::wstring Wpath = localFolder.c_str();

@@ -268,7 +268,7 @@ struct MutableGpuSources {
         Lowest(context, simData) {}
 };
 
-struct FullPipeline {
+struct WaterSimulationPipelines {
   RootSignature<SimulationStage::SpektrumRootDescription>
       spektrumRootDescription;
   RootSignature<SimulationStage::FFTDescription> FFTRootDescription;
@@ -286,8 +286,8 @@ struct FullPipeline {
   ConeMapCreater2 coneMapCreater2;
   MixMaxCompute mixMaxCompute;
 
-  static FullPipeline Create(GraphicsDevice &device,
-                             PipelineStateProvider &pipelineStateProvider);
+  static WaterSimulationPipelines
+  Create(GraphicsDevice &device, PipelineStateProvider &pipelineStateProvider);
 };
 void WaterSimulationComputeShader(
     SimulationStage::SimulationResources &simResource,
@@ -295,7 +295,7 @@ void WaterSimulationComputeShader(
         &simulationConstantSources,
     SimulationStage::MutableGpuSources &simulationMutableSources,
     const SimulationData &simData,
-    SimulationStage::FullPipeline &fullSimPipeline,
+    SimulationStage::WaterSimulationPipelines &fullSimPipeline,
     Axodox::Graphics::D3D12::CommandAllocator &computeAllocator,
     Axodox::Graphics::D3D12::GpuVirtualAddress timeDataBuffer, const u32 &N,
     const DebugValues &debugValues,

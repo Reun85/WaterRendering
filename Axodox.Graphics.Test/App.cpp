@@ -12,6 +12,7 @@ App::App(AppShared &shared)
       imgui_wrapper_(device, shared_.settings.framesInFlight,
                      shared_.settings.ImGuiIniPath) {
 
+  shared_.cout << shared_.cacheLocation << std::endl;
   cam.SetView(XMVectorSet(DefaultsValues::Cam::camStartPos.x,
                           DefaultsValues::Cam::camStartPos.y,
                           DefaultsValues::Cam::camStartPos.z, 0),
@@ -175,122 +176,6 @@ void DrawImGuiForPSResources(
 
 void App::Run() {
 
-  PipelineStateProvider pipelineStateProvider{device};
-
-  // Graphics pipeline
-  RootSignature<WaterGraphicRootDescription> waterRootSignature{device};
-
-  VertexShader simpleVertexShader{app_folder() / L"VertexShader.cso"};
-  PixelShader simplePixelShader{app_folder() / L"PixelShader.cso"};
-  HullShader hullShader{app_folder() / L"hullShader.cso"};
-  DomainShader domainShader{app_folder() / L"domainShader.cso"};
-
-  auto &gBufferFormats = DeferredShading::GBuffer::GetGBufferFormats();
-
-  GraphicsPipelineStateDefinition waterPipelineStateDefinition{
-      .RootSignature = &waterRootSignature,
-      .VertexShader = &simpleVertexShader,
-      .DomainShader = &domainShader,
-      .HullShader = &hullShader,
-      .PixelShader = &simplePixelShader,
-      .RasterizerState = debugValues.rasterizerFlags,
-      .DepthStencilState = DepthStencilMode::WriteDepth,
-      .InputLayout = VertexPosition::Layout,
-      .TopologyType = PrimitiveTopologyType::Patch,
-      .RenderTargetFormats =
-          std::initializer_list(std::to_address(gBufferFormats.begin()),
-                                std::to_address(gBufferFormats.end())),
-      .DepthStencilFormat = Format::D32_Float};
-
-  Axodox::Graphics::D3D12::PipelineState waterPipelineState =
-      pipelineStateProvider
-          .CreatePipelineStateAsync(waterPipelineStateDefinition)
-          .get();
-
-  VertexShader atmosphereVS{app_folder() / L"AtmosphereVS.cso"};
-  PixelShader atmospherePS{app_folder() / L"AtmospherePS.cso"};
-  RootSignature<SkyboxRootDescription> skyboxRootSignature{device};
-  DepthStencilState skyboxDepthStencilState{DepthStencilMode::WriteDepth};
-  skyboxDepthStencilState.Comparison = ComparisonFunction::LessOrEqual;
-
-  GraphicsPipelineStateDefinition skyboxPipelineStateDefinition{
-      .RootSignature = &skyboxRootSignature,
-      .VertexShader = &atmosphereVS,
-      .PixelShader = &atmospherePS,
-      .RasterizerState = RasterizerFlags::CullNone,
-      .DepthStencilState = skyboxDepthStencilState,
-      .InputLayout = VertexPositionNormalTexture::Layout,
-      .RenderTargetFormats =
-          std::initializer_list(std::to_address(gBufferFormats.begin()),
-                                std::to_address(gBufferFormats.end())),
-
-      .DepthStencilFormat = Format::D32_Float};
-  Axodox::Graphics::D3D12::PipelineState skyboxPipelineState =
-      pipelineStateProvider
-          .CreatePipelineStateAsync(skyboxPipelineStateDefinition)
-          .get();
-
-  VertexShader deferredShadingVS{app_folder() / L"DeferredShadingVS.cso"};
-  PixelShader deferredShadingPS{app_folder() / L"DeferredShadingPS.cso"};
-  RootSignature<DeferredShading> deferredShadingRootSignature{device};
-
-  GraphicsPipelineStateDefinition deferredShadingPipelineStateDefinition{
-      .RootSignature = &deferredShadingRootSignature,
-      .VertexShader = &deferredShadingVS,
-      .PixelShader = &deferredShadingPS,
-      .BlendState = {BlendType::Additive, BlendType::AlphaBlend},
-      .RasterizerState = RasterizerFlags::CullCounterClockwise,
-      .InputLayout = VertexPositionNormalTexture::Layout,
-      .TopologyType = PrimitiveTopologyType::Triangle,
-      .RenderTargetFormats = {Format::B8G8R8A8_UNorm},
-  };
-  Axodox::Graphics::D3D12::PipelineState deferredShadingPipelineState =
-      pipelineStateProvider
-          .CreatePipelineStateAsync(deferredShadingPipelineStateDefinition)
-          .get();
-
-  RootSignature<SSRPostProcessing> postProcessingRootSignature{device};
-  ComputeShader postProcessingComputeShader{app_folder() /
-                                            L"SSRPostProcessingShader.cso"};
-  ComputePipelineStateDefinition postProcessingStateDefinition{
-      .RootSignature = &postProcessingRootSignature,
-      .ComputeShader = &postProcessingComputeShader};
-  auto postProcessingPipelineState =
-      pipelineStateProvider
-          .CreatePipelineStateAsync(postProcessingStateDefinition)
-          .get();
-
-  BasicShader basicShader =
-      BasicShader::WithDefaultShaders(pipelineStateProvider, device);
-
-  // SilhouetteDetector silhouetteDetector =
-  //     SilhouetteDetector::WithDefaultShaders(pipelineStateProvider,
-  //     device);
-
-  // SilhouetteClear silhouetteClear =
-  //     SilhouetteClear::WithDefaultShaders(pipelineStateProvider, device);
-
-  // SilhouetteDetectorTester silhouetteTester =
-  //     SilhouetteDetectorTester::WithDefaultShaders(pipelineStateProvider,
-  //                                                  device);
-
-  ParallaxDraw parallaxDraw =
-      ParallaxDraw::WithDefaultShaders(pipelineStateProvider, device);
-
-  PrismParallaxDraw prismParallaxDraw =
-      PrismParallaxDraw::WithDefaultShaders(pipelineStateProvider, device);
-
-  WaterGraphicRootDescription::WaterPixelShaderData waterData;
-  DeferredShading::DeferredShaderBuffers defData;
-  PixelLighting sunData = PixelLighting::SunData();
-
-  ShadowMapping::Data shadowMapData(cam);
-
-  // Compute pipeline
-
-  auto fullSimPipeline =
-      SimulationStage::FullPipeline::Create(device, pipelineStateProvider);
-
   // Group together allocations
   GroupedResourceAllocator groupedResourceAllocator{device};
   ResourceUploader resourceUploader{device};
@@ -305,8 +190,6 @@ void App::Run() {
       .CommonDescriptorHeap = &commonDescriptorHeap,
       .RenderTargetDescriptorHeap = &renderTargetDescriptorHeap,
       .DepthStencilDescriptorHeap = &depthStencilDescriptorHeap};
-
-  SimulationData simData = SimulationData::Default();
 
   ImmutableMesh planeMesh{immutableAllocationContext, CreateQuadPatch()};
   ImmutableMesh simplePlane{immutableAllocationContext,
@@ -433,10 +316,10 @@ void App::Run() {
     NewData newData;
     {
       if (beforeNextFrame_.changeFlag) {
-        waterPipelineStateDefinition.RasterizerState.Flags =
+        fullRenderPipeline.waterPipelineStateDefinition.RasterizerState.Flags =
             *beforeNextFrame_.changeFlag;
-        newData.pipelineState = pipelineStateProvider.CreatePipelineStateAsync(
-            waterPipelineStateDefinition);
+        newData.pipelineState = pipelineStateProvider_.CreatePipelineStateAsync(
+            fullRenderPipeline.waterPipelineStateDefinition);
       }
       if (beforeNextFrame_.patchHighestChanged) {
         newData.highestData =
@@ -461,7 +344,7 @@ void App::Run() {
     // This is necessary for the compute queue
 
     if (beforeNextFrame_.changeFlag && newData.pipelineState) {
-      waterPipelineState = newData.pipelineState->get();
+      fullRenderPipeline.waterPipelineState = newData.pipelineState->get();
       beforeNextFrame_.changeFlag = std::nullopt;
     }
 
@@ -494,6 +377,7 @@ void App::Run() {
 
     auto oceanModelMatrix =
         XMMatrixTranslationFromVector(XMVECTOR{0, -5, 0, 0});
+
     std::future<std::vector<WaterGraphicRootDescription::OceanData> &>
         oceanDataFuture;
     if (debugValues.drawMethod == DebugValues::DrawTechnology::Tesselation ||
@@ -501,14 +385,14 @@ void App::Run() {
         first_loop) {
       oceanDataFuture = threadpool_execute<
           std::vector<WaterGraphicRootDescription::OceanData>
-              &>([&cpuBuffers, this, simData, camChanged, oceanModelMatrix]()
+              &>([&cpuBuffers, this, camChanged, oceanModelMatrix]()
                      -> std::vector<WaterGraphicRootDescription::OceanData> & {
         if (camChanged && !debugValues.lockQuadTree) {
           cpuBuffers.oceanData.clear();
           return WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
               cpuBuffers.oceanData, cam, oceanModelMatrix,
-              simData.quadTreeDistanceThreshold, simData.maxDepth, debugValues,
-              &runtimeResults_);
+              this->simData.quadTreeDistanceThreshold, this->simData.maxDepth,
+              debugValues, &runtimeResults_);
         }
         return cpuBuffers.oceanData;
       });
@@ -595,19 +479,13 @@ void App::Run() {
                                      ResourceStates::RenderTarget);
 
         commonDescriptorHeap.Set(allocator);
-        // std::array<ID3D12DescriptorHeap *const, 2> heaps = {
-        //     commonDescriptorHeap.GetCurrentHeap(), imgui_wrapper_.GetHeap()};
-        // allocator.SetDescriptorHeaps(heaps);
 
         renderTargetView->Clear(allocator, settings.clearColor);
         frameResource.Clear(allocator);
       }
 
       // Global data
-      GpuVirtualAddress cameraConstantBuffer;
-      GpuVirtualAddress debugConstantBuffer;
-      GpuVirtualAddress lightsConstantBuffer;
-      GpuVirtualAddress timeDataBuffer;
+      GlobalGPUBuffers globalBuffers;
 
       {
         CameraConstants cameraConstants{};
@@ -626,423 +504,53 @@ void App::Run() {
                         XMMatrixTranspose(cam.GetINVProj()));
         XMStoreFloat4x4(&cameraConstants.INVvpMatrix,
                         XMMatrixTranspose(cam.GetINVViewProj()));
-        cameraConstantBuffer =
+        globalBuffers.cameraConstantBuffer =
             frameResource.DynamicBuffer.AddBuffer(cameraConstants);
-        debugConstantBuffer =
+        globalBuffers.debugConstantBuffer =
             frameResource.DynamicBuffer.AddBuffer(debugBufferContent);
-        lightsConstantBuffer = frameResource.DynamicBuffer.AddBuffer(sunData);
-        timeDataBuffer = frameResource.DynamicBuffer.AddBuffer(timeConstants);
+        globalBuffers.lightsConstantBuffer =
+            frameResource.DynamicBuffer.AddBuffer(sunData);
+        globalBuffers.timeDataBuffer =
+            frameResource.DynamicBuffer.AddBuffer(timeConstants);
       }
 
+      ConstantGPUBuffers constantBuffers{
+          .waterData = frameResource.DynamicBuffer.AddBuffer(waterData),
+          .defData = frameResource.DynamicBuffer.AddBuffer(defData),
+      };
+      OtherInput others{
+          .oceanModelMatrix = oceanModelMatrix,
+          .debugValues = debugValues,
+          .oceanDataFuture = oceanDataFuture,
+      };
+      Meshes meshes{
+          .planeMesh = planeMesh,
+          .simplePlane = simplePlane,
+          .BoxWithoutBottom = BoxWithoutBottom,
+          .skyboxMesh = skyboxMesh,
+          .deferredShadingPlane = deferredShadingPlane,
+      };
+      Textures textures{.skyboxTexture = skyboxTexture};
       // Draw Ocean
       {
-        // Will be accessed in multiple sections
-        const XMMATRIX modelMatrix = oceanModelMatrix;
+        RenderFrameContext renderFrameContext{
+            .renderTargetView = renderTargetView,
+            .frameResources = frameResource,
+            .commandQueue = {&directQueue, 1},
+            .globalBuffers = globalBuffers,
+            .constantBuffers = constantBuffers,
+            .drawingSimResource = drawingSimResource,
+            .others = others,
+            .meshes = meshes,
+            .textures = textures,
 
-        // Need to reset after drawing
-        std::optional<ShaderResourceView *> usedTextureAddress;
-        std::optional<MutableTextureWithState *> usedTexture;
-
-        // Start Draw pass
-        // Debug Data
-        {
-          if (debugValues.debugTextureMode.has_value()) {
-            const auto val = debugValues.debugTextureMode.value();
-            switch (val) {
-            case DebugValues::DebugTextureDisplay::DisplacementHighest:
-              usedTexture = &drawingSimResource.HighestBuffer.displacementMap;
-              break;
-            case DebugValues::DebugTextureDisplay::GradientsHighest:
-              usedTexture = &drawingSimResource.HighestBuffer.gradients;
-              break;
-            case DebugValues::DebugTextureDisplay::DisplacementMedium:
-              usedTexture = &drawingSimResource.MediumBuffer.displacementMap;
-              break;
-            case DebugValues::DebugTextureDisplay::GradientsMedium:
-              usedTexture = &drawingSimResource.MediumBuffer.gradients;
-              break;
-            case DebugValues::DebugTextureDisplay::DisplacementLowest:
-              usedTexture = &drawingSimResource.LowestBuffer.displacementMap;
-              break;
-            case DebugValues::DebugTextureDisplay::GradientsLowest:
-              usedTexture = &drawingSimResource.LowestBuffer.gradients;
-              break;
-            }
-          }
-
-          if (usedTexture.has_value()) {
-            usedTextureAddress = (*usedTexture)->ShaderResource(allocator);
-          }
-        }
-
-        GpuVirtualAddress waterDataBuffer =
-            frameResource.DynamicBuffer.AddBuffer(waterData);
-
-        // Pre translate resources
-        GpuVirtualAddress displacementMapAddressHighest =
-            *drawingSimResource.HighestBuffer.displacementMap.ShaderResource(
-                allocator);
-        GpuVirtualAddress gradientsAddressHighest =
-            *drawingSimResource.HighestBuffer.gradients.ShaderResource(
-                allocator);
-        GpuVirtualAddress displacementMapAddressMedium =
-            *drawingSimResource.MediumBuffer.displacementMap.ShaderResource(
-                allocator);
-        GpuVirtualAddress gradientsAddressMedium =
-            *drawingSimResource.MediumBuffer.gradients.ShaderResource(
-                allocator);
-        GpuVirtualAddress displacementMapAddressLowest =
-            *drawingSimResource.LowestBuffer.displacementMap.ShaderResource(
-                allocator);
-        GpuVirtualAddress gradientsAddressLowest =
-            *drawingSimResource.LowestBuffer.gradients.ShaderResource(
-                allocator);
-
-        // Shadow Map pass
-        //{
-        //  // Get shadow casting object silhouette
-        //  {
-        //    {
-        //      silhouetteClear.Pre(allocator);
-        //      SilhouetteClear::Inp inp{
-        //          .buffers = silhouetteDetectorBuffers,
-        //      };
-        //      silhouetteClear.Run(allocator, frameResource.DynamicBuffer,
-        //                          inp);
-        //    }
-        //    {
-        //      silhouetteDetector.Pre(allocator);
-        //      SilhouetteDetector::Inp inp{
-        //          .buffers = silhouetteDetectorBuffers,
-        //          .lights = lightsConstantBuffer,
-        //          .mesh = Box,
-        //          .meshBuffers = silhouetteDetectorMeshBuffers,
-        //      };
-        //      silhouetteDetector.Run(allocator, frameResource.DynamicBuffer,
-        //                             inp);
-        //    }
-        //  }
-        //  // ...
-        //}
-
-        // GBuffer Pass
-        {
-          auto gBufferViews = frameResource.GBuffer.GetGBufferViews();
-          allocator.SetRenderTargets(
-              std::initializer_list(std::to_address(gBufferViews.begin()),
-                                    std::to_address(gBufferViews.end())),
-              frameResource.DepthBuffer.DepthStencil());
-
-          // Box
-          // outline
-          //{
-          //  allocator.TransitionResource(
-          //      silhouetteDetectorBuffers.EdgeCountBuffer.get()->get(),
-          //      ResourceStates::UnorderedAccess,
-          //      ResourceStates::IndirectArgument);
-
-          //  silhouetteTester.Pre(allocator);
-          //  XMMATRIX boxModel = XMMatrixTranspose(
-          //      XMMatrixTranslationFromVector(XMVECTOR{2, 5, 2, 0}));
-          //  SilhouetteDetectorTester::ModelConstants boxModelConstants{};
-          //  XMStoreFloat4x4(&boxModelConstants.mMatrix, boxModel);
-          //  SilhouetteDetectorTester::Inp inp{
-          //      .camera = cameraConstantBuffer,
-          //      .modelTransform =
-          //          frameResource.DynamicBuffer.AddBuffer(boxModelConstants),
-          //      .texture = std::nullopt,
-          //      .mesh = Box,
-          //      .buffers = silhouetteDetectorBuffers,
-          //      .meshBuffers = silhouetteDetectorMeshBuffers,
-          //  };
-          //  silhouetteTester.Run(allocator, frameResource.DynamicBuffer,
-          //  inp); allocator.TransitionResource(
-          //      silhouetteDetectorBuffers.EdgeCountBuffer.get()->get(),
-          //      ResourceStates::IndirectArgument,
-          //      ResourceStates::UnorderedAccess);
-          //}
-          // Box
-          /*{
-          basicShader.Pre(allocator);
-
-          XMMATRIX boxModel = XMMatrixTranspose(
-          XMMatrixTranslationFromVector(XMVECTOR{2, 5, 2, 0}));
-          BasicShader::ShaderMask::ModelConstants boxModelConstants{};
-          XMStoreFloat4x4(&boxModelConstants.mMatrix, boxModel);
-          BasicShader::Inp inp{
-          .camera = cameraConstantBuffer,
-          .modelTransform =
-          frameResource.DynamicBuffer.AddBuffer(boxModelConstants),
-          .texture = std::nullopt,
-          .mesh = Box,
-          };
-          basicShader.Run(allocator, frameResource.DynamicBuffer, inp);
-          }*/
-
-          // Water
-          {
-            if (debugValues.drawMethod ==
-                DebugValues::DrawTechnology::Tesselation) {
-
-              // Ocean Buffers
-              WaterGraphicRootDescription::ModelConstants modelConstants{};
-
-              XMStoreFloat4x4(&modelConstants.mMatrix,
-                              XMMatrixTranspose(modelMatrix));
-
-              GpuVirtualAddress modelBuffer =
-                  frameResource.DynamicBuffer.AddBuffer(modelConstants);
-
-              waterPipelineState.Apply(allocator);
-
-              const auto &oceanQuadData = oceanDataFuture.get();
-              for (auto &curr : oceanQuadData) {
-                if (curr.N == 0)
-                  continue;
-                auto mask = waterRootSignature.Set(
-                    allocator, RootSignatureUsage::Graphics);
-
-                if (usedTextureAddress.has_value())
-                  mask.texture = **usedTextureAddress;
-
-                mask.heightMapHighest = displacementMapAddressHighest;
-                mask.gradientsHighest = gradientsAddressHighest;
-                mask.heightMapMedium = displacementMapAddressMedium;
-                mask.gradientsMedium = gradientsAddressMedium;
-                mask.heightMapLowest = displacementMapAddressLowest;
-                mask.gradientsLowest = gradientsAddressLowest;
-
-                mask.waterPBRBuffer = waterDataBuffer;
-
-                mask.hullBuffer =
-                    frameResource.DynamicBuffer.AddBuffer(curr.hullConstants);
-                mask.vertexBuffer =
-                    frameResource.DynamicBuffer.AddBuffer(curr.vertexConstants);
-                mask.debugBuffer = debugConstantBuffer;
-                mask.cameraBuffer = cameraConstantBuffer;
-                mask.modelBuffer = modelBuffer;
-
-                planeMesh.Draw(allocator, curr.N);
-              }
-            } else if (debugValues.drawMethod ==
-                       DebugValues::DrawTechnology::Parallax) {
-
-              // Ocean Buffers
-              ParallaxDraw::ModelBuffers modelConstants{};
-
-              modelConstants.center = float3(0, -5, 0);
-              modelConstants.scale = float2(DefaultsValues::App::oceanSize / 2,
-                                            DefaultsValues::App::oceanSize / 2);
-              modelConstants.PrismHeight = debugValues.prismHeight;
-
-              GpuVirtualAddress modelBuffer =
-                  frameResource.DynamicBuffer.AddBuffer(modelConstants);
-
-              parallaxDraw.Pre(allocator);
-
-              ParallaxDraw::Inp inp{
-                  .coneMaps =
-                      {drawingSimResource.LODs[0]->coneMapBuffer.ShaderResource(
-                           allocator),
-                       drawingSimResource.LODs[1]->coneMapBuffer.ShaderResource(
-                           allocator),
-                       drawingSimResource.LODs[2]->coneMapBuffer.ShaderResource(
-                           allocator)},
-                  .gradients =
-                      {
-                          drawingSimResource.LODs[0]->gradients.ShaderResource(
-                              allocator),
-                          drawingSimResource.LODs[1]->gradients.ShaderResource(
-                              allocator),
-                          drawingSimResource.LODs[2]->gradients.ShaderResource(
-                              allocator),
-
-                      },
-                  .texture = usedTextureAddress,
-                  .modelBuffers = modelBuffer,
-                  .cameraBuffer = cameraConstantBuffer,
-                  .debugBuffers = debugConstantBuffer,
-                  .waterPBRBuffers = waterDataBuffer,
-                  .mesh = simplePlane,
-
-              };
-              parallaxDraw.Run(allocator, inp);
-            }
-
-            else if (debugValues.drawMethod ==
-                     DebugValues::DrawTechnology::PrismParallax) {
-
-              // Ocean Buffers
-              PrismParallaxDraw::ModelBuffers modelConstants{};
-
-              XMStoreFloat4x4(&modelConstants.mMatrix,
-                              XMMatrixTranspose(modelMatrix));
-
-              XMStoreFloat4x4(
-                  &modelConstants.mINVMatrix,
-                  XMMatrixTranspose(XMMatrixInverse(nullptr, modelMatrix)));
-
-              modelConstants.center = XMFLOAT3{0, -5, 0};
-              modelConstants.PrismHeight = debugValues.prismHeight;
-
-              GpuVirtualAddress modelBuffer =
-                  frameResource.DynamicBuffer.AddBuffer(modelConstants);
-
-              prismParallaxDraw.Pre(allocator);
-              PrismParallaxDraw::Inp inp{
-                  .coneMaps =
-                      {drawingSimResource.LODs[0]->coneMapBuffer.ShaderResource(
-                           allocator),
-                       drawingSimResource.LODs[1]->coneMapBuffer.ShaderResource(
-                           allocator),
-                       drawingSimResource.LODs[2]->coneMapBuffer.ShaderResource(
-                           allocator)},
-                  .gradients =
-                      {
-                          drawingSimResource.LODs[0]->gradients.ShaderResource(
-                              allocator),
-                          drawingSimResource.LODs[1]->gradients.ShaderResource(
-                              allocator),
-                          drawingSimResource.LODs[2]->gradients.ShaderResource(
-                              allocator),
-                      },
-                  .texture = usedTextureAddress,
-                  .cameraBuffer = cameraConstantBuffer,
-                  .debugBuffers = debugConstantBuffer,
-                  .waterPBRBuffers = waterDataBuffer,
-                  .modelBuffers = modelBuffer,
-                  //.mesh = BoxOnlyWithIndexBuffer,
-                  .mesh = BoxWithoutBottom,
-                  .vertexData = GpuVirtualAddress(0),
-              };
-
-              const auto &oceanQuadData = oceanDataFuture.get();
-              for (auto &curr : oceanQuadData) {
-                if (curr.N == 0)
-                  continue;
-
-                inp.vertexData =
-                    frameResource.DynamicBuffer.AddBuffer(curr.vertexConstants);
-                inp.N = curr.N;
-                prismParallaxDraw.Run(allocator, inp);
-              }
-            }
-          }
-          // skybox
-          {
-            skyboxPipelineState.Apply(allocator);
-
-            auto mask = skyboxRootSignature.Set(allocator,
-                                                RootSignatureUsage::Graphics);
-
-            mask.skybox = skyboxTexture;
-            mask.lightingBuffer = lightsConstantBuffer;
-
-            mask.cameraBuffer = cameraConstantBuffer;
-
-            skyboxMesh.Draw(allocator);
-          }
-        }
-
-        // Deferred Shading Pass
-        {
-          allocator.SetRenderTargets({renderTargetView}, nullptr);
-          deferredShadingPipelineState.Apply(allocator);
-          frameResource.GBuffer.TranslateToView(allocator);
-          allocator.TransitionResource(
-              frameResource.DepthBuffer
-                  .operator Axodox::Graphics::D3D12::ResourceArgument(),
-              ResourceStates::DepthWrite, ResourceStates::PixelShaderResource);
-          auto mask = deferredShadingRootSignature.Set(
-              allocator, RootSignatureUsage::Graphics);
-
-          mask.BindGBuffer(frameResource.GBuffer);
-
-          // Textures
-          mask.skybox = skyboxTexture;
-          mask.gradientsHighest =
-              *drawingSimResource.HighestBuffer.gradients.ShaderResource(
-                  allocator);
-          mask.gradientsMedium =
-              *drawingSimResource.MediumBuffer.gradients.ShaderResource(
-                  allocator);
-          mask.gradientsLowest =
-              *drawingSimResource.LowestBuffer.gradients.ShaderResource(
-                  allocator);
-
-          // Buffers
-          mask.lightingBuffer = lightsConstantBuffer;
-          mask.cameraBuffer = cameraConstantBuffer;
-          mask.debugBuffer = debugConstantBuffer;
-
-          mask.deferredShaderBuffer =
-              frameResource.DynamicBuffer.AddBuffer(defData);
-
-          mask.geometryDepth = *frameResource.DepthBuffer.ShaderResource();
-
-          deferredShadingPlane.Draw(allocator);
-        }
-
-        // SSR post process
-        if (debugValues.enableSSR) {
-          allocator.TransitionResource(*renderTargetView,
-                                       ResourceStates::RenderTarget,
-                                       ResourceStates::NonPixelShaderResource);
-
-          auto mask = postProcessingRootSignature.Set(
-              allocator, RootSignatureUsage::Compute);
-          mask.InpColor = *frameResource.ScreenResourceView;
-          mask.DepthBuffer = *frameResource.DepthBuffer.ShaderResource();
-          mask.NormalBuffer = *frameResource.GBuffer.Normal.ShaderResource();
-          mask.OutputTexture =
-              *frameResource.PostProcessingBuffer.UnorderedAccess();
-          mask.CameraBuffer = cameraConstantBuffer;
-
-          postProcessingPipelineState.Apply(allocator);
-
-          auto definition = frameResource.PostProcessingBuffer.Definition();
-          allocator.Dispatch(definition->Width / 16 + 1,
-                             definition->Height / 16 + 1);
-
-          allocator.TransitionResources(
-              {{frameResource.PostProcessingBuffer,
-                ResourceStates::UnorderedAccess, ResourceStates::CopySource},
-               {*renderTargetView, ResourceStates::NonPixelShaderResource,
-                ResourceStates::CopyDest}});
-
-          allocator.CopyResource(frameResource.PostProcessingBuffer,
-                                 *renderTargetView);
-
-          allocator.TransitionResources(
-              {{frameResource.PostProcessingBuffer, ResourceStates::CopySource,
-                ResourceStates::UnorderedAccess},
-               {*renderTargetView, ResourceStates::CopyDest,
-                ResourceStates::RenderTarget}});
-        }
-        allocator.TransitionResource(frameResource.DepthBuffer,
-                                     ResourceStates::PixelShaderResource,
-                                     ResourceStates::DepthWrite);
-        frameResource.GBuffer.TranslateToTarget(allocator);
-
-        // Retransition simulation resources for compute shaders
-
-        drawingSimResource.HighestBuffer.gradients.UnorderedAccess(allocator);
-        drawingSimResource.HighestBuffer.displacementMap.UnorderedAccess(
-            allocator);
-        drawingSimResource.MediumBuffer.gradients.UnorderedAccess(allocator);
-        drawingSimResource.MediumBuffer.displacementMap.UnorderedAccess(
-            allocator);
-        drawingSimResource.LowestBuffer.gradients.UnorderedAccess(allocator);
-        drawingSimResource.LowestBuffer.displacementMap.UnorderedAccess(
-            allocator);
-        if (usedTexture.has_value())
-          (*usedTexture)->UnorderedAccess(allocator);
+        };
+        fullRenderPipeline.Execute(renderFrameContext);
       }
 
       auto CPURenderEnd = std::chrono::high_resolution_clock::now();
       runtimeResults_.CPUTime = CPURenderEnd - frameStart;
-      DrawImGuiMenu(allocator, waterData, simData, defData, drawingSimResource,
-                    sunData);
+      DrawImGuiMenu(allocator, drawingSimResource);
 
       //  End frame command list
       {
@@ -1086,10 +594,7 @@ void App::Run() {
 }
 void App::DrawImGuiMenu(
     CommandAllocator &allocator,
-    WaterGraphicRootDescription::WaterPixelShaderData &waterData,
-    SimulationData &simData, DeferredShading::DeferredShaderBuffers &defData,
-    SimulationStage::SimulationResources &drawingSimResource,
-    PixelLighting &sunData) {
+    SimulationStage::SimulationResources &drawingSimResource) {
   // ImGUI
   if (settings.showImgui) {
     imgui_wrapper_.Pre(allocator);

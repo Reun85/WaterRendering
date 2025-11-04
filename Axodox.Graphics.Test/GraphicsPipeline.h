@@ -331,7 +331,7 @@ struct ShadowMapping : public RootSignatureMask {
   }
 };
 
-struct SSRPostProcessing : public RootSignatureMask {
+struct SSRPostProcessingMask : public RootSignatureMask {
   RootDescriptor<RootDescriptorType::ConstantBuffer> CameraBuffer;
   RootDescriptorTable<1> InpColor;
   RootDescriptorTable<1> NormalBuffer;
@@ -339,7 +339,7 @@ struct SSRPostProcessing : public RootSignatureMask {
   RootDescriptorTable<1> OutputTexture;
   StaticSampler Sampler;
 
-  explicit SSRPostProcessing(const RootSignatureContext &context)
+  explicit SSRPostProcessingMask(const RootSignatureContext &context)
       : RootSignatureMask(context), CameraBuffer(this, {0}),
         InpColor(this, {DescriptorRangeType::ShaderResource, {0}}),
         NormalBuffer(this, {DescriptorRangeType::ShaderResource, {1}}),
@@ -394,6 +394,36 @@ struct BasicShader : ShaderJob {
            const Inp &inp) const;
   ~BasicShader() override = default;
 };
+
+struct PostProcessingShader : ShaderJob {
+  struct Inp {
+    const GpuVirtualAddress &camera;
+    const ShaderResourceView &inp;
+    const ShaderResourceView &depthBuffer;
+    const ShaderResourceView &normalBuffer;
+    const ShaderResourceView &textureBuffer;
+    const u32 X, Y;
+    // Copies the textureBuffer to output.
+    const std::optional<ResourceArgument> output;
+  };
+
+  using ShaderMask = SSRPostProcessingMask;
+  RootSignature<ShaderMask> Signature;
+  PipelineState pipeline;
+
+  PostProcessingShader(PipelineStateProvider &pipelineProvider,
+                       GraphicsDevice &device, ComputeShader *cs);
+
+  static PostProcessingShader
+  WithDefaultShaders(PipelineStateProvider &pipelineProvider,
+                     GraphicsDevice &device);
+
+  void Pre(CommandAllocator &allocator) const override;
+  void Run(CommandAllocator &allocator, DynamicBufferManager &buffermanager,
+           const Inp &inp) const;
+  ~PostProcessingShader() override = default;
+};
+
 /// @brief All resources that may be used by a single frame rendering.
 struct FrameResources : ShaderBuffers {
   CommandAllocator Allocator;
@@ -421,22 +451,85 @@ struct FrameResources : ShaderBuffers {
   ~FrameResources() override = default;
 };
 
+struct ConstantGPUBuffers {
+  GpuVirtualAddress waterData;
+  GpuVirtualAddress defData;
+};
+
+struct GlobalGPUBuffers {
+  GpuVirtualAddress cameraConstantBuffer;
+  GpuVirtualAddress debugConstantBuffer;
+  GpuVirtualAddress lightsConstantBuffer;
+  GpuVirtualAddress timeDataBuffer;
+};
+
+struct Meshes {
+  ImmutableMesh &planeMesh;
+  ImmutableMesh &simplePlane;
+  ImmutableMesh &BoxWithoutBottom;
+  ImmutableMesh &skyboxMesh;
+  ImmutableMesh &deferredShadingPlane;
+};
+
+struct Textures {
+  CubeMapTexture &skyboxTexture;
+};
+struct OtherInput {
+  XMMATRIX &oceanModelMatrix;
+  DebugValues &debugValues;
+  std::future<std::vector<WaterGraphicRootDescription::OceanData> &>
+      &oceanDataFuture;
+};
+
 /// @brief All tools needed to render a frame.
 struct RenderFrameContext {
+  const RenderTargetView *renderTargetView;
   FrameResources &frameResources;
   /// If you have more available command queues, you can add them here
   std::span<CommandQueue> commandQueue;
-
-  void Begin();
-  void Finish();
+  GlobalGPUBuffers globalBuffers;
+  ConstantGPUBuffers constantBuffers;
+  SimulationStage::SimulationResources &drawingSimResource;
+  OtherInput others;
+  Meshes meshes;
+  Textures textures;
 };
 
-struct RenderPipeline {
+struct WaterRenderPipelines {
   struct CreateSettings {
     RasterizerFlags rasterizerState;
   };
+
+  typedef Axodox::Graphics::D3D12::PipelineState PipelineState;
+
+  RootSignature<WaterGraphicRootDescription> waterRootSignature;
+  GraphicsPipelineStateDefinition waterPipelineStateDefinition;
+  PipelineState waterPipelineState;
+
+  RootSignature<SkyboxRootDescription> skyboxRootSignature;
+  GraphicsPipelineStateDefinition skyboxPipelineStateDefinition;
+  PipelineState skyboxPipelineState;
+
+  RootSignature<DeferredShading> deferredShadingRootSignature;
+  GraphicsPipelineStateDefinition deferredShadingPipelineStateDefinition;
+  PipelineState deferredShadingPipelineState;
+
+  PostProcessingShader postProcessingShader;
+
+  BasicShader basicShader;
+
+  // SilhouetteDetector silhouetteDetector ;
+
+  // SilhouetteClear silhouetteClear ;
+
+  // SilhouetteDetectorTester silhouetteTester ;
+
+  ParallaxDraw parallaxDraw;
+
+  PrismParallaxDraw prismParallaxDraw;
+
   void Execute(RenderFrameContext &context);
-  static RenderPipeline Create(ResourceAllocationContext &context,
-                               PipelineStateProvider &provider,
-                               CreateSettings settings);
+  static WaterRenderPipelines Create(GraphicsDevice &device,
+                                     PipelineStateProvider &provider,
+                                     CreateSettings settings);
 };

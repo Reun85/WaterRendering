@@ -417,111 +417,564 @@ void BasicShader::Run(CommandAllocator &allocator, DynamicBufferManager &,
   inp.mesh.Draw(allocator);
 }
 
-// RenderPipeline
-// RenderPipeline::Create(ResourceAllocationContext &context,
-//                        PipelineStateProvider &pipelineStateProvider,
-//                        CreateSettings settings) {
-//
-//   GraphicsDevice &device = *context.Device;
-//   RootSignature<WaterGraphicRootDescription> waterRootSignature{device};
-//
-//   VertexShader simpleVertexShader{app_folder() / L"VertexShader.cso"};
-//   PixelShader simplePixelShader{app_folder() / L"PixelShader.cso"};
-//   HullShader hullShader{app_folder() / L"hullShader.cso"};
-//   DomainShader domainShader{app_folder() / L"domainShader.cso"};
-//
-//   auto &gBufferFormats = DeferredShading::GBuffer::GetGBufferFormats();
-//
-//   GraphicsPipelineStateDefinition waterPipelineStateDefinition{
-//       .RootSignature = &waterRootSignature,
-//       .VertexShader = &simpleVertexShader,
-//       .DomainShader = &domainShader,
-//       .HullShader = &hullShader,
-//       .PixelShader = &simplePixelShader,
-//       .RasterizerState = settings.rasterizerState,
-//       .DepthStencilState = DepthStencilMode::WriteDepth,
-//       .InputLayout = VertexPosition::Layout,
-//       .TopologyType = PrimitiveTopologyType::Patch,
-//       .RenderTargetFormats =
-//           std::initializer_list(std::to_address(gBufferFormats.begin()),
-//                                 std::to_address(gBufferFormats.end())),
-//       .DepthStencilFormat = Format::D32_Float};
-//
-//   Axodox::Graphics::D3D12::PipelineState waterPipelineState =
-//       pipelineStateProvider
-//           .CreatePipelineStateAsync(waterPipelineStateDefinition)
-//           .get();
-//
-//   VertexShader atmosphereVS{app_folder() / L"AtmosphereVS.cso"};
-//   PixelShader atmospherePS{app_folder() / L"AtmospherePS.cso"};
-//   RootSignature<SkyboxRootDescription> skyboxRootSignature{device};
-//   DepthStencilState skyboxDepthStencilState{DepthStencilMode::WriteDepth};
-//   skyboxDepthStencilState.Comparison = ComparisonFunction::LessOrEqual;
-//
-//   GraphicsPipelineStateDefinition skyboxPipelineStateDefinition{
-//       .RootSignature = &skyboxRootSignature,
-//       .VertexShader = &atmosphereVS,
-//       .PixelShader = &atmospherePS,
-//       .RasterizerState = RasterizerFlags::CullNone,
-//       .DepthStencilState = skyboxDepthStencilState,
-//       .InputLayout = VertexPositionNormalTexture::Layout,
-//       .RenderTargetFormats =
-//           std::initializer_list(std::to_address(gBufferFormats.begin()),
-//                                 std::to_address(gBufferFormats.end())),
-//
-//       .DepthStencilFormat = Format::D32_Float};
-//   Axodox::Graphics::D3D12::PipelineState skyboxPipelineState =
-//       pipelineStateProvider
-//           .CreatePipelineStateAsync(skyboxPipelineStateDefinition)
-//           .get();
-//
-//   VertexShader deferredShadingVS{app_folder() / L"DeferredShadingVS.cso"};
-//   PixelShader deferredShadingPS{app_folder() / L"DeferredShadingPS.cso"};
-//   RootSignature<DeferredShading> deferredShadingRootSignature{device};
-//
-//   GraphicsPipelineStateDefinition deferredShadingPipelineStateDefinition{
-//       .RootSignature = &deferredShadingRootSignature,
-//       .VertexShader = &deferredShadingVS,
-//       .PixelShader = &deferredShadingPS,
-//       .BlendState = {BlendType::Additive, BlendType::AlphaBlend},
-//       .RasterizerState = RasterizerFlags::CullCounterClockwise,
-//       .InputLayout = VertexPositionNormalTexture::Layout,
-//       .TopologyType = PrimitiveTopologyType::Triangle,
-//       .RenderTargetFormats = {Format::B8G8R8A8_UNorm},
-//   };
-//   Axodox::Graphics::D3D12::PipelineState deferredShadingPipelineState =
-//       pipelineStateProvider
-//           .CreatePipelineStateAsync(deferredShadingPipelineStateDefinition)
-//           .get();
-//
-//   RootSignature<SSRPostProcessing> postProcessingRootSignature{device};
-//   ComputeShader postProcessingComputeShader{app_folder() /
-//                                             L"SSRPostProcessingShader.cso"};
-//   ComputePipelineStateDefinition postProcessingStateDefinition{
-//       .RootSignature = &postProcessingRootSignature,
-//       .ComputeShader = &postProcessingComputeShader};
-//   auto postProcessingPipelineState =
-//       pipelineStateProvider
-//           .CreatePipelineStateAsync(postProcessingStateDefinition)
-//           .get();
-//
-//   BasicShader basicShader =
-//       BasicShader::WithDefaultShaders(pipelineStateProvider, device);
-//
-//   // SilhouetteDetector silhouetteDetector =
-//   //     SilhouetteDetector::WithDefaultShaders(pipelineStateProvider,
-//   //     device);
-//
-//   // SilhouetteClear silhouetteClear =
-//   //     SilhouetteClear::WithDefaultShaders(pipelineStateProvider, device);
-//
-//   // SilhouetteDetectorTester silhouetteTester =
-//   //     SilhouetteDetectorTester::WithDefaultShaders(pipelineStateProvider,
-//   //                                                  device);
-//
-//   ParallaxDraw parallaxDraw =
-//       ParallaxDraw::WithDefaultShaders(pipelineStateProvider, device);
-//
-//   PrismParallaxDraw prismParallaxDraw =
-//       PrismParallaxDraw::WithDefaultShaders(pipelineStateProvider, device);
-// }
+PostProcessingShader::PostProcessingShader(
+    PipelineStateProvider &pipelineProvider, GraphicsDevice &device,
+    ComputeShader *cs)
+    : Signature(device),
+
+      pipeline(pipelineProvider
+                   .CreatePipelineStateAsync(ComputePipelineStateDefinition{
+                       .RootSignature = &Signature, .ComputeShader = cs})
+                   .get()) {}
+
+PostProcessingShader PostProcessingShader::WithDefaultShaders(
+    PipelineStateProvider &pipelineProvider, GraphicsDevice &device) {
+  ComputeShader cs{app_folder() / L"SSRPostProcessingShader.cso"};
+
+  return PostProcessingShader(pipelineProvider, device, &cs);
+}
+
+void PostProcessingShader::Pre(CommandAllocator &allocator) const {
+  pipeline.Apply(allocator);
+}
+
+void PostProcessingShader::Run(CommandAllocator &allocator,
+                               DynamicBufferManager &, const Inp &inp) const {
+  auto mask = Signature.Set(allocator, RootSignatureUsage::Compute);
+  mask.InpColor = inp.inp;
+  mask.DepthBuffer = inp.depthBuffer;
+  mask.NormalBuffer = inp.normalBuffer;
+  mask.OutputTexture = inp.textureBuffer;
+  mask.CameraBuffer = inp.camera;
+
+  pipeline.Apply(allocator);
+
+  allocator.Dispatch(inp.X, inp.Y);
+
+  if (inp.output) {
+    auto res = *inp.output;
+    allocator.TransitionResources(
+        {{inp.textureBuffer, ResourceStates::UnorderedAccess,
+          ResourceStates::CopySource},
+         {res, ResourceStates::NonPixelShaderResource,
+          ResourceStates::CopyDest}});
+
+    allocator.CopyResource(inp.textureBuffer, res);
+
+    allocator.TransitionResources(
+        {{inp.textureBuffer, ResourceStates::CopySource,
+          ResourceStates::UnorderedAccess},
+         {res, ResourceStates::CopyDest, ResourceStates::RenderTarget}});
+  }
+}
+
+WaterRenderPipelines
+WaterRenderPipelines::Create(GraphicsDevice &device,
+                             PipelineStateProvider &pipelineStateProvider_,
+                             CreateSettings settings) {
+
+  RootSignature<WaterGraphicRootDescription> waterRootSignature{device};
+
+  VertexShader simpleVertexShader{app_folder() / L"VertexShader.cso"};
+  PixelShader simplePixelShader{app_folder() / L"PixelShader.cso"};
+  HullShader hullShader{app_folder() / L"hullShader.cso"};
+  DomainShader domainShader{app_folder() / L"domainShader.cso"};
+
+  auto &gBufferFormats = DeferredShading::GBuffer::GetGBufferFormats();
+
+  GraphicsPipelineStateDefinition waterPipelineStateDefinition{
+      .RootSignature = &waterRootSignature,
+      .VertexShader = &simpleVertexShader,
+      .DomainShader = &domainShader,
+      .HullShader = &hullShader,
+      .PixelShader = &simplePixelShader,
+      .RasterizerState = settings.rasterizerState,
+      .DepthStencilState = DepthStencilMode::WriteDepth,
+      .InputLayout = VertexPosition::Layout,
+      .TopologyType = PrimitiveTopologyType::Patch,
+      .RenderTargetFormats =
+          std::initializer_list(std::to_address(gBufferFormats.begin()),
+                                std::to_address(gBufferFormats.end())),
+      .DepthStencilFormat = Format::D32_Float};
+
+  Axodox::Graphics::D3D12::PipelineState waterPipelineState =
+      pipelineStateProvider_
+          .CreatePipelineStateAsync(waterPipelineStateDefinition)
+          .get();
+
+  VertexShader atmosphereVS{app_folder() / L"AtmosphereVS.cso"};
+  PixelShader atmospherePS{app_folder() / L"AtmospherePS.cso"};
+  RootSignature<SkyboxRootDescription> skyboxRootSignature{device};
+  DepthStencilState skyboxDepthStencilState{DepthStencilMode::WriteDepth};
+  skyboxDepthStencilState.Comparison = ComparisonFunction::LessOrEqual;
+
+  GraphicsPipelineStateDefinition skyboxPipelineStateDefinition{
+      .RootSignature = &skyboxRootSignature,
+      .VertexShader = &atmosphereVS,
+      .PixelShader = &atmospherePS,
+      .RasterizerState = RasterizerFlags::CullNone,
+      .DepthStencilState = skyboxDepthStencilState,
+      .InputLayout = VertexPositionNormalTexture::Layout,
+      .RenderTargetFormats =
+          std::initializer_list(std::to_address(gBufferFormats.begin()),
+                                std::to_address(gBufferFormats.end())),
+
+      .DepthStencilFormat = Format::D32_Float};
+  Axodox::Graphics::D3D12::PipelineState skyboxPipelineState =
+      pipelineStateProvider_
+          .CreatePipelineStateAsync(skyboxPipelineStateDefinition)
+          .get();
+
+  VertexShader deferredShadingVS{app_folder() / L"DeferredShadingVS.cso"};
+  PixelShader deferredShadingPS{app_folder() / L"DeferredShadingPS.cso"};
+  RootSignature<DeferredShading> deferredShadingRootSignature{device};
+
+  GraphicsPipelineStateDefinition deferredShadingPipelineStateDefinition{
+      .RootSignature = &deferredShadingRootSignature,
+      .VertexShader = &deferredShadingVS,
+      .PixelShader = &deferredShadingPS,
+      .BlendState = {BlendType::Additive, BlendType::AlphaBlend},
+      .RasterizerState = RasterizerFlags::CullCounterClockwise,
+      .InputLayout = VertexPositionNormalTexture::Layout,
+      .TopologyType = PrimitiveTopologyType::Triangle,
+      .RenderTargetFormats = {Format::B8G8R8A8_UNorm},
+  };
+
+  Axodox::Graphics::D3D12::PipelineState deferredShadingPipelineState =
+      pipelineStateProvider_
+          .CreatePipelineStateAsync(deferredShadingPipelineStateDefinition)
+          .get();
+
+  PostProcessingShader postProcessingShader =
+      PostProcessingShader::WithDefaultShaders(pipelineStateProvider_, device);
+
+  BasicShader basicShader =
+      BasicShader::WithDefaultShaders(pipelineStateProvider_, device);
+
+  // SilhouetteDetector silhouetteDetector =
+  //     SilhouetteDetector::WithDefaultShaders(pipelineStateProvider,
+  //     device);
+
+  // SilhouetteClear silhouetteClear =
+  //     SilhouetteClear::WithDefaultShaders(pipelineStateProvider, device);
+
+  // SilhouetteDetectorTester silhouetteTester =
+  //     SilhouetteDetectorTester::WithDefaultShaders(pipelineStateProvider,
+  //                                                  device);
+
+  ParallaxDraw parallaxDraw =
+      ParallaxDraw::WithDefaultShaders(pipelineStateProvider_, device);
+
+  PrismParallaxDraw prismParallaxDraw =
+      PrismParallaxDraw::WithDefaultShaders(pipelineStateProvider_, device);
+
+  return WaterRenderPipelines{
+      .waterRootSignature = waterRootSignature,
+      .waterPipelineStateDefinition = waterPipelineStateDefinition,
+      .waterPipelineState = waterPipelineState,
+      .skyboxRootSignature = skyboxRootSignature,
+      .skyboxPipelineStateDefinition = skyboxPipelineStateDefinition,
+      .skyboxPipelineState = skyboxPipelineState,
+      .deferredShadingRootSignature = deferredShadingRootSignature,
+      .deferredShadingPipelineStateDefinition =
+          deferredShadingPipelineStateDefinition,
+      .deferredShadingPipelineState = deferredShadingPipelineState,
+      .postProcessingShader = postProcessingShader,
+      .basicShader = basicShader,
+      //. silhouetteDetector=silhouetteDetector  ,
+
+      // . silhouetteClear= silhouetteClear ,
+
+      // . silhouetteTester=silhouetteTester  ,
+      .parallaxDraw = parallaxDraw,
+      .prismParallaxDraw = prismParallaxDraw};
+}
+
+void WaterRenderPipelines::Execute(RenderFrameContext &context) {
+  auto &frameResource = context.frameResources;
+  auto &allocator = frameResource.Allocator;
+  auto &constantBuffers = context.constantBuffers;
+  auto &globalBuffers = context.globalBuffers;
+  auto &debugValues = context.others.debugValues;
+  auto &drawingSimResource = context.drawingSimResource;
+
+  // Will be accessed in multiple sections
+  const XMMATRIX &modelMatrix = context.others.oceanModelMatrix;
+
+  // Need to reset after drawing
+  std::optional<ShaderResourceView *> usedTextureAddress;
+  std::optional<MutableTextureWithState *> usedTexture;
+
+  // Start Draw pass
+  // Debug Data
+  {
+    if (debugValues.debugTextureMode.has_value()) {
+      const auto val = debugValues.debugTextureMode.value();
+      switch (val) {
+      case DebugValues::DebugTextureDisplay::DisplacementHighest:
+        usedTexture = &drawingSimResource.HighestBuffer.displacementMap;
+        break;
+      case DebugValues::DebugTextureDisplay::GradientsHighest:
+        usedTexture = &drawingSimResource.HighestBuffer.gradients;
+        break;
+      case DebugValues::DebugTextureDisplay::DisplacementMedium:
+        usedTexture = &drawingSimResource.MediumBuffer.displacementMap;
+        break;
+      case DebugValues::DebugTextureDisplay::GradientsMedium:
+        usedTexture = &drawingSimResource.MediumBuffer.gradients;
+        break;
+      case DebugValues::DebugTextureDisplay::DisplacementLowest:
+        usedTexture = &drawingSimResource.LowestBuffer.displacementMap;
+        break;
+      case DebugValues::DebugTextureDisplay::GradientsLowest:
+        usedTexture = &drawingSimResource.LowestBuffer.gradients;
+        break;
+      }
+    }
+
+    if (usedTexture.has_value()) {
+      usedTextureAddress = (*usedTexture)->ShaderResource(allocator);
+    }
+  }
+
+  GpuVirtualAddress waterDataBuffer =
+      frameResource.DynamicBuffer.AddBuffer(constantBuffers.waterData);
+
+  // Pre translate resources
+  GpuVirtualAddress displacementMapAddressHighest =
+      *drawingSimResource.HighestBuffer.displacementMap.ShaderResource(
+          allocator);
+  GpuVirtualAddress gradientsAddressHighest =
+      *drawingSimResource.HighestBuffer.gradients.ShaderResource(allocator);
+  GpuVirtualAddress displacementMapAddressMedium =
+      *drawingSimResource.MediumBuffer.displacementMap.ShaderResource(
+          allocator);
+  GpuVirtualAddress gradientsAddressMedium =
+      *drawingSimResource.MediumBuffer.gradients.ShaderResource(allocator);
+  GpuVirtualAddress displacementMapAddressLowest =
+      *drawingSimResource.LowestBuffer.displacementMap.ShaderResource(
+          allocator);
+  GpuVirtualAddress gradientsAddressLowest =
+      *drawingSimResource.LowestBuffer.gradients.ShaderResource(allocator);
+
+  // Shadow Map pass
+  //{
+  //  // Get shadow casting object silhouette
+  //  {
+  //    {
+  //      silhouetteClear.Pre(allocator);
+  //      SilhouetteClear::Inp inp{
+  //          .buffers = silhouetteDetectorBuffers,
+  //      };
+  //      silhouetteClear.Run(allocator, frameResource.DynamicBuffer,
+  //                          inp);
+  //    }
+  //    {
+  //      silhouetteDetector.Pre(allocator);
+  //      SilhouetteDetector::Inp inp{
+  //          .buffers = silhouetteDetectorBuffers,
+  //          .lights = lightsConstantBuffer,
+  //          .mesh = Box,
+  //          .meshBuffers = silhouetteDetectorMeshBuffers,
+  //      };
+  //      silhouetteDetector.Run(allocator, frameResource.DynamicBuffer,
+  //                             inp);
+  //    }
+  //  }
+  //  // ...
+  //}
+
+  // GBuffer Pass
+  {
+    auto gBufferViews = frameResource.GBuffer.GetGBufferViews();
+    allocator.SetRenderTargets(
+        std::initializer_list(std::to_address(gBufferViews.begin()),
+                              std::to_address(gBufferViews.end())),
+        frameResource.DepthBuffer.DepthStencil());
+
+    // Box
+    // outline
+    //{
+    //  allocator.TransitionResource(
+    //      silhouetteDetectorBuffers.EdgeCountBuffer.get()->get(),
+    //      ResourceStates::UnorderedAccess,
+    //      ResourceStates::IndirectArgument);
+
+    //  silhouetteTester.Pre(allocator);
+    //  XMMATRIX boxModel = XMMatrixTranspose(
+    //      XMMatrixTranslationFromVector(XMVECTOR{2, 5, 2, 0}));
+    //  SilhouetteDetectorTester::ModelConstants boxModelConstants{};
+    //  XMStoreFloat4x4(&boxModelConstants.mMatrix, boxModel);
+    //  SilhouetteDetectorTester::Inp inp{
+    //      .camera = cameraConstantBuffer,
+    //      .modelTransform =
+    //          frameResource.DynamicBuffer.AddBuffer(boxModelConstants),
+    //      .texture = std::nullopt,
+    //      .mesh = Box,
+    //      .buffers = silhouetteDetectorBuffers,
+    //      .meshBuffers = silhouetteDetectorMeshBuffers,
+    //  };
+    //  silhouetteTester.Run(allocator, frameResource.DynamicBuffer,
+    //  inp); allocator.TransitionResource(
+    //      silhouetteDetectorBuffers.EdgeCountBuffer.get()->get(),
+    //      ResourceStates::IndirectArgument,
+    //      ResourceStates::UnorderedAccess);
+    //}
+    // Box
+
+    /*{
+    basicShader.Pre(allocator);
+
+    XMMATRIX boxModel = XMMatrixTranspose(
+    XMMatrixTranslationFromVector(XMVECTOR{2, 5, 2, 0}));
+    BasicShader::ShaderMask::ModelConstants boxModelConstants{};
+    XMStoreFloat4x4(&boxModelConstants.mMatrix, boxModel);
+    BasicShader::Inp inp{
+    .camera = cameraConstantBuffer,
+    .modelTransform =
+    frameResource.DynamicBuffer.AddBuffer(boxModelConstants),
+    .texture = std::nullopt,
+    .mesh = Box,
+    };
+    basicShader.Run(allocator, frameResource.DynamicBuffer, inp);
+    }*/
+
+    // Water
+    {
+      if (debugValues.drawMethod == DebugValues::DrawTechnology::Tesselation) {
+
+        // Ocean Buffers
+        WaterGraphicRootDescription::ModelConstants modelConstants{};
+
+        XMStoreFloat4x4(&modelConstants.mMatrix,
+                        XMMatrixTranspose(modelMatrix));
+
+        GpuVirtualAddress modelBuffer =
+            frameResource.DynamicBuffer.AddBuffer(modelConstants);
+
+        waterPipelineState.Apply(allocator);
+
+        const auto &oceanQuadData = context.others.oceanDataFuture.get();
+        for (auto &curr : oceanQuadData) {
+          if (curr.N == 0)
+            continue;
+          auto mask =
+              waterRootSignature.Set(allocator, RootSignatureUsage::Graphics);
+
+          if (usedTextureAddress.has_value())
+            mask.texture = **usedTextureAddress;
+
+          mask.heightMapHighest = displacementMapAddressHighest;
+          mask.gradientsHighest = gradientsAddressHighest;
+          mask.heightMapMedium = displacementMapAddressMedium;
+          mask.gradientsMedium = gradientsAddressMedium;
+          mask.heightMapLowest = displacementMapAddressLowest;
+          mask.gradientsLowest = gradientsAddressLowest;
+
+          mask.waterPBRBuffer = waterDataBuffer;
+
+          mask.hullBuffer =
+              frameResource.DynamicBuffer.AddBuffer(curr.hullConstants);
+          mask.vertexBuffer =
+              frameResource.DynamicBuffer.AddBuffer(curr.vertexConstants);
+          mask.debugBuffer = globalBuffers.debugConstantBuffer;
+          mask.cameraBuffer = globalBuffers.cameraConstantBuffer;
+          mask.modelBuffer = modelBuffer;
+
+          context.meshes.planeMesh.Draw(allocator, curr.N);
+        }
+      } else if (debugValues.drawMethod ==
+                 DebugValues::DrawTechnology::Parallax) {
+
+        // Ocean Buffers
+        ParallaxDraw::ModelBuffers modelConstants{};
+
+        modelConstants.center = float3(0, -5, 0);
+        modelConstants.scale = float2(DefaultsValues::App::oceanSize / 2,
+                                      DefaultsValues::App::oceanSize / 2);
+        modelConstants.PrismHeight = debugValues.prismHeight;
+
+        GpuVirtualAddress modelBuffer =
+            frameResource.DynamicBuffer.AddBuffer(modelConstants);
+
+        parallaxDraw.Pre(allocator);
+
+        ParallaxDraw::Inp inp{
+            .coneMaps =
+                {drawingSimResource.LODs[0]->coneMapBuffer.ShaderResource(
+                     allocator),
+                 drawingSimResource.LODs[1]->coneMapBuffer.ShaderResource(
+                     allocator),
+                 drawingSimResource.LODs[2]->coneMapBuffer.ShaderResource(
+                     allocator)},
+            .gradients =
+                {
+                    drawingSimResource.LODs[0]->gradients.ShaderResource(
+                        allocator),
+                    drawingSimResource.LODs[1]->gradients.ShaderResource(
+                        allocator),
+                    drawingSimResource.LODs[2]->gradients.ShaderResource(
+                        allocator),
+
+                },
+            .texture = usedTextureAddress,
+            .modelBuffers = modelBuffer,
+            .cameraBuffer = globalBuffers.cameraConstantBuffer,
+            .debugBuffers = globalBuffers.debugConstantBuffer,
+            .waterPBRBuffers = waterDataBuffer,
+            .mesh = context.meshes.simplePlane,
+
+        };
+        parallaxDraw.Run(allocator, inp);
+      }
+
+      else if (debugValues.drawMethod ==
+               DebugValues::DrawTechnology::PrismParallax) {
+
+        // Ocean Buffers
+        PrismParallaxDraw::ModelBuffers modelConstants{};
+
+        XMStoreFloat4x4(&modelConstants.mMatrix,
+                        XMMatrixTranspose(modelMatrix));
+
+        XMStoreFloat4x4(
+            &modelConstants.mINVMatrix,
+            XMMatrixTranspose(XMMatrixInverse(nullptr, modelMatrix)));
+
+        modelConstants.center = XMFLOAT3{0, -5, 0};
+        modelConstants.PrismHeight = debugValues.prismHeight;
+
+        GpuVirtualAddress modelBuffer =
+            frameResource.DynamicBuffer.AddBuffer(modelConstants);
+
+        prismParallaxDraw.Pre(allocator);
+        PrismParallaxDraw::Inp inp{
+            .coneMaps =
+                {drawingSimResource.LODs[0]->coneMapBuffer.ShaderResource(
+                     allocator),
+                 drawingSimResource.LODs[1]->coneMapBuffer.ShaderResource(
+                     allocator),
+                 drawingSimResource.LODs[2]->coneMapBuffer.ShaderResource(
+                     allocator)},
+            .gradients =
+                {
+                    drawingSimResource.LODs[0]->gradients.ShaderResource(
+                        allocator),
+                    drawingSimResource.LODs[1]->gradients.ShaderResource(
+                        allocator),
+                    drawingSimResource.LODs[2]->gradients.ShaderResource(
+                        allocator),
+                },
+            .texture = usedTextureAddress,
+            .cameraBuffer = globalBuffers.cameraConstantBuffer,
+            .debugBuffers = globalBuffers.debugConstantBuffer,
+            .waterPBRBuffers = waterDataBuffer,
+            .modelBuffers = modelBuffer,
+            //.mesh = BoxOnlyWithIndexBuffer,
+            .mesh = context.meshes.BoxWithoutBottom,
+            .vertexData = GpuVirtualAddress(0),
+        };
+
+        const auto &oceanQuadData = context.others.oceanDataFuture.get();
+        for (auto &curr : oceanQuadData) {
+          if (curr.N == 0)
+            continue;
+
+          inp.vertexData =
+              frameResource.DynamicBuffer.AddBuffer(curr.vertexConstants);
+          inp.N = curr.N;
+          prismParallaxDraw.Run(allocator, inp);
+        }
+      }
+    }
+    // skybox
+    {
+      skyboxPipelineState.Apply(allocator);
+
+      auto mask =
+          skyboxRootSignature.Set(allocator, RootSignatureUsage::Graphics);
+
+      mask.skybox = context.textures.skyboxTexture;
+      mask.lightingBuffer = globalBuffers.lightsConstantBuffer;
+
+      mask.cameraBuffer = globalBuffers.cameraConstantBuffer;
+
+      context.meshes.skyboxMesh.Draw(allocator);
+    }
+  }
+
+  // Deferred Shading Pass
+  {
+    allocator.SetRenderTargets({context.renderTargetView}, nullptr);
+    deferredShadingPipelineState.Apply(allocator);
+    frameResource.GBuffer.TranslateToView(allocator);
+    allocator.TransitionResource(
+        frameResource.DepthBuffer
+            .operator Axodox::Graphics::D3D12::ResourceArgument(),
+        ResourceStates::DepthWrite, ResourceStates::PixelShaderResource);
+    auto mask = deferredShadingRootSignature.Set(allocator,
+                                                 RootSignatureUsage::Graphics);
+
+    mask.BindGBuffer(frameResource.GBuffer);
+
+    // Textures
+    mask.skybox = context.textures.skyboxTexture;
+    mask.gradientsHighest =
+        *drawingSimResource.HighestBuffer.gradients.ShaderResource(allocator);
+    mask.gradientsMedium =
+        *drawingSimResource.MediumBuffer.gradients.ShaderResource(allocator);
+    mask.gradientsLowest =
+        *drawingSimResource.LowestBuffer.gradients.ShaderResource(allocator);
+
+    // Buffers
+    mask.lightingBuffer = context.globalBuffers.lightsConstantBuffer;
+    mask.cameraBuffer = context.globalBuffers.cameraConstantBuffer;
+    mask.debugBuffer = context.globalBuffers.debugConstantBuffer;
+
+    mask.deferredShaderBuffer = context.constantBuffers.defData;
+
+    mask.geometryDepth = *frameResource.DepthBuffer.ShaderResource();
+
+    context.meshes.deferredShadingPlane.Draw(allocator);
+  }
+
+  // SSR post process
+  if (debugValues.enableSSR) {
+    allocator.TransitionResource(*context.renderTargetView,
+                                 ResourceStates::RenderTarget,
+                                 ResourceStates::NonPixelShaderResource);
+
+    auto definition = frameResource.PostProcessingBuffer.Definition();
+
+    PostProcessingShader::Inp inp{
+        .camera = context.globalBuffers.cameraConstantBuffer,
+        .inp = *frameResource.ScreenResourceView,
+        .depthBuffer = *frameResource.DepthBuffer.ShaderResource(),
+        .normalBuffer = *frameResource.GBuffer.Normal.ShaderResource(),
+        .textureBuffer = *frameResource.PostProcessingBuffer.ShaderResource(),
+        .X = definition->Width / 16 + 1,
+        .Y = definition->Height / 16 + 1,
+
+        .output = *context.renderTargetView,
+    };
+
+    postProcessingShader.Pre(allocator);
+    postProcessingShader.Run(allocator, frameResource.DynamicBuffer, inp);
+  }
+
+  allocator.TransitionResource(frameResource.DepthBuffer,
+                               ResourceStates::PixelShaderResource,
+                               ResourceStates::DepthWrite);
+  frameResource.GBuffer.TranslateToTarget(allocator);
+
+  // Retransition simulation resources for compute shaders
+
+  drawingSimResource.HighestBuffer.gradients.UnorderedAccess(allocator);
+  drawingSimResource.HighestBuffer.displacementMap.UnorderedAccess(allocator);
+  drawingSimResource.MediumBuffer.gradients.UnorderedAccess(allocator);
+  drawingSimResource.MediumBuffer.displacementMap.UnorderedAccess(allocator);
+  drawingSimResource.LowestBuffer.gradients.UnorderedAccess(allocator);
+  drawingSimResource.LowestBuffer.displacementMap.UnorderedAccess(allocator);
+  if (usedTexture.has_value())
+    (*usedTexture)->UnorderedAccess(allocator);
+}

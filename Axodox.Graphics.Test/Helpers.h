@@ -134,16 +134,15 @@ struct RuntimeResults {
   void DrawImGui(bool exclusiveWindow = false) const;
 };
 
-inline float3 XMVECTORToFloat3(const DirectX::XMVECTOR &x) {
-  float3 result;
-  DirectX::XMStoreFloat3(&result, x);
-  return result;
-}
-
-float4x4 XMMatrixToFloat4x4(const DirectX::XMMATRIX &x);
+float3 XMVECTORToFloat3(const DirectX::XMVECTOR &x);
 std::string Utf16ToUtf8(const std::wstring_view &wstr);
+// just returns the string copied.
+std::string Utf16ToUtf8(const std::string_view &str);
 std::wstring Utf8ToUtf16(const std::string_view &str);
-std::string GetLocalFolder();
+std::wstring Utf8ToUtf16(const std::wstring_view &str);
+std::filesystem::path GetLocalFolder();
+
+std::filesystem::path GetCacheFolder();
 
 struct ShaderBuffers {
   // Allocates necessary buffers if they are not yet allocated. May use the

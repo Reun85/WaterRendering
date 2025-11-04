@@ -3,7 +3,7 @@
 #include "ComputePipeline.h"
 
 namespace SimulationStage {
-FullPipeline SimulationStage::FullPipeline::Create(
+WaterSimulationPipelines SimulationStage::WaterSimulationPipelines::Create(
     GraphicsDevice &device, PipelineStateProvider &pipelineStateProvider) {
 
   ComputeShader spektrum{app_folder() / L"Spektrums.cso"};
@@ -64,20 +64,20 @@ FullPipeline SimulationStage::FullPipeline::Create(
   MixMaxCompute mixMaxCompute =
       MixMaxCompute::WithDefaultShaders(pipelineStateProvider, device);
 
-  return FullPipeline{.spektrumRootDescription = spektrumRootDescription,
-                      .FFTRootDescription = FFTRootDescription,
-                      .displacementRootDescription =
-                          displacementRootDescription,
-                      .gradientRootDescription = gradientRootDescription,
-                      .foamDecayRootDescription = foamDecayRootDescription,
-                      .spektrumPipeline = spektrumPipelineState.get(),
-                      .FFTPipeline = FFTPipelineState.get(),
-                      .displacementPipeline = displacementPipelineState.get(),
-                      .gradientPipeline = gradientPipelineState.get(),
-                      .foamDecayPipeline = foamDecayPipelineState.get(),
-                      .coneMapCreater = coneMapCreater,
-                      .coneMapCreater2 = coneMapCreater2,
-                      .mixMaxCompute = mixMaxCompute};
+  return WaterSimulationPipelines{
+      .spektrumRootDescription = spektrumRootDescription,
+      .FFTRootDescription = FFTRootDescription,
+      .displacementRootDescription = displacementRootDescription,
+      .gradientRootDescription = gradientRootDescription,
+      .foamDecayRootDescription = foamDecayRootDescription,
+      .spektrumPipeline = spektrumPipelineState.get(),
+      .FFTPipeline = FFTPipelineState.get(),
+      .displacementPipeline = displacementPipelineState.get(),
+      .gradientPipeline = gradientPipelineState.get(),
+      .foamDecayPipeline = foamDecayPipelineState.get(),
+      .coneMapCreater = coneMapCreater,
+      .coneMapCreater2 = coneMapCreater2,
+      .mixMaxCompute = mixMaxCompute};
 }
 
 void SimulationStage::WaterSimulationComputeShader(
@@ -86,7 +86,7 @@ void SimulationStage::WaterSimulationComputeShader(
         &simulationConstantSources,
     SimulationStage::MutableGpuSources &simulationMutableSources,
     const SimulationData &simData,
-    SimulationStage::FullPipeline &fullSimPipeline,
+    SimulationStage::WaterSimulationPipelines &fullSimPipeline,
     Axodox::Graphics::D3D12::CommandAllocator &computeAllocator,
     Axodox::Graphics::D3D12::GpuVirtualAddress timeDataBuffer, const u32 &N,
     const DebugValues &debugValues, const std::array<bool, 3> useLod) {

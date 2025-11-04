@@ -49,9 +49,7 @@ struct App {
 private:
   void Run();
   void DrawImGuiMenu(CommandAllocator &allocator,
-                     WaterGraphicRootDescription::WaterPixelShaderData &,
-                     SimulationData &, DeferredShading::DeferredShaderBuffers &,
-                     SimulationStage::SimulationResources &, PixelLighting &);
+                     SimulationStage::SimulationResources &);
 
   /// From Outer AppWrapper
   AppShared &shared_;
@@ -64,9 +62,25 @@ private:
   CommandQueue &computeQueue = directQueue;
   CoreSwapChain swapChain;
 
+  PipelineStateProvider pipelineStateProvider_{device, shared_.cacheLocation /
+                                                           "pipeline"};
+
+  SimulationStage::WaterSimulationPipelines fullSimPipeline =
+      SimulationStage::WaterSimulationPipelines::Create(device,
+                                                        pipelineStateProvider_);
+  WaterRenderPipelines fullRenderPipeline = WaterRenderPipelines::Create(
+      device, pipelineStateProvider_, WaterRenderPipelines::CreateSettings{});
+
+  // Common Data
+  WaterGraphicRootDescription::WaterPixelShaderData waterData;
+  DeferredShading::DeferredShaderBuffers defData;
+  PixelLighting sunData = PixelLighting::SunData();
+  SimulationData simData = SimulationData::Default();
+  // ShadowMapping::Data shadowMapData(cam);
+
   // ResourceAllocationContext immutableResourceAllocationContext_;
   // ResourceAllocationContext mutableResourceAllocationContext_;
-  // RenderPipeline renderStage_;
+  // WaterRenderPipelines renderStage_;
 
   ImGUIManager imgui_wrapper_;
 

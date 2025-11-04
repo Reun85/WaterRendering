@@ -98,7 +98,7 @@ DisplayComboBox(const char *label,
 struct ImGUIManager {
 
   ImGUIManager(const Axodox::Graphics::D3D12::GraphicsDevice &device,
-               u8 framesInFlight, const std::string &iniPath);
+               u8 framesInFlight, const std::filesystem::path &iniPath);
 
   ImGuiIO &GetIO();
   ~ImGUIManager();

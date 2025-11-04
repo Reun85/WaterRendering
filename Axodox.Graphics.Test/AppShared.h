@@ -2,7 +2,7 @@
 
 struct StartUpSettings {
   u8 framesInFlight = 2;
-  std::string ImGuiIniPath = GetLocalFolder() + "/imgui.ini";
+  std::filesystem::path ImGuiIniPath = GetLocalFolder() / "imgui.ini";
 };
 
 /// <summary>
@@ -14,6 +14,9 @@ struct AppShared {
   // WinRT
   winrt::Windows::UI::Core::CoreWindow window = nullptr;
   winrt::Windows::UI::Core::CoreDispatcher dispatcher = nullptr;
+
+  std::filesystem::path cacheLocation = GetCacheFolder();
+
   // debug purposes
   // uses IMGUI for printing data to the screen instead of console
   std::string prints = std::string();

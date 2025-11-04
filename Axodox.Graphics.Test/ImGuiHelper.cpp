@@ -5,14 +5,17 @@ using namespace winrt;
 
 com_ptr<ID3D12DescriptorHeap>
 InitImGui(const Axodox::Graphics::D3D12::GraphicsDevice &device,
-          u8 framesInFlight, const std ::string &iniPath) {
+          u8 framesInFlight, const std::filesystem::path &iniPath) {
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGuiIO &io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
   ImGui::StyleColorsDark();
 
-  io.IniFilename = iniPath.c_str();
+  typedef std::basic_string<std::filesystem::path::value_type> system_string;
+  system_string value = iniPath;
+  static std::string save = Utf16ToUtf8(value);
+  io.IniFilename = (char *)save.c_str();
 
   // Setup Platform/Renderer bindings
   ImGui_ImplUwp_InitForCurrentView();
@@ -38,7 +41,7 @@ InitImGui(const Axodox::Graphics::D3D12::GraphicsDevice &device,
 
 ImGUIManager::ImGUIManager(
     const Axodox::Graphics::D3D12::GraphicsDevice &device, u8 framesInFlight,
-    const std::string &iniPath) {
+    const std::filesystem::path &iniPath) {
   descriptorHeap_ = (InitImGui(device, framesInFlight, iniPath));
 }
 
