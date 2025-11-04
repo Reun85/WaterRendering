@@ -1,12 +1,15 @@
 #include "pch.h"
 #include "ConstantGPUBuffer.h"
 
+namespace Reun {
 ConstantGPUBuffer::ConstantGPUBuffer(const ResourceAllocationContext &context,
                                      BufferData data)
     :
 
       bufferRef(
-          context.ResourceAllocator->CreateBuffer(BufferDefinition(data))) {
+          context.ResourceAllocator->CreateBuffer(BufferDefinition(data))),
+      // invalid value for view
+      view(0) {
   _allocatedEvent = bufferRef->Allocated(
       [this, buffer = std::move(data), context](Resource *resource) {
         context.ResourceUploader->EnqueueUploadTask(resource, &buffer);
@@ -32,3 +35,4 @@ ConstantGPUBuffer::ConstantGPUBuffer(const ResourceAllocationContext &context,
 //    sizeof(T)
 //  );
 //}
+} // namespace Reun

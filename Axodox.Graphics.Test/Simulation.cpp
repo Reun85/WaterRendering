@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "Simulation.h"
 
+namespace Reun {
 void SimulationData::DrawImGui(NeedToDo &out, bool exclusiveWindow) {
   bool cont = true;
   if (exclusiveWindow) {
@@ -281,3 +282,4 @@ SimulationData SimulationData::Default() {
 
   return res;
 }
+} // namespace Reun

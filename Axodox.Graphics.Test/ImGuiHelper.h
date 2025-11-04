@@ -3,6 +3,7 @@
 #include "ComputePipeline.h"
 #include "GraphicsPipeline.h"
 
+namespace Reun {
 using namespace Axodox::Infrastructure;
 
 namespace ImGuiHelpers {
@@ -110,3 +111,4 @@ struct ImGUIManager {
 private:
   winrt::com_ptr<ID3D12DescriptorHeap> descriptorHeap_ = nullptr;
 };
+} // namespace Reun

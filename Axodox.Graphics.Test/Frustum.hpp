@@ -1,6 +1,7 @@
 #pragma once
 #include "pch.h"
 
+namespace Reun {
 using namespace DirectX;
 struct Plane {
   // unit vector
@@ -101,3 +102,4 @@ struct AABB : public Volume {
             globalAABB.isOnOrForwardPlane(camFrustum.farFace));
   };
 };
+} // namespace Reun

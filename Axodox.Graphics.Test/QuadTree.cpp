@@ -1,7 +1,8 @@
 #include <pch.h>
 #include "QuadTree.h"
-using namespace DirectX;
+#include "Frustum.hpp"
 
+namespace Reun {
 ConstQuadTreeLeafIteratorDepthFirst::ConstQuadTreeLeafIteratorDepthFirst(
     const NodeID node, const Depth maxDepth, const QuadTree &_tree,
     const TravelOrder &_order)
@@ -282,3 +283,4 @@ TravelOrder::TravelOrder(const float3 &camForward, const XMMATRIX &mMatrix) {
   }
   directions[indices[3]] = 9;
 }
+} // namespace Reun

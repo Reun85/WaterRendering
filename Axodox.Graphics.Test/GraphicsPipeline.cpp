@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "GraphicsPipeline.h"
 #include "QuadTree.h"
+#include "Frustum.hpp"
+namespace Reun::Graphics {
 
 void FrameResources::Wait() {
   if (Marker)
@@ -263,6 +265,7 @@ void ShadowMapping::Data::Update(const Camera &cam, const LightData &light) {
           XMMatrixOrthographicOffCenterRH(minX, maxX, minY, maxY, minZ, maxZ);
     } else {
       lightPos = lightP;
+      lightView = XMMatrixIdentity();
       assert("IMPLEMENT THIS");
     }
 
@@ -310,11 +313,14 @@ WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
            cam.GetFrustum(), mMatrix, quadTreeDistanceThreshold, MaxDepth);
 
   if (runtimeResults) {
-    (*runtimeResults)->QuadTreeBuildTime += std::chrono::duration_cast<
-        decltype((*runtimeResults)->QuadTreeBuildTime)>(
-        std::chrono::high_resolution_clock::now() - start);
 
-    (*runtimeResults)->qtNodes += qt.GetSize();
+    auto &x = **runtimeResults;
+    x.QuadTreeBuildTime +=
+        std::chrono::duration_cast<decltype(x.QuadTreeBuildTime)>(
+            std::chrono::high_resolution_clock::now() - start);
+
+    x.qtNodes = qt.GetSize();
+    x.drawnNodes = 0;
   }
   // The best choice is to upload planeBottomLeft and
   // planeTopRight and kinda of UV coordinate that can go
@@ -326,10 +332,13 @@ WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
     auto *curr = &vec.emplace_back();
 
     for (auto it = qt.begin(); it != qt.end(); ++it) {
-      (*runtimeResults)->NavigatingTheQuadTree += std::chrono::duration_cast<
-          decltype((*runtimeResults)->NavigatingTheQuadTree)>(
-          (std::chrono::high_resolution_clock::now() - start));
-      (*runtimeResults)->drawnNodes++;
+      if (runtimeResults) {
+        auto &x = **runtimeResults;
+        x.NavigatingTheQuadTree +=
+            std::chrono::duration_cast<decltype(x.NavigatingTheQuadTree)>(
+                (std::chrono::high_resolution_clock::now() - start));
+        x.drawnNodes++;
+      }
 
       static float div = 1.f;
       {
@@ -978,3 +987,4 @@ void WaterRenderPipelines::Execute(RenderFrameContext &context) {
   if (usedTexture.has_value())
     (*usedTexture)->UnorderedAccess(allocator);
 }
+} // namespace Reun::Graphics

@@ -92,6 +92,7 @@ float2 GetTextureCoordFromPlaneCoordAndPatch(float2 planeCoord, float patchSize)
 
 struct TimeConstants
 {
+    float trueDeltaTime;
     float deltaTime;
     float timeSinceLaunch;
 };

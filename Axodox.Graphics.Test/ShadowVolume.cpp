@@ -13,6 +13,7 @@ using namespace Axodox::Graphics::D3D12;
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
 using namespace Axodox::Threading;
+namespace Reun {
 
 SilhouetteDetector::Buffers::Buffers(ResourceAllocationContext &context,
                                      u32 IndexCount)
@@ -187,23 +188,23 @@ SilhouetteDetectorTester::SilhouetteDetectorTester(
     PipelineStateProvider &pipelineProvider, GraphicsDevice &device,
     VertexShader *vs, PixelShader *ps)
     : Signature(device),
-      pipeline(
-          pipelineProvider
-              .CreatePipelineStateAsync(GraphicsPipelineStateDefinition{
-                  .RootSignature = &Signature,
-                  .VertexShader = vs,
-                  .PixelShader = ps,
-                  .RasterizerState = RasterizerFlags::CullClockwise,
-                  .DepthStencilState = DepthStencilMode::WriteDepth,
-                  .TopologyType = PrimitiveTopologyType::Line,
-                  .RenderTargetFormats = std::initializer_list(
-                      std::to_address(
-                          DeferredShading::GBuffer::GetGBufferFormats()
-                              .begin()),
-                      std::to_address(
-                          DeferredShading::GBuffer::GetGBufferFormats().end())),
-                  .DepthStencilFormat = Format::D32_Float})
-              .get()) {
+      pipeline(pipelineProvider
+                   .CreatePipelineStateAsync(GraphicsPipelineStateDefinition{
+                       .RootSignature = &Signature,
+                       .VertexShader = vs,
+                       .PixelShader = ps,
+                       .RasterizerState = RasterizerFlags::CullClockwise,
+                       .DepthStencilState = DepthStencilMode::WriteDepth,
+                       .TopologyType = PrimitiveTopologyType::Line,
+                       .RenderTargetFormats = std::initializer_list(
+                           std::to_address(Reun::Graphics::DeferredShading::
+                                               GBuffer::GetGBufferFormats()
+                                                   .begin()),
+                           std::to_address(Reun::Graphics::DeferredShading::
+                                               GBuffer::GetGBufferFormats()
+                                                   .end())),
+                       .DepthStencilFormat = Format::D32_Float})
+                   .get()) {
   // Create command signature for ExecuteIndirect
 
   D3D12_INDIRECT_ARGUMENT_DESC indirectArgDesc = {};
@@ -266,3 +267,4 @@ void SilhouetteDetectorTester::Run(CommandAllocator &allocator,
                              0        // Count buffer offset
   );
 }
+} // namespace Reun

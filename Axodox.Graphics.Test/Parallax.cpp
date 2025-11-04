@@ -2,7 +2,8 @@
 #include "Parallax.h"
 #include "GraphicsPipeline.h"
 
-namespace SimulationStage {
+using namespace Reun::SimulationStage;
+namespace Reun {
 ConeMapCreater::ConeMapCreater(PipelineStateProvider &pipelineProvider,
                                GraphicsDevice &device, ComputeShader *cs)
     : Signature(device),
@@ -72,29 +73,28 @@ void ConeMapCreater2::Run(CommandAllocator &allocator,
   allocator.Dispatch((sizeX + xGroupSize - 1) / xGroupSize,
                      (sizeY + yGroupSize - 1) / yGroupSize, 1);
 }
-} // namespace SimulationStage
 
 ParallaxDraw::ParallaxDraw(PipelineStateProvider &pipelineProvider,
                            GraphicsDevice &device, VertexShader *vs,
                            PixelShader *ps)
     : Signature(device),
-      pipeline(
-          pipelineProvider
-              .CreatePipelineStateAsync(GraphicsPipelineStateDefinition{
-                  .RootSignature = &Signature,
-                  .VertexShader = vs,
-                  .PixelShader = ps,
-                  .RasterizerState = RasterizerFlags::CullClockwise,
-                  .DepthStencilState = DepthStencilMode::WriteDepth,
-                  .InputLayout = VertexPositionNormalTexture::Layout,
-                  .RenderTargetFormats = std::initializer_list(
-                      std::to_address(
-                          DeferredShading::GBuffer::GetGBufferFormats()
-                              .begin()),
-                      std::to_address(
-                          DeferredShading::GBuffer::GetGBufferFormats().end())),
-                  .DepthStencilFormat = Format::D32_Float})
-              .get()) {}
+      pipeline(pipelineProvider
+                   .CreatePipelineStateAsync(GraphicsPipelineStateDefinition{
+                       .RootSignature = &Signature,
+                       .VertexShader = vs,
+                       .PixelShader = ps,
+                       .RasterizerState = RasterizerFlags::CullClockwise,
+                       .DepthStencilState = DepthStencilMode::WriteDepth,
+                       .InputLayout = VertexPositionNormalTexture::Layout,
+                       .RenderTargetFormats = std::initializer_list(
+                           std::to_address(Reun::Graphics::DeferredShading::
+                                               GBuffer::GetGBufferFormats()
+                                                   .begin()),
+                           std::to_address(Reun::Graphics::DeferredShading::
+                                               GBuffer::GetGBufferFormats()
+                                                   .end())),
+                       .DepthStencilFormat = Format::D32_Float})
+                   .get()) {}
 
 ParallaxDraw
 ParallaxDraw::WithDefaultShaders(PipelineStateProvider &pipelineProvider,
@@ -165,26 +165,26 @@ PrismParallaxDraw::PrismParallaxDraw(PipelineStateProvider &pipelineProvider,
                                      GraphicsDevice &device, VertexShader *vs,
                                      PixelShader *ps)
     : Signature(device),
-      pipeline(
-          pipelineProvider
-              .CreatePipelineStateAsync(GraphicsPipelineStateDefinition{
-                  .RootSignature = &Signature,
-                  .VertexShader = vs,
-                  .PixelShader = ps,
-                  // .RasterizerState = RasterizerFlags::CullNone,
-                  .RasterizerState = RasterizerFlags::CullClockwise,
-                  //.RasterizerState = RasterizerFlags::Wireframe,
-                  .DepthStencilState = DepthStencilMode::WriteDepth,
-                  .InputLayout = VertexPosition::Layout,
-                  .TopologyType = PrimitiveTopologyType::Triangle,
-                  .RenderTargetFormats = std::initializer_list(
-                      std::to_address(
-                          DeferredShading::GBuffer::GetGBufferFormats()
-                              .begin()),
-                      std::to_address(
-                          DeferredShading::GBuffer::GetGBufferFormats().end())),
-                  .DepthStencilFormat = Format::D32_Float})
-              .get()) {}
+      pipeline(pipelineProvider
+                   .CreatePipelineStateAsync(GraphicsPipelineStateDefinition{
+                       .RootSignature = &Signature,
+                       .VertexShader = vs,
+                       .PixelShader = ps,
+                       // .RasterizerState = RasterizerFlags::CullNone,
+                       .RasterizerState = RasterizerFlags::CullClockwise,
+                       //.RasterizerState = RasterizerFlags::Wireframe,
+                       .DepthStencilState = DepthStencilMode::WriteDepth,
+                       .InputLayout = VertexPosition::Layout,
+                       .TopologyType = PrimitiveTopologyType::Triangle,
+                       .RenderTargetFormats = std::initializer_list(
+                           std::to_address(Reun::Graphics::DeferredShading::
+                                               GBuffer::GetGBufferFormats()
+                                                   .begin()),
+                           std::to_address(Reun::Graphics::DeferredShading::
+                                               GBuffer::GetGBufferFormats()
+                                                   .end())),
+                       .DepthStencilFormat = Format::D32_Float})
+                   .get()) {}
 
 PrismParallaxDraw
 PrismParallaxDraw::WithDefaultShaders(PipelineStateProvider &pipelineProvider,
@@ -246,3 +246,4 @@ void DisplacedHeightMapJob::Run(CommandAllocator &allocator,
   mask.OutGradients = *inp.outGradients;
   allocator.Dispatch(inp.N, inp.N, 1);
 }
+} // namespace Reun

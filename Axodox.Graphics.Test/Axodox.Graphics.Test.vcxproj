@@ -121,6 +121,7 @@
     <ClInclude Include="GraphicsPipeline.h" />
     <ClInclude Include="Helpers.h" />
     <ClInclude Include="ImGuiHelper.h" />
+    <ClInclude Include="Meshes.h" />
     <ClInclude Include="MutableTextureWithState.hpp" />
     <ClInclude Include="oldstuff.h" />
     <ClInclude Include="Parallax.h" />
@@ -132,6 +133,8 @@
     <ClInclude Include="Typedefs.h" />
     <ClInclude Include="Simulation.h" />
     <ClInclude Include="WrapperAddons\ResourceTransitor.h" />
+    <ClInclude Include="WrapperAddons\ShaderBuffer.h" />
+    <ClInclude Include="WrapperAddons\ShaderJob.h" />
     <ClInclude Include="WrapperAddons\StructuredObject.h" />
     <ClInclude Include="WrapperAddons\ConstantGPUBuffer.h" />
     <ClInclude Include="WrapperAddons\CubeMap.h" />
@@ -152,6 +155,7 @@
     <ClCompile Include="GraphicsPipeline.cpp" />
     <ClCompile Include="Helpers.cpp" />
     <ClCompile Include="ImGuiHelper.cpp" />
+    <ClCompile Include="Meshes.cpp" />
     <ClCompile Include="Parallax.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>

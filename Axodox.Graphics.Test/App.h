@@ -12,20 +12,48 @@
 
 #include "AppShared.h"
 
+namespace Reun {
+
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
 using namespace Axodox::Threading;
 using namespace winrt::Windows::UI::Core;
 
+using namespace DirectX;
 struct TimeData {
-  float deltaTime;
-  float timeSinceLaunch;
+  // used by camera etc, will always be !=0
+  float trueDeltaTime = 0.f;
+  // should be used for simulation, action
+  float deltaTime = 0.f;
+  float timeSinceLaunch = 0.f;
+};
+
+struct Descriptors {
+
+  PipelineStateProvider pipelineStateProvider_;
+  GroupedResourceAllocator groupedResourceAllocator;
+  ResourceUploader resourceUploader;
+  CommonDescriptorHeap commonDescriptorHeap;
+  DepthStencilDescriptorHeap depthStencilDescriptorHeap;
+  RenderTargetDescriptorHeap renderTargetDescriptorHeap;
+  CommittedResourceAllocator committedResourceAllocator;
+
+  // Used only at startup
+  ResourceAllocationContext immutableAllocationContext;
+
+  // Used during runtime
+  ResourceAllocationContext mutableAllocationContext;
+
+  void Build();
+  Descriptors(GraphicsDevice &, StartUpSettings &);
+  Descriptors(const Descriptors &) = delete;
+  Descriptors(Descriptors &&) = delete;
 };
 
 struct App {
 
   struct RuntimeCPUBuffers {
-    std::vector<WaterGraphicRootDescription::OceanData> oceanData;
+    std::vector<Graphics::WaterGraphicRootDescription::OceanData> oceanData;
   };
 
   explicit App(AppShared &shared);
@@ -48,8 +76,12 @@ struct App {
 
 private:
   void Run();
-  void DrawImGuiMenu(CommandAllocator &allocator,
+  void DrawImGuiMenu(CommandAllocator &allocator, Graphics::FrameResources &,
                      SimulationStage::SimulationResources &);
+  Graphics::GlobalGPUBuffers
+  CreateGlobalGPUBuffers(DynamicBufferManager &bufferManager);
+
+  void CalculateTimeConstants();
 
   /// From Outer AppWrapper
   AppShared &shared_;
@@ -62,19 +94,20 @@ private:
   CommandQueue &computeQueue = directQueue;
   CoreSwapChain swapChain;
 
-  PipelineStateProvider pipelineStateProvider_{device, shared_.cacheLocation /
-                                                           "pipeline"};
+  Descriptors descriptors_{device, shared_.settings};
 
   SimulationStage::WaterSimulationPipelines fullSimPipeline =
-      SimulationStage::WaterSimulationPipelines::Create(device,
-                                                        pipelineStateProvider_);
-  WaterRenderPipelines fullRenderPipeline = WaterRenderPipelines::Create(
-      device, pipelineStateProvider_, WaterRenderPipelines::CreateSettings{});
+      SimulationStage::WaterSimulationPipelines::Create(
+          device, descriptors_.pipelineStateProvider_);
+  Graphics::WaterRenderPipelines fullRenderPipeline =
+      Graphics::WaterRenderPipelines::Create(
+          device, descriptors_.pipelineStateProvider_,
+          Graphics::WaterRenderPipelines::CreateSettings{});
 
   // Common Data
-  WaterGraphicRootDescription::WaterPixelShaderData waterData;
-  DeferredShading::DeferredShaderBuffers defData;
-  PixelLighting sunData = PixelLighting::SunData();
+  Graphics::WaterGraphicRootDescription::WaterPixelShaderData waterData;
+  Graphics::DeferredShading::DeferredShaderBuffers defData;
+  Graphics::PixelLighting sunData = Graphics::PixelLighting::SunData();
   SimulationData simData = SimulationData::Default();
   // ShadowMapping::Data shadowMapData(cam);
 
@@ -97,18 +130,31 @@ private:
   // AppData
   //---------------
 
-  // Timing
-  float gameTime = 0.f;
-  using SinceTimeStartTimeFrame = std::chrono::nanoseconds;
-  decltype(std::chrono::high_resolution_clock::now()) loopStartTime;
-  SinceTimeStartTimeFrame GetTimeSinceStart();
-
-  // Camera
+  // For use between all frames
+  bool first_loop = true;
   Camera cam = Camera();
   RuntimeSettings settings = RuntimeSettings{};
   DebugValues debugValues = DebugValues{};
+  // reuse buffers.
+  RuntimeCPUBuffers cpuBuffers;
+
+  // Timing
+  float gameTime = 0.f;
+  using SinceTimeStartTimeFrame = std::chrono::nanoseconds;
+  using TimePoint = decltype(std::chrono::high_resolution_clock::now());
+  TimePoint loopStartTime;
+  TimePoint currentFrameStart;
+
+  SinceTimeStartTimeFrame GetTimeSinceStart();
+  TimeData timeConstants_;
 
   // Per Frame data
-  NeedToDo beforeNextFrame_;
+  NeedToDo beforeNextFrame_ = NeedToDo::WithFirstLoopUpdateSettings();
+
   RuntimeResults runtimeResults_;
+
+  // OceanData
+  XMMATRIX
+  oceanModelMatrix = XMMatrixTranslationFromVector(XMVECTOR{0, -5, 0, 0});
 };
+} // namespace Reun

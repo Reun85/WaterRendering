@@ -6,6 +6,7 @@
 
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
+namespace Reun {
 namespace SimulationStage {
 struct ConeMapCreater;
 
@@ -118,6 +119,7 @@ struct SimulationResources {
   CommandFenceMarker FrameDoneMarker;
   DynamicBufferManager DynamicBuffer;
 
+  // static constexpr bool useDifferentFFTOutputBuffers = false;
 #define useDifferentFFTOutputBuffers false
   struct LODDataBuffers {
     MutableTextureWithState tildeh;
@@ -268,6 +270,17 @@ struct MutableGpuSources {
         Lowest(context, simData) {}
 };
 
+struct GlobalGPUBuffers {};
+struct ConstantGPUBuffers {};
+
+/// @brief All tools needed to simulate the ocean for a frame.
+struct SimulationFrameContext {
+  SimulationResources &frameResources;
+  /// If you have more available command queues, you can add them here
+  GlobalGPUBuffers globalBuffers;
+  ConstantGPUBuffers constantBuffers;
+};
+
 struct WaterSimulationPipelines {
   RootSignature<SimulationStage::SpektrumRootDescription>
       spektrumRootDescription;
@@ -288,17 +301,19 @@ struct WaterSimulationPipelines {
 
   static WaterSimulationPipelines
   Create(GraphicsDevice &device, PipelineStateProvider &pipelineStateProvider);
+  void Execute(SimulationFrameContext &context);
 };
 void WaterSimulationComputeShader(
     SimulationStage::SimulationResources &simResource,
-    SimulationStage::ConstantGpuSources<Axodox::Graphics::D3D12::MutableTexture>
-        &simulationConstantSources,
+    SimulationStage::ConstantGpuSources<
+        ::Axodox::Graphics::D3D12::MutableTexture> &simulationConstantSources,
     SimulationStage::MutableGpuSources &simulationMutableSources,
     const SimulationData &simData,
     SimulationStage::WaterSimulationPipelines &fullSimPipeline,
-    Axodox::Graphics::D3D12::CommandAllocator &computeAllocator,
-    Axodox::Graphics::D3D12::GpuVirtualAddress timeDataBuffer, const u32 &N,
+    ::Axodox::Graphics::D3D12::CommandAllocator &computeAllocator,
+    ::Axodox::Graphics::D3D12::GpuVirtualAddress timeDataBuffer, const u32 &N,
     const DebugValues &debugValues,
     const std::array<bool, 3> useLod = {true, true, true});
 
 } // namespace SimulationStage
+} // namespace Reun

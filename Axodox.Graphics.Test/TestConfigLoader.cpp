@@ -9,6 +9,7 @@
 
 #include "TestConfigLoader.h"
 
+namespace Reun {
 // Helper streams
 // -----------------------------------------------------------------------------
 struct DataOutStream {
@@ -275,7 +276,7 @@ static std::vector<std::pair<std::string, std::filesystem::path>> getFiles() {
   }
   return files;
 }
-template <MyStream OS> void HandleDebugValues(OS &s, DebugValues &x) {
+template <MyStream OS> void HandleDebugValues(OS &s, Reun::DebugValues &x) {
   streamdo(s, x.conecreater);
   streamdo(s, x.pixelMult);
   streamdo(s, x.swizzleorder);
@@ -311,8 +312,8 @@ void HandlesPatchData(OS &s, SimulationData::PatchData &x) {
 };
 template <MyStream OS>
 void HandleSimulationData(
-    OS &s, SimulationData &x,
-    std::optional<NeedToDo *> beforeNextFrame = std::nullopt) {
+    OS &s, Reun::SimulationData &x,
+    std::optional<Reun::NeedToDo *> beforeNextFrame = std::nullopt) {
   SimulationData::PatchData tmp = x.highest;
   HandlesPatchData(s, x.highest);
   if (beforeNextFrame.has_value()) {
@@ -341,7 +342,8 @@ void HandleSimulationData(
 }
 template <MyStream OS>
 void HandleWaterPixelShaderData(
-    OS &s, WaterGraphicRootDescription::WaterPixelShaderData &x) {
+    OS &s,
+    Reun::Graphics::WaterGraphicRootDescription::WaterPixelShaderData &x) {
 
   streamdo(s, x.AlbedoColor);
   streamdo(s, x.Roughness);
@@ -353,7 +355,8 @@ void HandleWaterPixelShaderData(
   streamdo(s, x._ScatterShadowStrength);
   streamdo(s, x._Fresnel);
 }
-template <MyStream OS> void HandlePixelLighting(OS &s, PixelLighting &x) {
+template <MyStream OS>
+void HandlePixelLighting(OS &s, Reun::Graphics::PixelLighting &x) {
   streamdo(s, x.lightCount);
   for (auto &el : x.lights) {
     streamdo(s, el.lightPos);
@@ -362,17 +365,19 @@ template <MyStream OS> void HandlePixelLighting(OS &s, PixelLighting &x) {
   }
 }
 template <MyStream OS>
-void HandleDeferredShader(OS &s, DeferredShading::DeferredShaderBuffers &x) {
+void HandleDeferredShader(
+    OS &s, Reun::Graphics::DeferredShading::DeferredShaderBuffers &x) {
 
   streamdo(s, x._TipColor);
   streamdo(s, x.EnvMapMult);
 }
-template <MyStream OS> void HandleRuntimeSettings(OS &s, RuntimeSettings &x) {
+template <MyStream OS>
+void HandleRuntimeSettings(OS &s, Reun::RuntimeSettings &x) {
   streamdo(s, x.timeRunning);
   streamdo(s, x.showImgui);
   streamdo(s, x.clearColor);
 }
-template <MyStream OS> void HandleCamera(OS &s, Camera &x) {
+template <MyStream OS> void HandleCamera(OS &s, Reun::Camera &x) {
   bool firstPerson = x.GetFirstPerson();
   auto eye = x.GetEye();
   auto at = x.GetAt();
@@ -389,9 +394,10 @@ template <MyStream OS> void HandleCamera(OS &s, Camera &x) {
 template <MyStream OS>
 void PerformFileOperation(
     OS &stream, DebugValues &debugValues, SimulationData &simData,
-    WaterGraphicRootDescription::WaterPixelShaderData &waterData,
-    PixelLighting &sunData,
-    DeferredShading::DeferredShaderBuffers &deferredData,
+    Reun::Graphics::WaterGraphicRootDescription::WaterPixelShaderData
+        &waterData,
+    Reun::Graphics::PixelLighting &sunData,
+    Reun::Graphics::DeferredShading::DeferredShaderBuffers &deferredData,
     RuntimeSettings &settings, Camera &cam, NeedToDo &beforeNextFrame) {
 
   HandleDebugValues(stream, debugValues);
@@ -403,13 +409,13 @@ void PerformFileOperation(
   HandleCamera(stream, cam);
 }
 
-void ShowImguiLoaderConfig(
-    DebugValues &debugValues, SimulationData &simData,
-    WaterGraphicRootDescription::WaterPixelShaderData &waterData,
-    PixelLighting &sunData,
-    DeferredShading::DeferredShaderBuffers &deferredData,
-    RuntimeSettings &settings, Camera &cam, NeedToDo &beforeNextFrame,
-    bool exclusiveWindow) {
+void Reun::ShowImguiLoaderConfig(
+    Reun::DebugValues &debugValues, Reun::SimulationData &simData,
+    Graphics::WaterGraphicRootDescription::WaterPixelShaderData &waterData,
+    Graphics::PixelLighting &sunData,
+    Graphics::DeferredShading::DeferredShaderBuffers &deferredData,
+    Reun::RuntimeSettings &settings, Reun::Camera &cam,
+    Reun::NeedToDo &beforeNextFrame, bool exclusiveWindow) {
 
   static std::vector<std::pair<std::string, std::filesystem::path>> files =
       getFiles();
@@ -526,3 +532,4 @@ void ShowImguiLoaderConfig(
     files = getFiles();
   }
 }
+} // namespace Reun

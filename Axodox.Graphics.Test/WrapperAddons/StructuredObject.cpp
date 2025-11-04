@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "StructuredObject.h"
+namespace Axodox::Graphics::D3D12 {
 
 Axodox::Graphics::D3D12::StructuredObjectViews::StructuredObjectViews(
     ResourceAllocationContext &context, Buffer *const br,
@@ -39,6 +40,8 @@ Axodox::Graphics::D3D12::StructuredObjectViews::StructuredObjectViews(
     }
   });
 }
+} // namespace Axodox::Graphics::D3D12
+namespace Reun {
 
 MeshSpecificBuffers::MeshSpecificBuffers(ResourceAllocationContext &context,
                                          const ImmutableMesh &mesh,
@@ -121,3 +124,4 @@ StructuredObject::StructuredObject(ResourceAllocationContext &context,
       StructuredObjectViews(context, &*_buff, viewDefinitions)
 
 {}
+} // namespace Reun

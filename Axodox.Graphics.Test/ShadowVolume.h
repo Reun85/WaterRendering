@@ -1,6 +1,7 @@
 #pragma once
 #include "pch.h"
 
+namespace Reun {
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
 class Camera;
@@ -228,3 +229,4 @@ struct SilhouetteDetectorTester : ShaderJob {
            const Inp &inp) const;
   ~SilhouetteDetectorTester() override = default;
 };
+} // namespace Reun

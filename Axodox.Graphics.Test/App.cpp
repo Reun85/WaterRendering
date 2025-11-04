@@ -1,10 +1,15 @@
 #pragma once
 #include "pch.h"
 #include "App.h"
+#include "Meshes.h"
 #include "TestConfigLoader.h"
+
+namespace Reun {
 using namespace winrt;
 using namespace Windows;
 using namespace Windows::UI::Core;
+using namespace DirectX;
+using namespace Meshes;
 
 App::App(AppShared &shared)
     : shared_(shared),
@@ -12,7 +17,6 @@ App::App(AppShared &shared)
       imgui_wrapper_(device, shared_.settings.framesInFlight,
                      shared_.settings.ImGuiIniPath) {
 
-  shared_.cout << shared_.cacheLocation << std::endl;
   cam.SetView(XMVectorSet(DefaultsValues::Cam::camStartPos.x,
                           DefaultsValues::Cam::camStartPos.y,
                           DefaultsValues::Cam::camStartPos.z, 0),
@@ -128,8 +132,10 @@ void App::SetWindow() {
 }
 
 void DrawImGuiForPSResources(
-    WaterGraphicRootDescription::WaterPixelShaderData &waterData,
-    PixelLighting &sunData, DeferredShading::DeferredShaderBuffers &defData,
+    Reun::Graphics::WaterGraphicRootDescription::WaterPixelShaderData
+        &waterData,
+    Reun::Graphics::PixelLighting &sunData,
+    Reun::Graphics::DeferredShading::DeferredShaderBuffers &defData,
     bool exclusiveWindow = true) {
   bool cont = true;
   if (exclusiveWindow) {
@@ -176,30 +182,17 @@ void DrawImGuiForPSResources(
 
 void App::Run() {
 
-  // Group together allocations
-  GroupedResourceAllocator groupedResourceAllocator{device};
-  ResourceUploader resourceUploader{device};
-  CommonDescriptorHeap commonDescriptorHeap{device,
-                                            shared_.settings.framesInFlight};
-  DepthStencilDescriptorHeap depthStencilDescriptorHeap{device};
-  RenderTargetDescriptorHeap renderTargetDescriptorHeap{device};
-  ResourceAllocationContext immutableAllocationContext{
-      .Device = &device,
-      .ResourceAllocator = &groupedResourceAllocator,
-      .ResourceUploader = &resourceUploader,
-      .CommonDescriptorHeap = &commonDescriptorHeap,
-      .RenderTargetDescriptorHeap = &renderTargetDescriptorHeap,
-      .DepthStencilDescriptorHeap = &depthStencilDescriptorHeap};
-
-  ImmutableMesh planeMesh{immutableAllocationContext, CreateQuadPatch()};
-  ImmutableMesh simplePlane{immutableAllocationContext,
+  ImmutableMesh planeMesh{descriptors_.immutableAllocationContext,
+                          CreateQuadPatch()};
+  ImmutableMesh simplePlane{descriptors_.immutableAllocationContext,
                             CreatePlane(2, XMUINT2(2, 2))};
 
-  ImmutableMesh deferredShadingPlane{immutableAllocationContext,
+  ImmutableMesh deferredShadingPlane{descriptors_.immutableAllocationContext,
                                      CreateBackwardsPlane(2, XMUINT2(2, 2))};
-  ImmutableMesh skyboxMesh{immutableAllocationContext, CreateCube(2)};
-  ImmutableMesh Box{immutableAllocationContext, CreateCube(2)};
-  ImmutableMesh BoxWithoutBottom{immutableAllocationContext,
+  ImmutableMesh skyboxMesh{descriptors_.immutableAllocationContext,
+                           CreateCube(2)};
+  ImmutableMesh Box{descriptors_.immutableAllocationContext, CreateCube(2)};
+  ImmutableMesh BoxWithoutBottom{descriptors_.immutableAllocationContext,
                                  CreateCubeWithoutBottom(1)};
   /*ImmutableMesh BoxOnlyWithIndexBuffer{immutableAllocationContext,
   CreateBoxInVSMesh()};*/
@@ -212,31 +205,30 @@ void App::Run() {
                               .NegY = app_folder() / "Assets/skybox/ny.png",
                               .PosZ = app_folder() / "Assets/skybox/pz.png",
                               .NegZ = app_folder() / "Assets/skybox/nz.png"};
-  CubeMapTexture skyboxTexture{immutableAllocationContext, paths};
+  CubeMapTexture skyboxTexture{descriptors_.immutableAllocationContext, paths};
   // CubeMapTexture skyboxTexture{immutableAllocationContext,
   //                              app_folder() / "Assets/skybox/skybox3.hdr",
   //                              2024};
 
   //  Acquire memory
-  MeshSpecificBuffers silhouetteDetectorMeshBuffers(immutableAllocationContext,
-                                                    Box);
-  groupedResourceAllocator.Build();
+  MeshSpecificBuffers silhouetteDetectorMeshBuffers(
+      descriptors_.immutableAllocationContext, Box);
+  descriptors_.groupedResourceAllocator.Build();
 
-  auto mutableAllocationContext = immutableAllocationContext;
-  CommittedResourceAllocator committedResourceAllocator{device};
-  mutableAllocationContext.ResourceAllocator = &committedResourceAllocator;
+  auto &mutableAllocationContext = descriptors_.mutableAllocationContext;
+  auto &commonDescriptorHeap = descriptors_.commonDescriptorHeap;
 
   SimulationStage::ConstantGpuSources simulationConstantSources(
-      mutableAllocationContext, simData);
+      descriptors_.mutableAllocationContext, simData);
   SimulationStage::MutableGpuSources simulationMutableSources(
       mutableAllocationContext, simData);
 
   // SilhouetteDetector::Buffers silhouetteDetectorBuffers(
   //     mutableAllocationContext, Box.GetIndexCount() * 4);
 
-  std::array<FrameResources, 2> frameResources{
-      FrameResources(mutableAllocationContext),
-      FrameResources(mutableAllocationContext)};
+  std::array<Graphics::FrameResources, 2> frameResources{
+      Graphics::FrameResources(mutableAllocationContext),
+      Graphics::FrameResources(mutableAllocationContext)};
 
   std::array<SimulationStage::SimulationResources, 2> simulationResources{
       SimulationStage::SimulationResources(mutableAllocationContext, simData.N,
@@ -254,7 +246,7 @@ void App::Run() {
   //                                   simData.M);
   //}
 
-  committedResourceAllocator.Build();
+  descriptors_.committedResourceAllocator.Build();
 
   const u32 &N = simData.N;
 
@@ -267,30 +259,20 @@ void App::Run() {
     cam.SetAspect(float(resolution.x) / float(resolution.y));
   });
 
-  // Frame counter
-  std::chrono::steady_clock::time_point frameStart =
-      std::chrono::high_resolution_clock::now();
+  {
+    auto resolution = swapChain.Resolution();
+    cam.SetAspect(float(resolution.x) / float(resolution.y));
+  }
 
-  beforeNextFrame_.patchHighestChanged = true;
-  beforeNextFrame_.patchMediumChanged = true;
-  beforeNextFrame_.patchLowestChanged = true;
-
-  RuntimeCPUBuffers cpuBuffers;
-
-  auto resolution = swapChain.Resolution();
-  cam.SetAspect(float(resolution.x) / float(resolution.y));
-
-  bool first_loop = false;
   loopStartTime = std::chrono::high_resolution_clock::now();
-
-  const auto &dispatcher = shared_.dispatcher;
 
   // Main loop
   // ------------------------------------------------
   while (!quitRequested_ && !shouldStop_ && !internalRestartRequest_) {
 
     // Process user input
-    dispatcher.ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
+    shared_.dispatcher.ProcessEvents(
+        CoreProcessEventsOption::ProcessAllIfPresent);
 
     frameCounter_++;
     // Current frames resources
@@ -318,8 +300,9 @@ void App::Run() {
       if (beforeNextFrame_.changeFlag) {
         fullRenderPipeline.waterPipelineStateDefinition.RasterizerState.Flags =
             *beforeNextFrame_.changeFlag;
-        newData.pipelineState = pipelineStateProvider_.CreatePipelineStateAsync(
-            fullRenderPipeline.waterPipelineStateDefinition);
+        newData.pipelineState =
+            descriptors_.pipelineStateProvider_.CreatePipelineStateAsync(
+                fullRenderPipeline.waterPipelineStateDefinition);
       }
       if (beforeNextFrame_.patchHighestChanged) {
         newData.highestData =
@@ -340,8 +323,8 @@ void App::Run() {
 
     // Wait until buffers can be used
     frameResource.Wait();
-    calculatingSimResource.Wait();
     // This is necessary for the compute queue
+    calculatingSimResource.Wait();
 
     if (beforeNextFrame_.changeFlag && newData.pipelineState) {
       fullRenderPipeline.waterPipelineState = newData.pipelineState->get();
@@ -349,53 +332,41 @@ void App::Run() {
     }
 
     // Get DeltaTime
-    float deltaTime;
-    {
-      auto newFrameStart = std::chrono::high_resolution_clock::now();
-      deltaTime = GetDurationInFloatWithPrecision<std::chrono::seconds,
-                                                  std::chrono::milliseconds>(
-          newFrameStart - frameStart);
-      frameStart = newFrameStart;
-      if (settings.timeRunning) {
-        gameTime += deltaTime;
-      }
-    }
-    TimeData timeConstants{.deltaTime = settings.timeRunning ? deltaTime : 0,
-                           .timeSinceLaunch = gameTime};
+    CalculateTimeConstants();
 
     frameResource.MakeCompatible(*renderTargetView, mutableAllocationContext);
 
-    bool camChanged = cam.Update(deltaTime) || first_loop;
+    bool camChanged = cam.Update(timeConstants_.trueDeltaTime) || first_loop;
 
     // Frame Begin
     {
-      committedResourceAllocator.Build();
-      depthStencilDescriptorHeap.Build();
-      renderTargetDescriptorHeap.Build();
+      descriptors_.committedResourceAllocator.Build();
+      descriptors_.depthStencilDescriptorHeap.Build();
+      descriptors_.renderTargetDescriptorHeap.Build();
       commonDescriptorHeap.Build();
     }
 
-    auto oceanModelMatrix =
-        XMMatrixTranslationFromVector(XMVECTOR{0, -5, 0, 0});
-
-    std::future<std::vector<WaterGraphicRootDescription::OceanData> &>
+    // QuadTrees
+    std::future<std::vector<Graphics::WaterGraphicRootDescription::OceanData> &>
         oceanDataFuture;
     if (debugValues.drawMethod == DebugValues::DrawTechnology::Tesselation ||
         debugValues.drawMethod == DebugValues::DrawTechnology::PrismParallax ||
         first_loop) {
       oceanDataFuture = threadpool_execute<
-          std::vector<WaterGraphicRootDescription::OceanData>
-              &>([&cpuBuffers, this, camChanged, oceanModelMatrix]()
-                     -> std::vector<WaterGraphicRootDescription::OceanData> & {
-        if (camChanged && !debugValues.lockQuadTree) {
-          cpuBuffers.oceanData.clear();
-          return WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
-              cpuBuffers.oceanData, cam, oceanModelMatrix,
-              this->simData.quadTreeDistanceThreshold, this->simData.maxDepth,
-              debugValues, &runtimeResults_);
-        }
-        return cpuBuffers.oceanData;
-      });
+          std::vector<Graphics::WaterGraphicRootDescription::OceanData> &>(
+          [this, camChanged]()
+              -> std::vector<Graphics::WaterGraphicRootDescription::OceanData>
+                  & {
+                    if (camChanged && !debugValues.lockQuadTree) {
+                      cpuBuffers.oceanData.clear();
+                      return Graphics::WaterGraphicRootDescription::
+                          CollectOceanQuadInfoWithQuadTree(
+                              cpuBuffers.oceanData, cam, oceanModelMatrix,
+                              simData.quadTreeDistanceThreshold,
+                              simData.maxDepth, debugValues, &runtimeResults_);
+                    }
+                    return cpuBuffers.oceanData;
+                  });
     }
 
     // Compute shader stage
@@ -410,6 +381,10 @@ void App::Run() {
       // If a change has been issued change constant buffers
 
       if (newData.highestData || newData.mediumData || newData.lowestData) {
+        // If there is new data, we have to halt all running computes
+        for (auto &x : simulationResources) {
+          x.Wait();
+        }
         auto copyRes = [&computeAllocator](const MutableTexture &src,
                                            const MutableTexture &dst) {
           computeAllocator.TransitionResources(
@@ -445,7 +420,7 @@ void App::Run() {
 
       // Since we are using this on different queues, it is uploaded twice.
       GpuVirtualAddress timeDataBuffer =
-          simResource.DynamicBuffer.AddBuffer(timeConstants);
+          simResource.DynamicBuffer.AddBuffer(timeConstants_);
 
       WaterSimulationComputeShader(
           simResource, simulationConstantSources, simulationMutableSources,
@@ -457,7 +432,7 @@ void App::Run() {
         auto commandList = computeAllocator.EndList();
         computeAllocator.BeginList();
         simResource.DynamicBuffer.UploadResources(computeAllocator);
-        resourceUploader.UploadResourcesAsync(computeAllocator);
+        descriptors_.resourceUploader.UploadResourcesAsync(computeAllocator);
         auto initCommandList = computeAllocator.EndList();
 
         computeQueue.Execute(initCommandList);
@@ -485,55 +460,29 @@ void App::Run() {
       }
 
       // Global data
-      GlobalGPUBuffers globalBuffers;
+      Graphics::GlobalGPUBuffers globalBuffers =
+          CreateGlobalGPUBuffers(frameResource.DynamicBuffer);
 
       {
-        CameraConstants cameraConstants{};
-        DebugGPUBufferStuff debugBufferContent = From(debugValues, simData);
-
-        XMStoreFloat3(&cameraConstants.cameraPos, cam.GetEye());
-        XMStoreFloat4x4(&cameraConstants.vMatrix,
-                        XMMatrixTranspose(cam.GetViewMatrix()));
-        XMStoreFloat4x4(&cameraConstants.pMatrix,
-                        XMMatrixTranspose(cam.GetProj()));
-        XMStoreFloat4x4(&cameraConstants.vpMatrix,
-                        XMMatrixTranspose(cam.GetViewProj()));
-        XMStoreFloat4x4(&cameraConstants.INVvMatrix,
-                        XMMatrixTranspose(cam.GetINVView()));
-        XMStoreFloat4x4(&cameraConstants.INVpMatrix,
-                        XMMatrixTranspose(cam.GetINVProj()));
-        XMStoreFloat4x4(&cameraConstants.INVvpMatrix,
-                        XMMatrixTranspose(cam.GetINVViewProj()));
-        globalBuffers.cameraConstantBuffer =
-            frameResource.DynamicBuffer.AddBuffer(cameraConstants);
-        globalBuffers.debugConstantBuffer =
-            frameResource.DynamicBuffer.AddBuffer(debugBufferContent);
-        globalBuffers.lightsConstantBuffer =
-            frameResource.DynamicBuffer.AddBuffer(sunData);
-        globalBuffers.timeDataBuffer =
-            frameResource.DynamicBuffer.AddBuffer(timeConstants);
-      }
-
-      ConstantGPUBuffers constantBuffers{
-          .waterData = frameResource.DynamicBuffer.AddBuffer(waterData),
-          .defData = frameResource.DynamicBuffer.AddBuffer(defData),
-      };
-      OtherInput others{
-          .oceanModelMatrix = oceanModelMatrix,
-          .debugValues = debugValues,
-          .oceanDataFuture = oceanDataFuture,
-      };
-      Meshes meshes{
-          .planeMesh = planeMesh,
-          .simplePlane = simplePlane,
-          .BoxWithoutBottom = BoxWithoutBottom,
-          .skyboxMesh = skyboxMesh,
-          .deferredShadingPlane = deferredShadingPlane,
-      };
-      Textures textures{.skyboxTexture = skyboxTexture};
-      // Draw Ocean
-      {
-        RenderFrameContext renderFrameContext{
+        // Draw Ocean
+        Graphics::ConstantGPUBuffers constantBuffers{
+            .waterData = frameResource.DynamicBuffer.AddBuffer(waterData),
+            .defData = frameResource.DynamicBuffer.AddBuffer(defData),
+        };
+        Graphics::OtherInput others{
+            .oceanModelMatrix = oceanModelMatrix,
+            .debugValues = debugValues,
+            .oceanDataFuture = oceanDataFuture,
+        };
+        Graphics::Meshes meshes{
+            .planeMesh = planeMesh,
+            .simplePlane = simplePlane,
+            .BoxWithoutBottom = BoxWithoutBottom,
+            .skyboxMesh = skyboxMesh,
+            .deferredShadingPlane = deferredShadingPlane,
+        };
+        Graphics::Textures textures{.skyboxTexture = skyboxTexture};
+        Graphics::RenderFrameContext renderFrameContext{
             .renderTargetView = renderTargetView,
             .frameResources = frameResource,
             .commandQueue = {&directQueue, 1},
@@ -549,8 +498,8 @@ void App::Run() {
       }
 
       auto CPURenderEnd = std::chrono::high_resolution_clock::now();
-      runtimeResults_.CPUTime = CPURenderEnd - frameStart;
-      DrawImGuiMenu(allocator, drawingSimResource);
+      runtimeResults_.CPUTime = CPURenderEnd - currentFrameStart;
+      DrawImGuiMenu(allocator, frameResource, drawingSimResource);
 
       //  End frame command list
       {
@@ -561,7 +510,7 @@ void App::Run() {
 
         allocator.BeginList();
         frameResource.DynamicBuffer.UploadResources(allocator);
-        resourceUploader.UploadResourcesAsync(allocator);
+        descriptors_.resourceUploader.UploadResourcesAsync(allocator);
         auto initCommandList = allocator.EndList();
 
         directQueue.Execute(initCommandList);
@@ -592,8 +541,35 @@ void App::Run() {
   x.Marker = x.Fence.EnqueueSignal(directQueue);
   x.Fence.Await(x.Marker);
 }
+Reun::Graphics::GlobalGPUBuffers
+App::CreateGlobalGPUBuffers(DynamicBufferManager &bufferManager) {
+
+  Graphics::GlobalGPUBuffers globalBuffers;
+
+  CameraConstants cameraConstants{};
+  DebugGPUBufferStuff debugBufferContent = From(debugValues, simData);
+
+  XMStoreFloat3(&cameraConstants.cameraPos, cam.GetEye());
+  XMStoreFloat4x4(&cameraConstants.vMatrix,
+                  XMMatrixTranspose(cam.GetViewMatrix()));
+  XMStoreFloat4x4(&cameraConstants.pMatrix, XMMatrixTranspose(cam.GetProj()));
+  XMStoreFloat4x4(&cameraConstants.vpMatrix,
+                  XMMatrixTranspose(cam.GetViewProj()));
+  XMStoreFloat4x4(&cameraConstants.INVvMatrix,
+                  XMMatrixTranspose(cam.GetINVView()));
+  XMStoreFloat4x4(&cameraConstants.INVpMatrix,
+                  XMMatrixTranspose(cam.GetINVProj()));
+  XMStoreFloat4x4(&cameraConstants.INVvpMatrix,
+                  XMMatrixTranspose(cam.GetINVViewProj()));
+  globalBuffers.cameraConstantBuffer = bufferManager.AddBuffer(cameraConstants);
+  globalBuffers.debugConstantBuffer =
+      bufferManager.AddBuffer(debugBufferContent);
+  globalBuffers.lightsConstantBuffer = bufferManager.AddBuffer(sunData);
+  globalBuffers.timeDataBuffer = bufferManager.AddBuffer(timeConstants_);
+  return globalBuffers;
+}
 void App::DrawImGuiMenu(
-    CommandAllocator &allocator,
+    CommandAllocator &allocator, Graphics::FrameResources &frameResource,
     SimulationStage::SimulationResources &drawingSimResource) {
   // ImGUI
   if (settings.showImgui) {
@@ -621,14 +597,40 @@ void App::DrawImGuiMenu(
         ImGui::Text(std::format("{}", i).c_str());
         ImGui::SameLine();
         ImGui::Image(
-            (void *)((*drawingSimResource.LODs[i]->coneMapBuffer.ShaderResource(
+            (void *)((*drawingSimResource.LODs[i]->gradients.ShaderResource(
                           allocator))
                          .GpuHandle()
                          .ptr),
             ImVec2(256, 256));
+
         if (i != 2)
           ImGui::SameLine();
       }
+
+      ImGui::Text("Albedo");
+      ImGui::SameLine();
+      ImGui::Image((void *)((*frameResource.GBuffer.Albedo.ShaderResource())
+                                .GpuHandle()
+                                .ptr),
+                   ImVec2(256, 256));
+      ImGui::SameLine();
+
+      ImGui::Text("Material");
+      ImGui::SameLine();
+      ImGui::Image(
+          (void *)((*frameResource.GBuffer.MaterialValues.ShaderResource())
+                       .GpuHandle()
+                       .ptr),
+          ImVec2(256, 256));
+      ImGui::SameLine();
+      ImGui::Text("Normal");
+      ImGui::SameLine();
+
+      ImGui::Image((void *)((*frameResource.GBuffer.Normal.ShaderResource())
+                                .GpuHandle()
+                                .ptr),
+                   ImVec2(256, 256));
+      ImGui::SameLine();
 
       ImGui::Text("LOGS:\n---------------------\n%s", shared_.prints.c_str());
     }
@@ -646,3 +648,43 @@ App::SinceTimeStartTimeFrame App::GetTimeSinceStart() {
   return std::chrono::duration_cast<SinceTimeStartTimeFrame>(
       std::chrono::high_resolution_clock::now() - loopStartTime);
 };
+void App::CalculateTimeConstants() {
+
+  auto oldFrameStart = currentFrameStart;
+  currentFrameStart = std::chrono::high_resolution_clock::now();
+
+  float deltaTime = GetDurationInFloatWithPrecision<std::chrono::seconds,
+                                                    std::chrono::milliseconds>(
+      currentFrameStart - oldFrameStart);
+
+  if (settings.timeRunning) {
+    gameTime += deltaTime;
+  }
+  timeConstants_ = TimeData{.trueDeltaTime = deltaTime,
+                            .deltaTime = settings.timeRunning ? deltaTime : 0,
+                            .timeSinceLaunch = gameTime};
+}
+
+Descriptors::Descriptors(GraphicsDevice &device, StartUpSettings &settings)
+    : pipelineStateProvider_{device, settings.cacheLocation / "pipeline"},
+      groupedResourceAllocator{device}, resourceUploader{device},
+      commonDescriptorHeap{device, settings.framesInFlight},
+      depthStencilDescriptorHeap{device}, renderTargetDescriptorHeap{device},
+      committedResourceAllocator{device},
+      immutableAllocationContext{
+          .Device = &device,
+          .ResourceAllocator = &groupedResourceAllocator,
+          .ResourceUploader = &resourceUploader,
+          .CommonDescriptorHeap = &commonDescriptorHeap,
+          .RenderTargetDescriptorHeap = &renderTargetDescriptorHeap,
+          .DepthStencilDescriptorHeap = &depthStencilDescriptorHeap},
+
+      mutableAllocationContext{
+          .Device = &device,
+          .ResourceAllocator = &committedResourceAllocator,
+          .ResourceUploader = &resourceUploader,
+          .CommonDescriptorHeap = &commonDescriptorHeap,
+          .RenderTargetDescriptorHeap = &renderTargetDescriptorHeap,
+          .DepthStencilDescriptorHeap = &depthStencilDescriptorHeap} {}
+void Descriptors::Build() {}
+} // namespace Reun

@@ -1,4 +1,5 @@
 #include "pch.h"
+namespace Reun {
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
 
@@ -19,3 +20,4 @@ struct oldWaterPixelShaderData {
   float _ScatterStrength = 0.78f;
   float _ScatterShadowStrength = 4.460f;
 };
+} // namespace Reun

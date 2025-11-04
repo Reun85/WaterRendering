@@ -5,9 +5,50 @@
 #include "SkyboxPipeline.hpp"
 #include "Parallax.h"
 
+namespace Reun {
+class Camera;
+
+namespace Graphics {
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
-class Camera;
+
+struct LightData {
+  XMFLOAT4 lightPos;   // .a 0 for directional, 1 for positional
+  XMFLOAT4 lightColor; // .a is lightIntensity
+  XMFLOAT4 AmbientColor;
+};
+
+struct PixelLighting {
+  std::array<LightData, ShaderConstantCompat::maxLightCount> lights;
+  int lightCount;
+
+  static constexpr PixelLighting SunData() {
+    PixelLighting data = {};
+    data.lightCount = 1;
+    data.lights[0].lightPos = XMFLOAT4(1.f, 0.109f, 0.964f, 0.f);
+    data.lights[0].lightColor =
+        XMFLOAT4(231.f / 255.f, 207.f / 255.f, 137.f / 255.f, 1.f);
+
+    data.lights[0].AmbientColor =
+        XMFLOAT4(15.f / 255.f, 14.f / 255.f, 5.f / 255.f, .185f);
+
+    return data;
+  }
+  // old
+private:
+  static constexpr PixelLighting old() {
+    PixelLighting data = {};
+    data.lightCount = 1;
+    data.lights[0].lightPos = XMFLOAT4(1, 0.109f, 0.964f, 0);
+    data.lights[0].lightColor =
+        XMFLOAT4(243.f / 255.f, 206.f / 255.f, 97.f / 255.f, 0.446f);
+
+    data.lights[0].AmbientColor =
+        XMFLOAT4(15.f / 255.f, 14.f / 255.f, 5.f / 255.f, .639f);
+
+    return data;
+  }
+};
 
 struct WaterGraphicRootDescription : public RootSignatureMask {
   struct ModelConstants {
@@ -45,8 +86,8 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
     std::array<InstanceData, DefaultsValues::App::maxInstances> instanceData;
   };
   struct OceanData {
-    VertexConstants vertexConstants;
-    HullConstants hullConstants;
+    VertexConstants vertexConstants{};
+    HullConstants hullConstants{};
     u16 N = 0;
   };
 
@@ -533,3 +574,5 @@ struct WaterRenderPipelines {
                                      PipelineStateProvider &provider,
                                      CreateSettings settings);
 };
+} // namespace Graphics
+} // namespace Reun

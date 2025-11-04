@@ -1,5 +1,6 @@
 #pragma once
 #include "Shaders/constants.hlsli"
+namespace Reun {
 #include "Typedefs.h"
 #define CONST_QUALIFIER static const constexpr
 namespace ShaderConstantCompat {
@@ -10,7 +11,9 @@ CONST_QUALIFIER f32 defaultTesselation = DEFAULT_TESSELATION;
 CONST_QUALIFIER u32 maxLightCount = MAX_LIGHT_COUNT;
 CONST_QUALIFIER u32 maxShadowMapMatrices = MAX_SHADOWMAP_MATRICES;
 } // namespace ShaderConstantCompat
+} // namespace Reun
 
+// Unset all defines set via constants.hlsli
 #undef NUM_INSTANCES
 #undef DISP_MAP_LOG2
 #undef DISP_MAP_SIZE

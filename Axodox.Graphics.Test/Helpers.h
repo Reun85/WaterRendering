@@ -2,6 +2,7 @@
 
 #include "pch.h"
 #include "MutableTextureWithState.hpp"
+namespace Reun {
 
 template <typename T, typename Left, typename Right>
 concept Either = std::same_as<T, Left> || std::same_as<T, Right>;
@@ -54,27 +55,26 @@ struct NeedToDo {
   bool patchHighestChanged = false;
   bool patchMediumChanged = false;
   bool patchLowestChanged = false;
+  static NeedToDo WithFirstLoopUpdateSettings();
 };
-
-/// <summary>
-/// For deferred shading the culling should be set to CullCounterClockwise
-/// therefore shown mesh should be facing backwards
-/// </summary>
-/// <param name="size"></param>
-/// <param name="subdivisions"></param>
-/// <returns></returns>
-MeshDescription CreateBackwardsPlane(float size, DirectX::XMUINT2 subdivisions);
-
-MeshDescription CreateCubeWithoutBottom(float size,
-                                        XMFLOAT3 offset = XMFLOAT3{0, 0, 0});
-
-MeshDescription CreateBoxInVSMesh();
 
 template <typename T, const size_t N>
 std::initializer_list<typename std::array<T, N>::value_type>
 to_initializer_list(const std::array<T, N> &arr) {
   return std::initializer_list<typename std::array<T, N>::value_type>(
       arr.data(), arr.data() + arr.size());
+}
+
+template <typename Lambda>
+std::vector<std::invoke_result_t<Lambda>> inline NewVectorByFunction(
+    const usize n, Lambda &&factory) {
+  using T = std::invoke_result_t<Lambda>;
+  std::vector<T> result;
+  result.reserve(n);
+  for (usize i = 0; i < n; i++) {
+    result.push_back(std::forward<T>(factory()));
+  }
+  return result;
 }
 
 struct CameraConstants {
@@ -85,43 +85,6 @@ struct CameraConstants {
   XMFLOAT4X4 INVpMatrix;
   XMFLOAT4X4 INVvpMatrix;
   XMFLOAT3 cameraPos;
-};
-struct LightData {
-  XMFLOAT4 lightPos;   // .a 0 for directional, 1 for positional
-  XMFLOAT4 lightColor; // .a is lightIntensity
-  XMFLOAT4 AmbientColor;
-};
-
-struct PixelLighting {
-  std::array<LightData, ShaderConstantCompat::maxLightCount> lights;
-  int lightCount;
-
-  static constexpr PixelLighting SunData() {
-    PixelLighting data = {};
-    data.lightCount = 1;
-    data.lights[0].lightPos = XMFLOAT4(1.f, 0.109f, 0.964f, 0.f);
-    data.lights[0].lightColor =
-        XMFLOAT4(231.f / 255.f, 207.f / 255.f, 137.f / 255.f, 1.f);
-
-    data.lights[0].AmbientColor =
-        XMFLOAT4(15.f / 255.f, 14.f / 255.f, 5.f / 255.f, .185f);
-
-    return data;
-  }
-  // old
-private:
-  static constexpr PixelLighting old() {
-    PixelLighting data = {};
-    data.lightCount = 1;
-    data.lights[0].lightPos = XMFLOAT4(1, 0.109f, 0.964f, 0);
-    data.lights[0].lightColor =
-        XMFLOAT4(243.f / 255.f, 206.f / 255.f, 97.f / 255.f, 0.446f);
-
-    data.lights[0].AmbientColor =
-        XMFLOAT4(15.f / 255.f, 14.f / 255.f, 5.f / 255.f, .639f);
-
-    return data;
-  }
 };
 
 struct RuntimeResults {
@@ -141,38 +104,7 @@ std::string Utf16ToUtf8(const std::string_view &str);
 std::wstring Utf8ToUtf16(const std::string_view &str);
 std::wstring Utf8ToUtf16(const std::wstring_view &str);
 std::filesystem::path GetLocalFolder();
-
 std::filesystem::path GetCacheFolder();
 
-struct ShaderBuffers {
-  // Allocates necessary buffers if they are not yet allocated. May use the
-  // finalTarget size to determine the sizes of the buffers
-  virtual void MakeCompatible(const RenderTargetView &finalTarget,
-                              ResourceAllocationContext &allocationContext) = 0;
-
-  // Get ready for next frame
-  virtual void Clear(CommandAllocator &allocator) = 0;
-
-  virtual ~ShaderBuffers() = default;
-};
-
-struct ShaderJob {
-  virtual void Pre(CommandAllocator &allocator) const = 0;
-  virtual ~ShaderJob() = default;
-};
-
-template <typename Lambda>
-std::vector<std::invoke_result_t<Lambda>> inline NewVectorByFunction(
-    const usize n, Lambda &&factory) {
-  using T = std::invoke_result_t<Lambda>;
-  std::vector<T> result;
-  result.reserve(n);
-  for (usize i = 0; i < n; i++) {
-    result.push_back(std::forward<T>(factory()));
-  }
-  return result;
-}
-
 void set_flag(u32 &flag, u32 flagIndex, bool flagValue = true);
-
-MeshDescription CreateQuadPatch();
+}; // namespace Reun

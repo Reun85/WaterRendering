@@ -1,5 +1,6 @@
 #pragma once
 #include "../pch.h"
+namespace Reun {
 using namespace Axodox::Graphics::D3D12;
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
@@ -40,3 +41,4 @@ private:
   ShaderResourceViewRef _view;
   Axodox::Infrastructure::event_subscription _allocatedSubscription;
 };
+} // namespace Reun

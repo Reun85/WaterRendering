@@ -1,6 +1,7 @@
 #pragma once
 #include "pch.h"
 
+namespace Reun {
 class ResourceTransitorTooManyValuesError : public std::exception {};
 
 /// Holds a reference to command allocator and the required resource
@@ -98,3 +99,4 @@ public:
   }
   ~ResourceTransitor() { Queue(); }
 };
+} // namespace Reun

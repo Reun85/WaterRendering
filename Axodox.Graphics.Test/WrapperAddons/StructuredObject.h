@@ -39,6 +39,7 @@ private:
 };
 } // namespace Axodox::Graphics::D3D12
 
+namespace Reun {
 /// <summary>
 ///  An owning version of StructuredObjectViews
 /// UNTESTED
@@ -67,3 +68,4 @@ struct MeshSpecificBuffers {
                                u32 IndexByteSize);
   ~MeshSpecificBuffers() = default;
 };
+} // namespace Reun

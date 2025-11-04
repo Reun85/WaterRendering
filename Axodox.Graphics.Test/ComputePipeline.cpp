@@ -2,7 +2,7 @@
 #include "pch.h"
 #include "ComputePipeline.h"
 
-namespace SimulationStage {
+namespace Reun::SimulationStage {
 WaterSimulationPipelines SimulationStage::WaterSimulationPipelines::Create(
     GraphicsDevice &device, PipelineStateProvider &pipelineStateProvider) {
 
@@ -344,4 +344,4 @@ void SimulationResources::Wait() {
   if (FrameDoneMarker)
     Fence.Await(FrameDoneMarker);
 }
-} // namespace SimulationStage
+} // namespace Reun::SimulationStage

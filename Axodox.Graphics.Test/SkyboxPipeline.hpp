@@ -1,9 +1,10 @@
 #pragma once
 #include "pch.h"
 
+namespace Reun {
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
-using namespace DirectX::PackedVector;
+
 struct SkyboxRootDescription : public RootSignatureMask {
   RootDescriptor<RootDescriptorType::ConstantBuffer> cameraBuffer;
   RootDescriptor<RootDescriptorType::ConstantBuffer> lightingBuffer;
@@ -23,3 +24,4 @@ struct SkyboxRootDescription : public RootSignatureMask {
     Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
   }
 };
+} // namespace Reun

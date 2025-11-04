@@ -2,6 +2,7 @@
 #include "CubeMap.h"
 #include <DirectXTex.h>
 
+namespace Reun {
 using namespace Axodox::Graphics::D3D12;
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
@@ -314,3 +315,4 @@ CubeMapTexture::CubeMapTexture(const ResourceAllocationContext &context,
 }
 
 CubeMapTexture::operator GpuVirtualAddress() const { return *_view; }
+} // namespace Reun

@@ -2,6 +2,7 @@
 #include "pch.h"
 #include "QuadTree.h"
 
+namespace Reun {
 struct SimulationData {
   u32 N;
   u32 M;
@@ -195,3 +196,4 @@ CalculateFrequencies(const SimulationData::PatchData &dat) {
   }
   return res;
 }
+} // namespace Reun

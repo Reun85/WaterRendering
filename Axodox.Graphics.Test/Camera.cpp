@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "Frustum.hpp"
 
+namespace Reun {
 using namespace winrt::Windows::UI::Core;
 using namespace DirectX;
 Camera::Camera() {
@@ -284,3 +285,4 @@ void Camera::DrawImGui(bool exclusiveWindow) {
     ImGui::End();
   }
 }
+} // namespace Reun

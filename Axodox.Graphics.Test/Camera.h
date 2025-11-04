@@ -2,6 +2,7 @@
 
 #include "pch.h"
 
+namespace Reun {
 struct Frustum;
 
 struct ViewFrustumCoordinates {
@@ -149,3 +150,4 @@ private:
   // projection matrix needs recomputation
   bool m_projectionDirty = true;
 };
+} // namespace Reun

@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "ImGuiHelper.h"
 
+namespace Reun {
 using namespace winrt;
 
 com_ptr<ID3D12DescriptorHeap>
@@ -66,3 +67,4 @@ void ImGUIManager::Render(CommandAllocator &allocator) const {
 
   ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), allocator.operator->());
 }
+} // namespace Reun

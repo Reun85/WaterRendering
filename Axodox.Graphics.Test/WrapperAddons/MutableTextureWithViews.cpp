@@ -2,9 +2,8 @@
 #include "MutableTextureWithViews.h"
 #include "Infrastructure/BitwiseOperations.h"
 
-using namespace Axodox::Infrastructure;
-
 namespace Axodox::Graphics::D3D12 {
+using namespace Axodox::Infrastructure;
 MutableTextureWithViews::MutableTextureWithViews(
     const ResourceAllocationContext &context)
     : MutableTexture(context) {}

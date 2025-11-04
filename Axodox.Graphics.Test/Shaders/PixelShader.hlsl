@@ -6,113 +6,129 @@ Texture2D<float4> gradients1 : register(t3);
 Texture2D<float4> gradients2 : register(t4);
 Texture2D<float4> gradients3 : register(t5);
 
-cbuffer CameraBuffer : register(b0) { cameraConstants camConstants; }
+cbuffer CameraBuffer : register(b0)
+{
+    cameraConstants camConstants;
+}
 
-cbuffer DebugBuffer : register(b9) { DebugValues debugValues; }
+cbuffer DebugBuffer : register(b9)
+{
+    DebugValues debugValues;
+}
 
-struct input_t {
-  float4 Screen : SV_POSITION;
-  float3 localPos : POSITION;
-  float2 planeCoord : PLANECOORD;
+struct input_t
+{
+    float4 Screen : SV_POSITION;
+    float3 localPos : POSITION;
+    float2 planeCoord : PLANECOORD;
 };
 
-struct output_t {
-  float4 albedo;
-  float4 normal;
-  float4 materialValues;
+struct output_t
+{
+    float4 albedo : SV_Target0;
+    float4 normal : SV_Target1;
+    float4 materialValues : SV_Target2;
 };
 
-cbuffer PSProperties : register(b2) {
-  float3 Albedo;
-  float Roughness;
-  float foamDepthFalloff;
-  float foamRoughnessModifier;
-  float NormalDepthAttenuation;
-  float _HeightModifier;
-  float _WavePeakScatterStrength;
-  float _ScatterShadowStrength;
-  float _Fresnel;
+cbuffer PSProperties : register(b2)
+{
+    float3 Albedo;
+    float Roughness;
+    float foamDepthFalloff;
+    float foamRoughnessModifier;
+    float NormalDepthAttenuation;
+    float _HeightModifier;
+    float _WavePeakScatterStrength;
+    float _ScatterShadowStrength;
+    float _Fresnel;
 };
-float4 readGrad(float2 uv) {
-  float4 t1 = float4(0, 0, 0, 0);
-  float4 t2 = float4(0, 0, 0, 0);
-  float4 t3 = float4(0, 0, 0, 0);
-  if (has_flag(debugValues.flags, 3))
-    t1 = gradients1.SampleLevel(
+float4 readGrad(float2 uv)
+{
+    float4 t1 = float4(0, 0, 0, 0);
+    float4 t2 = float4(0, 0, 0, 0);
+    float4 t3 = float4(0, 0, 0, 0);
+    if (has_flag(debugValues.flags, 3))
+        t1 = gradients1.SampleLevel(
         _sampler,
         GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.r), 0);
-  if (has_flag(debugValues.flags, 4))
-    t2 = gradients2.SampleLevel(
+    if (has_flag(debugValues.flags, 4))
+        t2 = gradients2.SampleLevel(
         _sampler,
         GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.g), 0);
-  if (has_flag(debugValues.flags, 5))
-    t3 = gradients3.SampleLevel(
+    if (has_flag(debugValues.flags, 5))
+        t3 = gradients3.SampleLevel(
         _sampler,
         GetTextureCoordFromPlaneCoordAndPatch(uv, debugValues.patchSizes.b), 0);
 
-  return float4(normalize(t1.rgb + t2.rgb + t3.rgb), t1.w + t2.w + t3.w);
+    return float4(normalize(t1.rgb + t2.rgb + t3.rgb), t1.w + t2.w + t3.w);
 }
 
-output_t main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET {
 
-  output_t output;
+output_t main(input_t input, bool frontFacing : SV_IsFrontFace) : SV_TARGET
+{
 
-  if (has_flag(debugValues.flags, 6)) {
-    float2 texCoord = GetTextureCoordFromPlaneCoordAndPatch(
+    output_t output;
+
+    if (has_flag(debugValues.flags, 6))
+    {
+        float2 texCoord = GetTextureCoordFromPlaneCoordAndPatch(
         input.planeCoord, debugValues.patchSizes.r);
-    float4 text =
+        float4 text =
         Swizzle(_texture.Sample(_sampler, texCoord), debugValues.swizzleOrder) *
         float4(debugValues.pixelMult.xyz, 1);
 
-    output.albedo = text;
-    return output;
-  }
-  float4 grad = readGrad(input.planeCoord);
+        output.albedo = text;
+        return output;
+    }
+    float4 grad = readGrad(input.planeCoord);
 
-  float3 normal = normalize(grad.xyz);
+    float3 normal = normalize(grad.xyz);
 
-  const float3 viewVec = camConstants.cameraPos - input.localPos;
-  float3 viewDir = normalize(viewVec);
+    const float3 viewVec = camConstants.cameraPos - input.localPos;
+    float3 viewDir = normalize(viewVec);
 
-  if (has_flag(debugValues.flags, 24)) {
-    output.albedo = float4(0, 1, 0, 1);
-    if (dot(normal, viewDir) < 0)
-      output.albedo = float4(1, 0, 0, 1);
+    if (has_flag(debugValues.flags, 24))
+    {
+        output.albedo = float4(0, 1, 0, 1);
+        if (dot(normal, viewDir) < 0)
+            output.albedo = float4(1, 0, 0, 1);
 
-    return output;
-  }
+        return output;
+    }
 
   // if (dot(normal, viewDir) < 0)
   //{
   //     normal *= -1;
   // }
 
-  float Jacobian = grad.w;
-  if (has_flag(debugValues.flags, 25)) {
-    output.albedo = float4(Jacobian, Jacobian, Jacobian, 1);
-    return output;
-  }
+    float Jacobian = grad.w;
+    if (has_flag(debugValues.flags, 25))
+    {
+        output.albedo = float4(Jacobian, Jacobian, Jacobian, 1);
+        return output;
+    }
 
-  float depth = input.Screen.z / input.Screen.w;
+    float depth = input.Screen.z / input.Screen.w;
 
-  float foam = 0;
-  if (has_flag(debugValues.flags, 2)) {
-    foam = lerp(0.0f, Jacobian, pow(depth, foamDepthFalloff));
-  }
+    float foam = 0;
+    if (has_flag(debugValues.flags, 2))
+    {
+        foam = lerp(0.0f, Jacobian, pow(depth, foamDepthFalloff));
+    }
 
-  normal = lerp(normal, float3(0, 1, 0), pow(depth, NormalDepthAttenuation));
+    //normal = lerp(normal, float3(0, 1, 0), pow(depth, NormalDepthAttenuation));
 
   // Make foam appear rougher
-  float a = Roughness + foam * foamRoughnessModifier;
+    float a = Roughness + foam * foamRoughnessModifier;
 
-  float3 albedo = Albedo;
+    float3 albedo = Albedo;
 
   // low
-  output.albedo = float4(albedo, saturate(foam));
+    output.albedo = float4(albedo, saturate(foam));
   // high
-  output.normal = float4(OctahedronNormalEncode(normal), _Fresnel, 1);
+    output.normal = float4(OctahedronNormalEncode(normal), _Fresnel, 1);
   // low
-  output.materialValues = float4(a, _HeightModifier * _WavePeakScatterStrength,
+    output.materialValues = float4(a, _HeightModifier * _WavePeakScatterStrength,
                                  _ScatterShadowStrength, 1);
-  return output;
+    return output;
 }

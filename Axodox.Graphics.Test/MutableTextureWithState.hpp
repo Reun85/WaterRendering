@@ -1,6 +1,7 @@
 #pragma once
 #include "pch.h"
 
+namespace Reun {
 inline ResourceStates GetResourceStateFromFlags(const TextureFlags &flags) {
   if (has_flag(flags, TextureFlags::RenderTarget)) {
     return ResourceStates::RenderTarget;
@@ -65,3 +66,4 @@ public:
 
   TextureRef &getTexture() { return _texture; };
 };
+} // namespace Reun

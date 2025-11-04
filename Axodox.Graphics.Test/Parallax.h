@@ -3,6 +3,7 @@
 
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
+namespace Reun {
 class Camera;
 
 namespace SimulationStage {
@@ -412,3 +413,4 @@ struct DisplacedHeightMapJob : ShaderJob {
            const Inp &inp) const;
   ~DisplacedHeightMapJob() override = default;
 };
+} // namespace Reun

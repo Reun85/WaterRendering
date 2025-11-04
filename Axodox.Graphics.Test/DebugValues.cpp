@@ -1,6 +1,7 @@
 #pragma once
 #include "pch.h"
 
+namespace Reun {
 const static constexpr std::initializer_list<
     std::pair<u8, std::optional<const char *>>>
     DebugBitsDesc = {{u8(2), "Use Foam"},
@@ -225,3 +226,4 @@ void RuntimeSettings::DrawImGui([[maybe_unused]] NeedToDo &out,
   if (exclusiveWindow)
     ImGui::End();
 }
+} // namespace Reun

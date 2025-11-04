@@ -1,6 +1,7 @@
 #pragma once
 #include "pch.h"
 
+namespace Reun {
 // These variables are only used on the CPU side.
 #define QUALIFIER static const constexpr
 // These values are also defined somewhere in the shaders, meaning changing
@@ -50,3 +51,4 @@ public:
 };
 #undef QUALIFIER
 #undef CONST_QUALIFIER
+} // namespace Reun

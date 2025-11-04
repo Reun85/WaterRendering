@@ -3,6 +3,7 @@
 #include "Defaults.h"
 #include "Simulation.h"
 
+namespace Reun {
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
 using namespace Axodox::Threading;
@@ -19,7 +20,7 @@ struct DebugValues {
   std::optional<DebugTextureDisplay> debugTextureMode = std::nullopt;
 
   enum class DrawTechnology : u8 { Tesselation, Parallax, PrismParallax };
-  DrawTechnology drawMethod = DrawTechnology::PrismParallax;
+  DrawTechnology drawMethod = DrawTechnology::Tesselation;
 
   XMFLOAT4 pixelMult = XMFLOAT4(1, 1, 1, 1);
   XMUINT4 swizzleorder = XMUINT4(0, 1, 2, 3);
@@ -79,3 +80,4 @@ struct RuntimeSettings {
   XMFLOAT4 clearColor = DefaultsValues::App::clearColor;
   void DrawImGui([[maybe_unused]] NeedToDo &out, bool exclusiveWindow = false);
 };
+} // namespace Reun

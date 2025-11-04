@@ -6,6 +6,7 @@ using namespace winrt;
 using namespace Windows::ApplicationModel;
 using namespace Windows::ApplicationModel::Core;
 using namespace Windows::UI::Core;
+namespace Reun {
 
 struct AppWrapper
     : implements<AppWrapper, IFrameworkViewSource, IFrameworkView> {
@@ -17,7 +18,7 @@ struct AppWrapper
 
   void Load(hstring const &) {
     if (!app) {
-      app = std::make_unique<App>(shared_);
+      app = std::make_unique<Reun::App>(shared_);
 
     } else {
       throw hresult_error(E_FAIL,
@@ -27,7 +28,7 @@ struct AppWrapper
 
   void Uninitialize() {
     if (app) {
-      App::DeleteApp(app);
+      Reun::App::DeleteApp(app);
     } else {
       throw hresult_error(E_FAIL, L"App uninitialized while not initialized.");
     }
@@ -77,6 +78,7 @@ private:
   std::unique_ptr<App> app = nullptr;
 };
 
+} // namespace Reun
 int __stdcall wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
-  CoreApplication::Run(make<AppWrapper>());
+  CoreApplication::Run(make<Reun::AppWrapper>());
 }

@@ -1,8 +1,10 @@
 #include "pch.h"
 
+namespace Reun {
 struct StartUpSettings {
   u8 framesInFlight = 2;
   std::filesystem::path ImGuiIniPath = GetLocalFolder() / "imgui.ini";
+  std::filesystem::path cacheLocation = GetCacheFolder();
 };
 
 /// <summary>
@@ -15,8 +17,6 @@ struct AppShared {
   winrt::Windows::UI::Core::CoreWindow window = nullptr;
   winrt::Windows::UI::Core::CoreDispatcher dispatcher = nullptr;
 
-  std::filesystem::path cacheLocation = GetCacheFolder();
-
   // debug purposes
   // uses IMGUI for printing data to the screen instead of console
   std::string prints = std::string();
@@ -25,3 +25,4 @@ struct AppShared {
 
   StartUpSettings settings;
 };
+} // namespace Reun

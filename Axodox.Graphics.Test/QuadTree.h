@@ -1,7 +1,8 @@
 #pragma once
 #include <pch.h>
-#include "Frustum.hpp"
 
+namespace Reun {
+struct Frustum;
 using uint = uint32_t;
 using NodeID = uint;
 using NodeCenter = float2;
@@ -137,3 +138,4 @@ private:
   Depth minDepth = Defaults::minDepth;
   TravelOrder order;
 };
+} // namespace Reun
