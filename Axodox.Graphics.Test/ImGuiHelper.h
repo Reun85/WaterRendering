@@ -4,9 +4,9 @@
 #include "GraphicsPipeline.h"
 
 namespace Reun {
-using namespace Axodox::Infrastructure;
 
-namespace ImGuiHelpers {
+namespace Menu {
+using namespace Axodox::Infrastructure;
 inline std::optional<usize>
 DisplayComboBoxByIndex(const char *label,
                        const std::span<const char *const> &items,
@@ -94,12 +94,24 @@ DisplayComboBox(const char *label,
     return std::nullopt;
   }
 }
-} // namespace ImGuiHelpers
+
+namespace Bess::Config {
+
+/*
+Taken from: https://github.com/shivang51/bess/tree/main
+MIT license
+*/
+
+ImVec4 BlendColors(const ImVec4 &base, const ImVec4 &accent, float blendFactor);
+
+void setBessDarkColors();
+} // namespace Bess::Config
 
 struct ImGUIManager {
 
   ImGUIManager(const Axodox::Graphics::D3D12::GraphicsDevice &device,
-               u8 framesInFlight, const std::filesystem::path &iniPath);
+               u8 framesInFlight, const std::filesystem::path &iniPath,
+               const std::string iniName = "MyApp");
 
   ImGuiIO &GetIO();
   ~ImGUIManager();
@@ -107,8 +119,20 @@ struct ImGUIManager {
   ID3D12DescriptorHeap *GetHeap();
   void Pre(CommandAllocator &allocator) const;
   void Render(CommandAllocator &allocator) const;
+  ImGUIManager(const ImGUIManager &) = delete;
+  ImGUIManager(const ImGUIManager &&) = delete;
+
+public:
+  /// <summary>
+  ///  Keys cannot contain '=', '[]' and the values cannot contain line breaks;
+  ///  UB otherwise. Data is saved on destructor.
+  /// </summary>
+  std::unordered_map<std::string, std::string> settings;
 
 private:
+  std::string iniName;
+  void SetupPersistence();
   winrt::com_ptr<ID3D12DescriptorHeap> descriptorHeap_ = nullptr;
 };
+} // namespace Menu
 } // namespace Reun

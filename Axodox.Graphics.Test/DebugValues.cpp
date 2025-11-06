@@ -87,7 +87,7 @@ void DebugValues::CullingImGuiDraw(NeedToDo &out) {
        {"CullNone", CullNone},
        {"WireFrame", Wireframe}}};
 
-  const auto new_val = ImGuiHelpers::DisplayComboBox<RasterizerFlags>(
+  const auto new_val = Menu::DisplayComboBox<RasterizerFlags>(
       "Render State", std::span(items), rasterizerFlags);
   if (new_val.has_value()) {
     out.changeFlag = new_val.value();
@@ -111,8 +111,8 @@ void DebugValues::useTextureImGuiDraw() {
         index = (usize)debugTextureMode.value() + 1;
       else
         index = 0;
-      const auto chosen = ImGuiHelpers::DisplayComboBoxByIndex(
-          "Debug Texture Mode", std::span(items), index);
+      const auto chosen = Menu::DisplayComboBoxByIndex("Debug Texture Mode",
+                                                       std::span(items), index);
       if (chosen.has_value()) {
         const auto val = chosen.value();
         if (val == 0) {
@@ -144,7 +144,7 @@ void DebugValues::useTextureImGuiDraw() {
         ImGui::SameLine();
 
         const auto selectedIndex = *vals[i];
-        const auto chosen = ImGuiHelpers::DisplayComboBoxByIndex(
+        const auto chosen = Menu::DisplayComboBoxByIndex(
             id.c_str(), std::span(swizzleitems), selectedIndex);
 
         if (chosen.has_value()) {

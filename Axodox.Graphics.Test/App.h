@@ -115,7 +115,7 @@ private:
   // ResourceAllocationContext mutableResourceAllocationContext_;
   // WaterRenderPipelines renderStage_;
 
-  ImGUIManager imgui_wrapper_;
+  Menu::ImGUIManager imgui_wrapper_;
 
   // ApplicationData
   // -----------------

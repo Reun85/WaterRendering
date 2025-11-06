@@ -57,6 +57,7 @@ void App::StartRun() {
   isRunning_ = false;
 }
 using namespace Windows::UI::ViewManagement;
+
 bool App::ShouldRestart() const {
   // we stopped execution, but not because of a quit request, the app wants a
   // restart!
