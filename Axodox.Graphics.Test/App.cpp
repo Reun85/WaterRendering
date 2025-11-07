@@ -1,8 +1,9 @@
 #pragma once
 #include "pch.h"
-#include "App.h"
 #include "Meshes.h"
 #include "TestConfigLoader.h"
+
+#include "App.h"
 
 namespace Reun {
 using namespace winrt;
@@ -15,7 +16,8 @@ App::App(AppShared &shared)
     : shared_(shared),
       swapChain{directQueue, shared_.window, SwapChainFlags::IsTearingAllowed},
       imgui_wrapper_(device, shared_.settings.framesInFlight,
-                     shared_.settings.ImGuiIniPath) {
+                     shared_.settings.ImGuiIniPath),
+      menuSettings_(imgui_wrapper_.persistence) {
 
   cam.SetView(XMVectorSet(DefaultsValues::Cam::camStartPos.x,
                           DefaultsValues::Cam::camStartPos.y,
@@ -25,6 +27,11 @@ App::App(AppShared &shared)
 
   cam.SetFirstPerson(DefaultsValues::Cam::startFirstPerson);
   SetWindow();
+
+  shared_.cout << "Using folder " << GetLocalFolder() << " as local folder."
+               << std::endl;
+  shared_.cout << "Using folder " << GetCacheFolder() << " as cache folder."
+               << std::endl;
 }
 void App::DeleteApp(std::unique_ptr<App> &app) {
   app->Suspend();
@@ -136,49 +143,38 @@ void DrawImGuiForPSResources(
     Reun::Graphics::WaterGraphicRootDescription::WaterPixelShaderData
         &waterData,
     Reun::Graphics::PixelLighting &sunData,
-    Reun::Graphics::DeferredShading::DeferredShaderBuffers &defData,
-    bool exclusiveWindow = true) {
-  bool cont = true;
-  if (exclusiveWindow) {
-    cont = ImGui::Begin("PS Data");
-  }
-  if (cont) {
-    ImGui::ColorEdit3("Surface Color", &waterData.AlbedoColor.x);
-    ImGui::SliderFloat("Roughness", &waterData.Roughness, 0.0f, 1.0f);
+    Reun::Graphics::DeferredShading::DeferredShaderBuffers &defData) {
+  ImGui::ColorEdit3("Surface Color", &waterData.AlbedoColor.x);
+  ImGui::SliderFloat("Roughness", &waterData.Roughness, 0.0f, 1.0f);
 
-    ImGui::ColorEdit3("Tip Color", &defData._TipColor.x);
-    ImGui::SliderFloat("Normal Depth Attenuation",
-                       &waterData.NormalDepthAttenuation, 0, 2);
-    ImGui::SliderFloat("Foam Roughness Modifier",
-                       &waterData.foamRoughnessModifier, 0.0f, 10.0f);
-    ImGui::SliderFloat("Foam Depth Falloff", &waterData.foamDepthFalloff, 0.0f,
-                       10.0f);
-    ImGui::SliderFloat("Height Modifier", &waterData._HeightModifier, 0.0f,
-                       10.0f);
-    ImGui::SliderFloat("Fresnel", &waterData._Fresnel, 0.0f, 1.0f);
-    ImGui::SliderFloat("Wave Peak Scatter Strength",
-                       &waterData._WavePeakScatterStrength, 0.0f, 10.0f);
-    ImGui::SliderFloat("Scatter Shadow Strength",
-                       &waterData._ScatterShadowStrength, 0.0f, 10.0f);
+  ImGui::ColorEdit3("Tip Color", &defData._TipColor.x);
+  ImGui::SliderFloat("Normal Depth Attenuation",
+                     &waterData.NormalDepthAttenuation, 0, 2);
+  ImGui::SliderFloat("Foam Roughness Modifier",
+                     &waterData.foamRoughnessModifier, 0.0f, 10.0f);
+  ImGui::SliderFloat("Foam Depth Falloff", &waterData.foamDepthFalloff, 0.0f,
+                     10.0f);
+  ImGui::SliderFloat("Height Modifier", &waterData._HeightModifier, 0.0f,
+                     10.0f);
+  ImGui::SliderFloat("Fresnel", &waterData._Fresnel, 0.0f, 1.0f);
+  ImGui::SliderFloat("Wave Peak Scatter Strength",
+                     &waterData._WavePeakScatterStrength, 0.0f, 10.0f);
+  ImGui::SliderFloat("Scatter Shadow Strength",
+                     &waterData._ScatterShadowStrength, 0.0f, 10.0f);
 
-    ImGui::Separator();
-    ImGui::Text("Sun Data");
-    ImGui::SliderFloat3("Light Pos", (float *)&sunData.lights[0].lightPos, -1,
-                        1);
+  ImGui::Separator();
+  ImGui::Text("Sun Data");
+  ImGui::SliderFloat3("Light Pos", (float *)&sunData.lights[0].lightPos, -1, 1);
 
-    ImGui::ColorEdit3("Light Color", (float *)&sunData.lights[0].lightColor);
-    ImGui::SliderFloat("Light Intensity", &sunData.lights[0].lightColor.w, 0,
-                       10);
+  ImGui::ColorEdit3("Light Color", (float *)&sunData.lights[0].lightColor);
+  ImGui::SliderFloat("Light Intensity", &sunData.lights[0].lightColor.w, 0, 10);
 
-    ImGui::ColorEdit3("Ambient Color", &sunData.lights[0].AmbientColor.x);
-    ImGui::SliderFloat("Ambient Mult", &sunData.lights[0].AmbientColor.w, 0.0f,
-                       10.0f);
-    ImGui::Separator();
-    ImGui::Text("DeferredShaderBuffer Data");
-    ImGui::SliderFloat("Env Map", &defData.EnvMapMult, 0, 2);
-  }
-  if (exclusiveWindow)
-    ImGui::End();
+  ImGui::ColorEdit3("Ambient Color", &sunData.lights[0].AmbientColor.x);
+  ImGui::SliderFloat("Ambient Mult", &sunData.lights[0].AmbientColor.w, 0.0f,
+                     10.0f);
+  ImGui::Separator();
+  ImGui::Text("DeferredShaderBuffer Data");
+  ImGui::SliderFloat("Env Map", &defData.EnvMapMult, 0, 2);
 }
 
 void App::Run() {
@@ -237,10 +233,10 @@ void App::Run() {
       SimulationStage::SimulationResources(mutableAllocationContext, simData.N,
                                            simData.M)};
   // std::vector<FrameResources> frameResources;
-  // frameResources.reserve((usize)shared_.settings.framesInFlight);
+  // frameResources.reserve((usize)shared_.persistence.framesInFlight);
   // std::vector<SimulationStage::SimulationResources> simulationResources;
-  // simulationResources.reserve((usize)shared_.settings.framesInFlight);
-  // for (u8 i = 0; i < shared_.settings.framesInFlight; i++) {
+  // simulationResources.reserve((usize)shared_.persistence.framesInFlight);
+  // for (u8 i = 0; i < shared_.persistence.framesInFlight; i++) {
   //   frameResources.emplace_back(mutableAllocationContext);
 
   //  simulationResources.emplace_back(mutableAllocationContext, simData.N,
@@ -569,81 +565,96 @@ App::CreateGlobalGPUBuffers(DynamicBufferManager &bufferManager) {
   globalBuffers.timeDataBuffer = bufferManager.AddBuffer(timeConstants_);
   return globalBuffers;
 }
+void App ::DrawImGuiApplicationData(
+    CommandAllocator &allocator, Graphics::FrameResources &frameResource,
+    SimulationStage::SimulationResources &drawingSimResource) {
+
+  shared_.prints += shared_.cout.str();
+  shared_.cout.str("");
+  ImGui::Text("Press ESC to quit");
+  ImGui::Text("Press Space to stop time");
+  ImGui::Text("frame %d", frameCounter_);
+  ImGui::Text(" %.3f s",
+              GetDurationInFloatWithPrecision<std::chrono::seconds,
+                                              std::chrono::milliseconds>(
+                  GetTimeSinceStart()));
+  ImGui::Text(" %.3f ms/frame (%.1f FPS)",
+              1000.0f / imgui_wrapper_.GetIO().Framerate,
+              imgui_wrapper_.GetIO().Framerate);
+
+  settings.DrawImGui(beforeNextFrame_);
+
+  runtimeResults_.DrawImGui(false);
+  cam.DrawImGui(false);
+  for (int i = 0; i < 3; ++i) {
+    ImGui::Text(std::format("{}", i).c_str());
+    ImGui::SameLine();
+    ImGui::Image(
+        (void *)((*drawingSimResource.LODs[i]->gradients.ShaderResource(
+                      allocator))
+                     .GpuHandle()
+                     .ptr),
+        ImVec2(256, 256));
+
+    if (i != 2)
+      ImGui::SameLine();
+  }
+
+  ImGui::Text("Albedo");
+  ImGui::SameLine();
+  ImGui::Image((void *)((*frameResource.GBuffer.Albedo.ShaderResource())
+                            .GpuHandle()
+                            .ptr),
+               ImVec2(256, 256));
+  ImGui::SameLine();
+
+  ImGui::Text("Material");
+  ImGui::SameLine();
+  ImGui::Image((void *)((*frameResource.GBuffer.MaterialValues.ShaderResource())
+                            .GpuHandle()
+                            .ptr),
+               ImVec2(256, 256));
+  ImGui::SameLine();
+  ImGui::Text("Normal");
+  ImGui::SameLine();
+
+  ImGui::Image((void *)((*frameResource.GBuffer.Normal.ShaderResource())
+                            .GpuHandle()
+                            .ptr),
+               ImVec2(256, 256));
+
+  ImGui::Text("LOGS:\n---------------------\n%s", shared_.prints.c_str());
+}
 void App::DrawImGuiMenu(
     CommandAllocator &allocator, Graphics::FrameResources &frameResource,
     SimulationStage::SimulationResources &drawingSimResource) {
   // ImGUI
-  if (settings.showImgui) {
-    imgui_wrapper_.Pre(allocator);
-
-    if (ImGui::Begin("Application")) {
-      shared_.prints += shared_.cout.str();
-      shared_.cout.str("");
-      ImGui::Text("Press ESC to quit");
-      ImGui::Text("Press Space to stop time");
-      ImGui::Text("frame %d", frameCounter_);
-      ImGui::Text(" %.3f s",
-                  GetDurationInFloatWithPrecision<std::chrono::seconds,
-                                                  std::chrono::milliseconds>(
-                      GetTimeSinceStart()));
-      ImGui::Text(" %.3f ms/frame (%.1f FPS)",
-                  1000.0f / imgui_wrapper_.GetIO().Framerate,
-                  imgui_wrapper_.GetIO().Framerate);
-
-      settings.DrawImGui(beforeNextFrame_);
-
-      runtimeResults_.DrawImGui(false);
-      cam.DrawImGui(false);
-      for (int i = 0; i < 3; ++i) {
-        ImGui::Text(std::format("{}", i).c_str());
-        ImGui::SameLine();
-        ImGui::Image(
-            (void *)((*drawingSimResource.LODs[i]->gradients.ShaderResource(
-                          allocator))
-                         .GpuHandle()
-                         .ptr),
-            ImVec2(256, 256));
-
-        if (i != 2)
-          ImGui::SameLine();
-      }
-
-      ImGui::Text("Albedo");
-      ImGui::SameLine();
-      ImGui::Image((void *)((*frameResource.GBuffer.Albedo.ShaderResource())
-                                .GpuHandle()
-                                .ptr),
-                   ImVec2(256, 256));
-      ImGui::SameLine();
-
-      ImGui::Text("Material");
-      ImGui::SameLine();
-      ImGui::Image(
-          (void *)((*frameResource.GBuffer.MaterialValues.ShaderResource())
-                       .GpuHandle()
-                       .ptr),
-          ImVec2(256, 256));
-      ImGui::SameLine();
-      ImGui::Text("Normal");
-      ImGui::SameLine();
-
-      ImGui::Image((void *)((*frameResource.GBuffer.Normal.ShaderResource())
-                                .GpuHandle()
-                                .ptr),
-                   ImVec2(256, 256));
-      ImGui::SameLine();
-
-      ImGui::Text("LOGS:\n---------------------\n%s", shared_.prints.c_str());
-    }
-    ImGui::End();
-    debugValues.DrawImGui(beforeNextFrame_);
-    simData.DrawImGui(beforeNextFrame_);
-    DrawImGuiForPSResources(waterData, sunData, defData, true);
-
-    ShowImguiLoaderConfig(debugValues, simData, waterData, sunData, defData,
-                          settings, cam, beforeNextFrame_, true);
-    imgui_wrapper_.Render(allocator);
+  if (!settings.showImgui) {
+    return;
   }
+  imgui_wrapper_.Pre(allocator);
+
+  menuSettings_.app.drawContent = [this, &allocator, &frameResource,
+                                   &drawingSimResource]() {
+    DrawImGuiApplicationData(allocator, frameResource, drawingSimResource);
+  };
+  menuSettings_.debugMenu.drawContent = [this]() {
+    debugValues.DrawImGui(beforeNextFrame_);
+  };
+  menuSettings_.simData.drawContent = [this]() {
+    simData.DrawImGui(beforeNextFrame_);
+  };
+
+  menuSettings_.renderingData.drawContent = [this]() {
+    DrawImGuiForPSResources(waterData, sunData, defData);
+  };
+
+  menuSettings_.save.drawContent = [this]() {
+    ShowImguiLoaderConfig(debugValues, simData, waterData, sunData, defData,
+                          settings, cam, beforeNextFrame_);
+  };
+  menuSettings_.Draw();
+  imgui_wrapper_.Render(allocator);
 }
 App::SinceTimeStartTimeFrame App::GetTimeSinceStart() {
   return std::chrono::duration_cast<SinceTimeStartTimeFrame>(

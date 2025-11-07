@@ -111,7 +111,7 @@ struct ImGUIManager {
 
   ImGUIManager(const Axodox::Graphics::D3D12::GraphicsDevice &device,
                u8 framesInFlight, const std::filesystem::path &iniPath,
-               const std::string iniName = "MyApp");
+               const std::string iniName = "MyApplication");
 
   ImGuiIO &GetIO();
   ~ImGUIManager();
@@ -127,10 +127,10 @@ public:
   ///  Keys cannot contain '=', '[]' and the values cannot contain line breaks;
   ///  UB otherwise. Data is saved on destructor.
   /// </summary>
-  std::unordered_map<std::string, std::string> settings;
+  std::unordered_map<std::string, std::string> persistence;
 
 private:
-  std::string iniName;
+  const std::string iniName;
   void SetupPersistence();
   winrt::com_ptr<ID3D12DescriptorHeap> descriptorHeap_ = nullptr;
 };

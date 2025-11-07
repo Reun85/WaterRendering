@@ -2,55 +2,51 @@
 #include "Simulation.h"
 
 namespace Reun {
-void SimulationData::DrawImGui(NeedToDo &out, bool exclusiveWindow) {
-  bool cont = true;
-  if (exclusiveWindow) {
-    cont = ImGui::Begin("Simulation Data");
-  }
-  if (cont) {
-    static const std::vector<std::pair<std::string, SimulationData>> presets =
-        SimulationData::Presets();
+void SimulationData::DrawImGui(NeedToDo &out) {
+  static const std::vector<std::pair<std::string, SimulationData>> presets =
+      SimulationData::Presets();
 
-    static int selectedPreset = 0;
+  static int selectedPreset = 0;
 
-    bool change = false;
-    ImGui::Text("N: %d, M: %d", N, M);
-    if (ImGui::BeginCombo("Presets", presets[selectedPreset].first.c_str())) {
-      for (int i = 0; i < presets.size(); i++) {
-        bool isSelected = selectedPreset == i;
-        if (ImGui::Selectable(presets[i].first.c_str(), isSelected)) {
-          selectedPreset = i;
-          change = true;
-          *this = presets[i].second;
-        }
-        if (isSelected)
-          ImGui::SetItemDefaultFocus();
+  bool change = false;
+  ImGui::Text("N: %d, M: %d", N, M);
+  if (ImGui::BeginCombo("Presets", presets[selectedPreset].first.c_str())) {
+    for (int i = 0; i < presets.size(); i++) {
+      bool isSelected = selectedPreset == i;
+      if (ImGui::Selectable(presets[i].first.c_str(), isSelected)) {
+        selectedPreset = i;
+        change = true;
+        *this = presets[i].second;
       }
-      ImGui::EndCombo();
+      if (isSelected)
+        ImGui::SetItemDefaultFocus();
     }
-    change |= ImGui::InputFloat2("Wind Direction", &windDirection.x);
-    change |= ImGui::InputFloat("Gravity", &gravity);
-    change |= ImGui::InputFloat("Depth", &depth);
-    ImGui::Text("Highest");
-    bool hig = highest.DrawImGui("Highest");
-    ImGui::Separator();
-    ImGui::Text("Medium");
-    bool med = medium.DrawImGui("Medium");
-    ImGui::Separator();
-    ImGui::Text("Lowest");
-    bool low = lowest.DrawImGui("Lowest");
-    ImGui::Separator();
-    ImGui::InputFloat("QuadTree distanceThreshold", &quadTreeDistanceThreshold);
-    i32 x = (i32)maxDepth;
-    ImGui::InputInt("Max Depth", &x);
-    maxDepth = (u32)x;
-    ImGui::Separator();
-    out.patchHighestChanged = hig || change;
-    out.patchMediumChanged = med || change;
-    out.patchLowestChanged = low || change;
+    ImGui::EndCombo();
   }
-  if (exclusiveWindow)
-    ImGui::End();
+  change |= ImGui::InputFloat2("Wind Direction", &windDirection.x);
+  change |= ImGui::InputFloat("Gravity", &gravity);
+  change |= ImGui::InputFloat("Depth", &depth);
+  bool hig = false;
+  bool med = false;
+  bool low = false;
+  if (ImGui::CollapsingHeader("Highest")) {
+    hig = highest.DrawImGui("Highest");
+  }
+  if (ImGui::CollapsingHeader("Medium")) {
+    med = medium.DrawImGui("Medium");
+  }
+  if (ImGui::CollapsingHeader("Lowest")) {
+    low = lowest.DrawImGui("Lowest");
+  }
+  ImGui::Separator();
+  ImGui::InputFloat("QuadTree distanceThreshold", &quadTreeDistanceThreshold);
+  i32 x = (i32)maxDepth;
+  ImGui::InputInt("Max Depth", &x);
+  maxDepth = (u32)x;
+  ImGui::Separator();
+  out.patchHighestChanged = hig || change;
+  out.patchMediumChanged = med || change;
+  out.patchLowestChanged = low || change;
 }
 bool SimulationData::PatchData::DrawImGui(std::string_view ID) {
   bool change = false;

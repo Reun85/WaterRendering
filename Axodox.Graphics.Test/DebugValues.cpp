@@ -31,52 +31,44 @@ const static constexpr std::initializer_list<
                      {u8(30), std::nullopt},
                      {u8(31), std::nullopt}};
 
-void DebugValues::DrawImGui(NeedToDo &out, bool exclusiveWindow) {
-  bool cont = true;
-  if (exclusiveWindow)
-    cont = ImGui::Begin("Debug Values");
-  if (cont) {
-    // useTexture
-    useTextureImGuiDraw();
-    // Culling
-    CullingImGuiDraw(out);
+void DebugValues::DrawImGui(NeedToDo &out) {
+  // useTexture
+  useTextureImGuiDraw();
+  // Culling
+  CullingImGuiDraw(out);
 
-    ImGui::InputFloat4("Blend Distances", (float *)&blendDistances);
-    ImGui::InputFloat("Prism Height", &prismHeight);
-    ImGui::SliderFloat("Cone step relax", &coneStepRelax, 0, 3);
-    ImGui::Checkbox("Enable SSR", &enableSSR);
-    ImGui::Checkbox("Lock QuadTree", &lockQuadTree);
-    ImGui::Checkbox("Cone Creater", &conecreater);
+  ImGui::InputFloat4("Blend Distances", (float *)&blendDistances);
+  ImGui::InputFloat("Prism Height", &prismHeight);
+  ImGui::SliderFloat("Cone step relax", &coneStepRelax, 0, 3);
+  ImGui::Checkbox("Enable SSR", &enableSSR);
+  ImGui::Checkbox("Lock QuadTree", &lockQuadTree);
+  ImGui::Checkbox("Cone Creater", &conecreater);
 
-    static const std::array<std::string, 3> modeitems = {
-        "Tesselation",
-        "Parallax",
-        "PrismParallax",
-    };
-    if (ImGui::BeginCombo("Draw Mode", modeitems[(u32)(drawMethod)].c_str())) {
-      for (uint i = 0; i < modeitems.size(); i++) {
-        bool isSelected = ((u32)(drawMethod) == i);
-        if (ImGui::Selectable(modeitems[i].c_str(), isSelected)) {
-          drawMethod = DrawTechnology(i);
-        }
-        if (isSelected) {
-          ImGui::SetItemDefaultFocus();
-        }
+  static const std::array<std::string, 3> modeitems = {
+      "Tesselation",
+      "Parallax",
+      "PrismParallax",
+  };
+  if (ImGui::BeginCombo("Draw Mode", modeitems[(u32)(drawMethod)].c_str())) {
+    for (uint i = 0; i < modeitems.size(); i++) {
+      bool isSelected = ((u32)(drawMethod) == i);
+      if (ImGui::Selectable(modeitems[i].c_str(), isSelected)) {
+        drawMethod = DrawTechnology(i);
       }
-      ImGui::EndCombo();
+      if (isSelected) {
+        ImGui::SetItemDefaultFocus();
+      }
     }
-
-    ImGui::InputInt("Max Cone Step", &maxConeStep);
-    for (auto &[id, name] : DebugBitsDesc) {
-      if (name.has_value())
-        ImGui::Checkbox(*name, &DebugBits[id]);
-      else
-        ImGui::Checkbox(std::format("Debug Bit {}", id).c_str(),
-                        &DebugBits[id]);
-    }
+    ImGui::EndCombo();
   }
-  if (exclusiveWindow)
-    ImGui::End();
+
+  ImGui::InputInt("Max Cone Step", &maxConeStep);
+  for (auto &[id, name] : DebugBitsDesc) {
+    if (name.has_value())
+      ImGui::Checkbox(*name, &DebugBits[id]);
+    else
+      ImGui::Checkbox(std::format("Debug Bit {}", id).c_str(), &DebugBits[id]);
+  }
 }
 
 void DebugValues::CullingImGuiDraw(NeedToDo &out) {

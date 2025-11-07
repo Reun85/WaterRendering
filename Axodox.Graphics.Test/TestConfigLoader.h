@@ -25,6 +25,5 @@ void ShowImguiLoaderConfig(
     Graphics::WaterGraphicRootDescription::WaterPixelShaderData &waterData,
     Graphics::PixelLighting &sunData,
     Graphics::DeferredShading::DeferredShaderBuffers &deferredData,
-    RuntimeSettings &settings, Camera &cam, NeedToDo &beforeNextFrame,
-    bool exclusiveWindow);
+    RuntimeSettings &settings, Camera &cam, NeedToDo &beforeNextFrame);
 } // namespace Reun

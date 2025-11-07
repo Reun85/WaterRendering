@@ -9,19 +9,19 @@ void SetupImGuiStyle() {
   setBessDarkColors(); // 4/5
 }
 
-com_ptr<ID3D12DescriptorHeap>
-InitImGui(const Axodox::Graphics::D3D12::GraphicsDevice &device,
-          u8 framesInFlight, const std::filesystem::path &iniPath) {
+void InitImGui(const std::filesystem::path &iniPath) {
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGuiIO &io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-  ImGui::StyleColorsDark();
 
   typedef std::basic_string<std::filesystem::path::value_type> system_string;
   system_string value = iniPath;
   static std::string save = Utf16ToUtf8(value);
   io.IniFilename = (char *)save.c_str();
+}
+com_ptr<ID3D12DescriptorHeap> InitImGuiPlatformDependent(
+    const Axodox::Graphics::D3D12::GraphicsDevice &device, u8 framesInFlight) {
 
   // Setup Platform/Renderer bindings
   ImGui_ImplUwp_InitForCurrentView();
@@ -48,10 +48,14 @@ InitImGui(const Axodox::Graphics::D3D12::GraphicsDevice &device,
 ImGUIManager::ImGUIManager(
     const Axodox::Graphics::D3D12::GraphicsDevice &device, u8 framesInFlight,
     const std::filesystem::path &iniPath, const std::string iniName)
-    : settings(), iniName(iniName) {
-  descriptorHeap_ = (InitImGui(device, framesInFlight, iniPath));
-  SetupImGuiStyle();
+    : persistence(), iniName(iniName) {
+
+  // Have to set persistence before initializing!
+  InitImGui(iniPath);
   SetupPersistence();
+  ImGui::LoadIniSettingsFromDisk(ImGui::GetIO().IniFilename);
+  descriptorHeap_ = (InitImGuiPlatformDependent(device, framesInFlight));
+  SetupImGuiStyle();
 }
 
 ImGuiIO &ImGUIManager::GetIO() { return ImGui::GetIO(); }
@@ -63,21 +67,16 @@ ImGUIManager::~ImGUIManager() {
 }
 
 void ImGUIManager::SetupPersistence() {
-  ImGuiIO &io = ImGui::GetIO();
 
   ImGuiSettingsHandler handler;
   handler.TypeName = iniName.c_str();
-  handler.TypeHash = ImHashStr(handler.TypeName);
-  handler.UserData = &settings;
+  handler.TypeHash = ImHashStr(iniName.c_str());
+  handler.UserData = &persistence;
 
-  // OnLoad, do we need to read our own data?
   handler.ReadOpenFn = [](ImGuiContext *ctx, ImGuiSettingsHandler *handler,
                           const char *name) -> void * {
-    if (strcmp(name, handler->TypeName) == 0) {
-      // This is our section!
-      return handler->UserData;
-    }
-    return nullptr;
+    // what data to read to
+    return handler->UserData;
   };
 
   handler.ReadLineFn = [](ImGuiContext *ctx, ImGuiSettingsHandler *handler,
@@ -106,7 +105,7 @@ void ImGUIManager::SetupPersistence() {
         *static_cast<std::unordered_map<std::string, std::string> *>(
             handler->UserData);
 
-    buf->appendf("[%s]\n", handler->TypeName);
+    buf->appendf("[%s][]\n", handler->TypeName);
 
     for (auto &[key, value] : settings) {
       buf->appendf("%s=%s\n", key.c_str(), value.c_str());

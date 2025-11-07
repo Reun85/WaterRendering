@@ -415,7 +415,7 @@ void Reun::ShowImguiLoaderConfig(
     Graphics::PixelLighting &sunData,
     Graphics::DeferredShading::DeferredShaderBuffers &deferredData,
     Reun::RuntimeSettings &settings, Reun::Camera &cam,
-    Reun::NeedToDo &beforeNextFrame, bool exclusiveWindow) {
+    Reun::NeedToDo &beforeNextFrame) {
 
   static std::vector<std::pair<std::string, std::filesystem::path>> files =
       getFiles();
@@ -430,88 +430,81 @@ void Reun::ShowImguiLoaderConfig(
   bool pressedLoad = false;
   bool pressedDelete = false;
 
-  bool cont = true;
-  if (exclusiveWindow)
-    cont = ImGui::Begin("Save data");
-  if (cont) {
-    if (!files.empty()) {
+  if (!files.empty()) {
 
-      if (ImGui::BeginCombo("File", files[selectedFile].first.c_str())) {
-        for (u16 i = 0; i < files.size(); i++) {
-          bool isSelected = (selectedFile == i);
-          if (ImGui::Selectable(files[i].first.c_str(), isSelected)) {
-            selectedFile = i;
-          }
-          if (isSelected) {
-            ImGui::SetItemDefaultFocus();
-          }
+    if (ImGui::BeginCombo("File", files[selectedFile].first.c_str())) {
+      for (u16 i = 0; i < files.size(); i++) {
+        bool isSelected = (selectedFile == i);
+        if (ImGui::Selectable(files[i].first.c_str(), isSelected)) {
+          selectedFile = i;
         }
-        ImGui::EndCombo();
+        if (isSelected) {
+          ImGui::SetItemDefaultFocus();
+        }
       }
-      if (!canDelete)
-        ImGui::BeginDisabled();
-      if (ImGui::Button("Delete")) {
-        canDelete = false;
-        pressedDelete = true;
-      }
-      if (!canDelete && !pressedDelete)
-        ImGui::EndDisabled();
-      ImGui::SameLine();
-      ImGui::Checkbox("sure?##DeleteCheck", &canDelete);
+      ImGui::EndCombo();
     }
-
-    ImGui::Checkbox("sure?##SaveCheck", &canOverSave);
-    ImGui::SameLine();
-    if (!canOverSave)
+    if (!canDelete)
       ImGui::BeginDisabled();
-    if (ImGui::Button("Save")) {
-      pressedSave = true;
-      canOverSave = false;
+    if (ImGui::Button("Delete")) {
+      canDelete = false;
+      pressedDelete = true;
     }
-    if (!canOverSave && !pressedSave)
-      ImGui::EndDisabled();
-
-    if (Text == "")
-      ImGui::BeginDisabled();
-    if (ImGui::Button("Create!")) {
-      namespace fs = std::filesystem;
-      fs::path dir = fs::path(GetLocalFolder()) / "SimConfig";
-
-      if (!fs::exists(dir)) {
-        fs::create_directories(dir); // Create directories if they don't exist
-      }
-      fs::path file = dir / Text;
-      std::ofstream os(file);
-      os.close();
-      files = getFiles();
-      auto it = std::ranges::find_if(
-          files, [](const auto &pair) { return pair.first == Text; });
-
-      if (it != files.end()) {
-        selectedFile = static_cast<u16>(std::distance(files.begin(), it));
-        pressedSave = true;
-      }
-    }
-    if (Text == "")
+    if (!canDelete && !pressedDelete)
       ImGui::EndDisabled();
     ImGui::SameLine();
-    if (ImGui::InputText("New file: ##Createnewfile", Text.data(), 128)) {
-      Text.resize(strlen(Text.c_str()));
-    }
-
-    ImGui::Checkbox("sure?##LoadCheck", &canOverwrite);
-    ImGui::SameLine();
-    if (!canOverwrite)
-      ImGui::BeginDisabled();
-    if (ImGui::Button("Load")) {
-      pressedLoad = true;
-      canOverwrite = false;
-    }
-    if (!canOverwrite && !pressedLoad)
-      ImGui::EndDisabled();
+    ImGui::Checkbox("sure?##DeleteCheck", &canDelete);
   }
-  if (exclusiveWindow)
-    ImGui::End();
+
+  ImGui::Checkbox("sure?##SaveCheck", &canOverSave);
+  ImGui::SameLine();
+  if (!canOverSave)
+    ImGui::BeginDisabled();
+  if (ImGui::Button("Save")) {
+    pressedSave = true;
+    canOverSave = false;
+  }
+  if (!canOverSave && !pressedSave)
+    ImGui::EndDisabled();
+
+  if (Text == "")
+    ImGui::BeginDisabled();
+  if (ImGui::Button("Create!")) {
+    namespace fs = std::filesystem;
+    fs::path dir = fs::path(GetLocalFolder()) / "SimConfig";
+
+    if (!fs::exists(dir)) {
+      fs::create_directories(dir); // Create directories if they don't exist
+    }
+    fs::path file = dir / Text;
+    std::ofstream os(file);
+    os.close();
+    files = getFiles();
+    auto it = std::ranges::find_if(
+        files, [](const auto &pair) { return pair.first == Text; });
+
+    if (it != files.end()) {
+      selectedFile = static_cast<u16>(std::distance(files.begin(), it));
+      pressedSave = true;
+    }
+  }
+  if (Text == "")
+    ImGui::EndDisabled();
+  ImGui::SameLine();
+  if (ImGui::InputText("New file: ##Createnewfile", Text.data(), 128)) {
+    Text.resize(strlen(Text.c_str()));
+  }
+
+  ImGui::Checkbox("sure?##LoadCheck", &canOverwrite);
+  ImGui::SameLine();
+  if (!canOverwrite)
+    ImGui::BeginDisabled();
+  if (ImGui::Button("Load")) {
+    pressedLoad = true;
+    canOverwrite = false;
+  }
+  if (!canOverwrite && !pressedLoad)
+    ImGui::EndDisabled();
 
   // Do the chosen operations
   if (pressedSave) {

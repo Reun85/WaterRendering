@@ -39,7 +39,7 @@ struct SimulationData {
   SimulationData &operator=(const SimulationData &other) = default;
 
 public:
-  void DrawImGui(NeedToDo &out, bool exclusiveWindow = true);
+  void DrawImGui(NeedToDo &out);
   static SimulationData Default();
   static std::vector<std::pair<std::string, SimulationData>> Presets();
 };

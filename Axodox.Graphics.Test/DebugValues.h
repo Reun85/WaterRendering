@@ -46,7 +46,7 @@ struct DebugValues {
     return {DebugBits[3], DebugBits[4], DebugBits[5]};
   }
   RasterizerFlags rasterizerFlags = RasterizerFlags::CullClockwise;
-  void DrawImGui(NeedToDo &out, bool exclusiveWindow = true);
+  void DrawImGui(NeedToDo &out);
 
 private:
   void CullingImGuiDraw(NeedToDo &out);

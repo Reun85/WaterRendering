@@ -3,38 +3,36 @@
 
 namespace Reun {
 struct MenuSettings {
-  enum Menu {
-    App = 0,
+  struct PanelState {
+    std::function<void()> drawContent;
+    bool isDetached = false;
 
-    Save = 1,
-    SimData = 2,
-    PS = 3,
-    Debug = 4,
+    std::string name;
+    // Unique name for ImGui
+    std::string safeName;
+    std::string detachButton;
+    std::string attachButton;
+    explicit PanelState(std::string name);
+    PanelState(std::string name, std::string safe_name);
   };
-  struct IsDetached {
-    struct PerChar {
-      bool App = false;
-      bool Save = false;
-      bool SimData = false;
-      bool PS = false;
-      bool Debug = false;
-    };
-    union {
-      PerChar per;
-      std::array<bool, 5> arr;
-    } values;
-    bool set(const Menu ind, const bool val = true) {
-      values.arr[(usize)ind] = val;
-    }
-    bool state(const Menu ind) { return values.arr[(usize)ind]; }
-  };
+
+  static constexpr usize s_menuCount = 5;
+
   MenuSettings(std::unordered_map<std::string, std::string> &persistence);
+  ~MenuSettings();
+  void Draw();
 
-  std::vector<bool> isDetached;
-  Menu SelectedMenu = Menu::App;
-  bool showDebugMenus = false;
+  std::string safeName;
+  std::string safeBarName;
+  PanelState app{"App"};
+  PanelState save{"Save"};
+  PanelState simData{"SimData"};
+  PanelState renderingData{"Rendering data"};
+  PanelState debugMenu{"Debug Menu"};
 
 private:
+  const std::array<MenuSettings::PanelState *, s_menuCount> list = {
+      &app, &save, &simData, &renderingData, &debugMenu};
   // Will write to here at destructor
   std::unordered_map<std::string, std::string> &persistence;
 };

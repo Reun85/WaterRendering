@@ -77,12 +77,8 @@ struct App {
 
 private:
   void Run();
-  void DrawImGuiMenu(CommandAllocator &allocator,
-                     Graphics::FrameResources &frameResource,
-                     SimulationStage::SimulationResources &drawingSimResource);
-  void DrawImGuiApplicationData(
-      CommandAllocator &allocator, Graphics::FrameResources &frameResource,
-      SimulationStage::SimulationResources &drawingSimResource);
+  void DrawImGuiMenu(CommandAllocator &allocator, Graphics::FrameResources &,
+                     SimulationStage::SimulationResources &);
   Graphics::GlobalGPUBuffers
   CreateGlobalGPUBuffers(DynamicBufferManager &bufferManager);
 
