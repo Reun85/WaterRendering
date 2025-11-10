@@ -147,7 +147,7 @@ private:
   // Timing
   float gameTime = 0.f;
   using SinceTimeStartTimeFrame = std::chrono::nanoseconds;
-  using TimePoint = decltype(std::chrono::high_resolution_clock::now());
+  using TimePoint = decltype(std::chrono::steady_clock::now());
   TimePoint loopStartTime;
   TimePoint currentFrameStart;
 

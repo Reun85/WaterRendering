@@ -261,7 +261,7 @@ void App::Run() {
     cam.SetAspect(float(resolution.x) / float(resolution.y));
   }
 
-  loopStartTime = std::chrono::high_resolution_clock::now();
+  loopStartTime = std::chrono::steady_clock::now();
 
   // Main loop
   // ------------------------------------------------
@@ -494,7 +494,7 @@ void App::Run() {
         fullRenderPipeline.Execute(renderFrameContext);
       }
 
-      auto CPURenderEnd = std::chrono::high_resolution_clock::now();
+      auto CPURenderEnd = std::chrono::steady_clock::now();
       runtimeResults_.CPUTime = CPURenderEnd - currentFrameStart;
       DrawImGuiMenu(allocator, frameResource, drawingSimResource);
 
@@ -658,12 +658,12 @@ void App::DrawImGuiMenu(
 }
 App::SinceTimeStartTimeFrame App::GetTimeSinceStart() {
   return std::chrono::duration_cast<SinceTimeStartTimeFrame>(
-      std::chrono::high_resolution_clock::now() - loopStartTime);
+      std::chrono::steady_clock::now() - loopStartTime);
 };
 void App::CalculateTimeConstants() {
 
   auto oldFrameStart = currentFrameStart;
-  currentFrameStart = std::chrono::high_resolution_clock::now();
+  currentFrameStart = std::chrono::steady_clock::now();
 
   float deltaTime = GetDurationInFloatWithPrecision<std::chrono::seconds,
                                                     std::chrono::milliseconds>(

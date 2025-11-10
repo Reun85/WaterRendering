@@ -303,9 +303,9 @@ WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
   tmp = cam.GetForward();
   XMStoreFloat3(&camDir, tmp);
 
-  decltype(std::chrono::high_resolution_clock::now()) start;
+  decltype(std::chrono::steady_clock::now()) start;
   if (runtimeResults)
-    start = std::chrono::high_resolution_clock::now();
+    start = std::chrono::steady_clock::now();
 
   qt.Build(center, fullSizeXZ, float3(camUsedPos.x, camUsedPos.y, camUsedPos.z),
            float3(camDir.x, camDir.y, camDir.z),
@@ -317,7 +317,7 @@ WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
     auto &x = **runtimeResults;
     x.QuadTreeBuildTime +=
         std::chrono::duration_cast<decltype(x.QuadTreeBuildTime)>(
-            std::chrono::high_resolution_clock::now() - start);
+            std::chrono::steady_clock::now() - start);
 
     x.qtNodes = qt.GetSize();
     x.drawnNodes = 0;
@@ -328,7 +328,7 @@ WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
 
   // Fill buffer with Quad Info
   {
-    start = std::chrono::high_resolution_clock::now();
+    start = std::chrono::steady_clock::now();
     auto *curr = &vec.emplace_back();
 
     for (auto it = qt.begin(); it != qt.end(); ++it) {
@@ -336,7 +336,7 @@ WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
         auto &x = **runtimeResults;
         x.NavigatingTheQuadTree +=
             std::chrono::duration_cast<decltype(x.NavigatingTheQuadTree)>(
-                (std::chrono::high_resolution_clock::now() - start));
+                (std::chrono::steady_clock::now() - start));
         x.drawnNodes++;
       }
 
@@ -348,13 +348,13 @@ WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
                                                               it->center.y};
       }
       if (!debugValues.calculateParallax()) {
-        start = std::chrono::high_resolution_clock::now();
+        start = std::chrono::steady_clock::now();
 
         auto res = it.GetSmallerNeighbor();
 
         (*runtimeResults)->NavigatingTheQuadTree += std::chrono::duration_cast<
             decltype((*runtimeResults)->NavigatingTheQuadTree)>(
-            (std::chrono::high_resolution_clock::now() - start));
+            (std::chrono::steady_clock::now() - start));
         static const constexpr auto l = [](const float x) -> float {
           if (x == 0)
             return 1;
@@ -370,7 +370,7 @@ WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
         curr = &vec.emplace_back();
       }
 
-      start = std::chrono::high_resolution_clock::now();
+      start = std::chrono::steady_clock::now();
     }
 
     // If a quarter of the capacity is unused shrink the vector in a
