@@ -456,16 +456,29 @@ void Reun::ShowImguiLoaderConfig(
     ImGui::Checkbox("sure?##DeleteCheck", &canDelete);
   }
 
-  ImGui::Checkbox("sure?##SaveCheck", &canOverSave);
-  ImGui::SameLine();
-  if (!canOverSave)
-    ImGui::BeginDisabled();
-  if (ImGui::Button("Save")) {
-    pressedSave = true;
-    canOverSave = false;
+  if (files.size() != 0) {
+    ImGui::Checkbox("sure?##SaveCheck", &canOverSave);
+    ImGui::SameLine();
+    if (!canOverSave)
+      ImGui::BeginDisabled();
+    if (ImGui::Button("Save")) {
+      pressedSave = true;
+      canOverSave = false;
+    }
+    if (!canOverSave && !pressedSave)
+      ImGui::EndDisabled();
+
+    ImGui::Checkbox("sure?##LoadCheck", &canOverwrite);
+    ImGui::SameLine();
+    if (!canOverwrite)
+      ImGui::BeginDisabled();
+    if (ImGui::Button("Load")) {
+      pressedLoad = true;
+      canOverwrite = false;
+    }
+    if (!canOverwrite && !pressedLoad)
+      ImGui::EndDisabled();
   }
-  if (!canOverSave && !pressedSave)
-    ImGui::EndDisabled();
 
   if (Text == "")
     ImGui::BeginDisabled();
@@ -494,18 +507,6 @@ void Reun::ShowImguiLoaderConfig(
   if (ImGui::InputText("New file: ##Createnewfile", Text.data(), 128)) {
     Text.resize(strlen(Text.c_str()));
   }
-
-  ImGui::Checkbox("sure?##LoadCheck", &canOverwrite);
-  ImGui::SameLine();
-  if (!canOverwrite)
-    ImGui::BeginDisabled();
-  if (ImGui::Button("Load")) {
-    pressedLoad = true;
-    canOverwrite = false;
-  }
-  if (!canOverwrite && !pressedLoad)
-    ImGui::EndDisabled();
-
   // Do the chosen operations
   if (pressedSave) {
     std::ofstream os(files[selectedFile].second);

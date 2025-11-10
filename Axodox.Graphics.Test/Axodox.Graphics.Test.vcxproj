@@ -59,13 +59,13 @@
   <PropertyGroup Label="UserMacros">
     <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
     <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
-    <AppxAutoIncrementPackageRevision>True</AppxAutoIncrementPackageRevision>
+    <AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
     <GenerateTestArtifacts>True</GenerateTestArtifacts>
     <AppxBundle>Always</AppxBundle>
     <AppxBundlePlatforms>x64</AppxBundlePlatforms>
     <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
-    <AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>
-    <PackageCertificateThumbprint>8F86BED8218E9CC4A993B116BD27BB209BB64E45</PackageCertificateThumbprint>
+    <AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>
+    <PackageCertificateKeyFile>Axodox.Graphics.Desktop_TemporaryKey.pfx</PackageCertificateKeyFile>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(ProjectDir)/includes</IncludePath>
@@ -123,7 +123,6 @@
     <ClInclude Include="Gui.h" />
     <ClInclude Include="Helpers.h" />
     <ClInclude Include="ImGuiHelper.h" />
-    <ClInclude Include="Menu.h" />
     <ClInclude Include="Meshes.h" />
     <ClInclude Include="MutableTextureWithState.hpp" />
     <ClInclude Include="oldstuff.h" />
@@ -189,6 +188,7 @@
     <Image Include="Assets\skybox\skybox3.hdr">
       <FileType>Document</FileType>
     </Image>
+    <None Include="Axodox.Graphics.Desktop_TemporaryKey.pfx" />
     <None Include="Axodox.Graphics.Test_TemporaryKey.pfx" />
     <None Include="packages.config" />
     <None Include="PropertySheet.props" />

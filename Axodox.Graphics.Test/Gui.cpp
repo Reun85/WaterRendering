@@ -50,7 +50,8 @@ MenuSettings::~MenuSettings() {
 
   auto f = [this](PanelState &panel) {
     if (panel.isDetached) {
-      persistence[panel.name + std::string(s_isDetachedKeyMod)] = s_detachedValue;
+      persistence[panel.name + std::string(s_isDetachedKeyMod)] =
+          s_detachedValue;
     } else {
       persistence.erase(panel.name + std::string(s_isDetachedKeyMod));
     }
@@ -60,21 +61,22 @@ MenuSettings::~MenuSettings() {
   }
 }
 
-void DrawPanelContent(MenuSettings::PanelState &state, const bool isDetached) {
+void DrawPanelContent(MenuSettings::PanelState &state, const bool isDetached,
+                      const bool canChangeDetachness = true) {
   std::string *but;
   if (isDetached) {
     but = &state.attachButton;
   } else {
     but = &state.detachButton;
   }
-  if (ImGui::Button(but->c_str())) {
+  if (canChangeDetachness && ImGui::Button(but->c_str())) {
     state.isDetached = !state.isDetached;
   }
   state.drawContent();
 }
 
 void MenuSettings::Draw() {
-  bool any_not_detached = false;
+  u32 number_not_detached = 0;
 
   // Floating panels
   for (PanelState *p : list) {
@@ -86,13 +88,15 @@ void MenuSettings::Draw() {
       }
       ImGui::End();
     } else {
-      any_not_detached = true;
+      number_not_detached++;
     }
   }
 
-  if (!any_not_detached)
+  if (number_not_detached == 0)
     return;
   if (ImGui::Begin(safeName.c_str())) {
+    // Since its alone, do not allow it to detach further
+    const bool canChangeDetachness = number_not_detached != 1;
 
     if (ImGui::BeginTabBar(safeBarName.c_str())) {
 
@@ -102,7 +106,7 @@ void MenuSettings::Draw() {
 
           if (ImGui::BeginTabItem(panel.name.c_str())) {
 
-            DrawPanelContent(panel, false);
+            DrawPanelContent(panel, false, canChangeDetachness);
             ImGui::EndTabItem();
           }
         }
