@@ -2,7 +2,7 @@
 #include "Meshes.h"
 
 namespace Reun {
-namespace Meshes {
+namespace MeshBuilders {
 MeshDescription CreateBackwardsPlane(float size,
                                      DirectX::XMUINT2 subdivisions) {
   if (subdivisions.x < 2 || subdivisions.y < 2)
@@ -181,5 +181,5 @@ MeshDescription CreateQuadPatch() {
 
   return result;
 }
-} // namespace Meshes
+} // namespace MeshBuilders
 } // namespace Reun

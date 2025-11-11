@@ -2,7 +2,7 @@
 #include "pch.h"
 namespace Reun {
 
-namespace Meshes {
+namespace MeshBuilders {
 /// <summary>
 /// For deferred shading the culling should be set to CullCounterClockwise
 /// therefore shown mesh should be facing backwards
@@ -18,9 +18,6 @@ MeshDescription CreateCubeWithoutBottom(float size,
 MeshDescription CreateBoxInVSMesh();
 
 MeshDescription CreateQuadPatch();
-}; // namespace Meshes
+}; // namespace MeshBuilders
 
-namespace Detail {
-struct Meshes {};
-}; // namespace Detail
 }; // namespace Reun

@@ -1,4 +1,4 @@
-// For all changes here remember to set them in constants.h!
+// For all new variables here remember to set them in constants.h!
 #define NUM_INSTANCES (1 << 12)
 #define DISP_MAP_LOG2 10
 #define DISP_MAP_SIZE (1<<DISP_MAP_LOG2)

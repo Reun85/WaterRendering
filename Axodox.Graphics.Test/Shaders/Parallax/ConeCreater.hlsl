@@ -75,8 +75,6 @@ float smart_method(uint2 threadID)
     return ta;
 }
 
-
-
 // The + are overhangs
 [numthreads(M + K * 2, M + K * 2, 1)]
 void main(uint3 DTid : SV_DispatchThreadID, uint3 LTid : SV_GroupThreadID, uint3 GTid : SV_GroupID)

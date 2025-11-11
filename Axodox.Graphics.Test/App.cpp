@@ -10,14 +10,16 @@ using namespace winrt;
 using namespace Windows;
 using namespace Windows::UI::Core;
 using namespace DirectX;
-using namespace Meshes;
 
 App::App(AppShared &shared)
     : shared_(shared),
       swapChain{directQueue, shared_.window, SwapChainFlags::IsTearingAllowed},
       imgui_wrapper_(device, shared_.settings.framesInFlight,
                      shared_.settings.ImGuiIniPath),
-      menuSettings_(imgui_wrapper_.persistence) {
+      menuSettings_(imgui_wrapper_.persistence),
+
+      textures_(Textures::Default(descriptors_)),
+      meshes_(Meshes::Default(descriptors_)) {
 
   cam.SetView(XMVectorSet(DefaultsValues::Cam::camStartPos.x,
                           DefaultsValues::Cam::camStartPos.y,
@@ -27,6 +29,35 @@ App::App(AppShared &shared)
 
   cam.SetFirstPerson(DefaultsValues::Cam::startFirstPerson);
   SetWindow();
+
+  // frameResources.reserve((usize)shared_.settings.framesInFlight);
+  //  simulationResources.reserve((usize)shared_.settings.framesInFlight);
+  for (u8 i = 0; i < shared_.settings.framesInFlight; i++) {
+    frameResources.push_back(std::make_unique<Graphics::FrameResources>(
+        descriptors_.mutableAllocationContext));
+
+    simulationResources.push_back(
+        std::make_unique<SimulationStage::SimulationResources>(
+            descriptors_.mutableAllocationContext, simData.N, simData.M));
+  }
+
+  swapChain.Resizing(no_revoke, [this](SwapChain const *self) {
+    for (auto &frame : frameResources)
+      frame->ScreenResourceView.reset();
+    descriptors_.commonDescriptorHeap.Clean();
+    auto resolution = self->Resolution();
+    cam.SetAspect(float(resolution.x) / float(resolution.y));
+  });
+
+  {
+    auto resolution = swapChain.Resolution();
+    cam.SetAspect(float(resolution.x) / float(resolution.y));
+  }
+
+  descriptors_.Build();
+  //  Acquire memory
+  // MeshSpecificBuffers silhouetteDetectorMeshBuffers(
+  //    descriptors_.immutableAllocationContext, Box);
 
   shared_.cout << "Using folder " << GetLocalFolder() << " as local folder."
                << std::endl;
@@ -179,87 +210,10 @@ void DrawImGuiForPSResources(
 
 void App::Run() {
 
-  ImmutableMesh planeMesh{descriptors_.immutableAllocationContext,
-                          CreateQuadPatch()};
-  ImmutableMesh simplePlane{descriptors_.immutableAllocationContext,
-                            CreatePlane(2, XMUINT2(2, 2))};
-
-  ImmutableMesh deferredShadingPlane{descriptors_.immutableAllocationContext,
-                                     CreateBackwardsPlane(2, XMUINT2(2, 2))};
-  ImmutableMesh skyboxMesh{descriptors_.immutableAllocationContext,
-                           CreateCube(2)};
-  ImmutableMesh Box{descriptors_.immutableAllocationContext, CreateCube(2)};
-  ImmutableMesh BoxWithoutBottom{descriptors_.immutableAllocationContext,
-                                 CreateCubeWithoutBottom(1)};
-  /*ImmutableMesh BoxOnlyWithIndexBuffer{immutableAllocationContext,
-  CreateBoxInVSMesh()};*/
-  // ImmutableMesh BoxWithoutBottom{immutableAllocationContext,
-  // CreateCube(1)};
-
-  const CubeMapPaths paths = {.PosX = app_folder() / "Assets/skybox/px.png",
-                              .NegX = app_folder() / "Assets/skybox/nx.png",
-                              .PosY = app_folder() / "Assets/skybox/py.png",
-                              .NegY = app_folder() / "Assets/skybox/ny.png",
-                              .PosZ = app_folder() / "Assets/skybox/pz.png",
-                              .NegZ = app_folder() / "Assets/skybox/nz.png"};
-  CubeMapTexture skyboxTexture{descriptors_.immutableAllocationContext, paths};
-  // CubeMapTexture skyboxTexture{immutableAllocationContext,
-  //                              app_folder() / "Assets/skybox/skybox3.hdr",
-  //                              2024};
-
-  //  Acquire memory
-  MeshSpecificBuffers silhouetteDetectorMeshBuffers(
-      descriptors_.immutableAllocationContext, Box);
-  descriptors_.groupedResourceAllocator.Build();
-
   auto &mutableAllocationContext = descriptors_.mutableAllocationContext;
   auto &commonDescriptorHeap = descriptors_.commonDescriptorHeap;
 
-  SimulationStage::ConstantGpuSources simulationConstantSources(
-      descriptors_.mutableAllocationContext, simData);
-  SimulationStage::MutableGpuSources simulationMutableSources(
-      mutableAllocationContext, simData);
-
-  // SilhouetteDetector::Buffers silhouetteDetectorBuffers(
-  //     mutableAllocationContext, Box.GetIndexCount() * 4);
-
-  std::array<Graphics::FrameResources, 2> frameResources{
-      Graphics::FrameResources(mutableAllocationContext),
-      Graphics::FrameResources(mutableAllocationContext)};
-
-  std::array<SimulationStage::SimulationResources, 2> simulationResources{
-      SimulationStage::SimulationResources(mutableAllocationContext, simData.N,
-                                           simData.M),
-      SimulationStage::SimulationResources(mutableAllocationContext, simData.N,
-                                           simData.M)};
-  // std::vector<FrameResources> frameResources;
-  // frameResources.reserve((usize)shared_.persistence.framesInFlight);
-  // std::vector<SimulationStage::SimulationResources> simulationResources;
-  // simulationResources.reserve((usize)shared_.persistence.framesInFlight);
-  // for (u8 i = 0; i < shared_.persistence.framesInFlight; i++) {
-  //   frameResources.emplace_back(mutableAllocationContext);
-
-  //  simulationResources.emplace_back(mutableAllocationContext, simData.N,
-  //                                   simData.M);
-  //}
-
-  descriptors_.committedResourceAllocator.Build();
-
   const u32 &N = simData.N;
-
-  swapChain.Resizing(no_revoke, [this, &frameResources,
-                                 &commonDescriptorHeap](SwapChain const *self) {
-    for (auto &frame : frameResources)
-      frame.ScreenResourceView.reset();
-    commonDescriptorHeap.Clean();
-    auto resolution = self->Resolution();
-    cam.SetAspect(float(resolution.x) / float(resolution.y));
-  });
-
-  {
-    auto resolution = swapChain.Resolution();
-    cam.SetAspect(float(resolution.x) / float(resolution.y));
-  }
 
   loopStartTime = std::chrono::steady_clock::now();
 
@@ -273,12 +227,15 @@ void App::Run() {
 
     frameCounter_++;
     // Current frames resources
-    auto &frameResource = frameResources[frameCounter_ & 0x1u];
+    auto &frameResource =
+        *frameResources[frameCounter_ % shared_.settings.framesInFlight];
     // Simulation resources for drawing.
-    auto &drawingSimResource = simulationResources[frameCounter_ & 0x1u];
+    auto &drawingSimResource =
+        *simulationResources[frameCounter_ % shared_.settings.framesInFlight];
     // Simulation resources for calculating.
     auto &calculatingSimResource =
-        simulationResources[(frameCounter_ + 1u) & 0x1u];
+        *simulationResources[(frameCounter_ + 1u) %
+                             shared_.settings.framesInFlight];
 
     auto renderTargetView = swapChain.RenderTargetView();
 
@@ -380,7 +337,7 @@ void App::Run() {
       if (newData.highestData || newData.mediumData || newData.lowestData) {
         // If there is new data, we have to halt all running computes
         for (auto &x : simulationResources) {
-          x.Wait();
+          x->Wait();
         }
         auto copyRes = [&computeAllocator](const MutableTexture &src,
                                            const MutableTexture &dst) {
@@ -472,13 +429,13 @@ void App::Run() {
             .oceanDataFuture = oceanDataFuture,
         };
         Graphics::Meshes meshes{
-            .planeMesh = planeMesh,
-            .simplePlane = simplePlane,
-            .BoxWithoutBottom = BoxWithoutBottom,
-            .skyboxMesh = skyboxMesh,
-            .deferredShadingPlane = deferredShadingPlane,
+            .planeMesh = meshes_.planeMesh,
+            .simplePlane = meshes_.simplePlane,
+            .BoxWithoutBottom = meshes_.BoxWithoutBottom,
+            .skyboxMesh = meshes_.skyboxMesh,
+            .deferredShadingPlane = meshes_.deferredShadingPlane,
         };
-        Graphics::Textures textures{.skyboxTexture = skyboxTexture};
+        Graphics::Textures textures{.skyboxTexture = textures_.skyboxTexture};
         Graphics::RenderFrameContext renderFrameContext{
             .renderTargetView = renderTargetView,
             .frameResources = frameResource,
@@ -524,17 +481,17 @@ void App::Run() {
   // Wait until everything is done before deleting context
 
   for (auto &frameResource : frameResources) {
-    if (frameResource.Marker) {
-      frameResource.Fence.Await(frameResource.Marker);
+    if (frameResource->Marker) {
+      frameResource->Fence.Await(frameResource->Marker);
     }
   }
   for (auto &drawingSimResource : simulationResources) {
-    if (drawingSimResource.FrameDoneMarker) {
-      drawingSimResource.Fence.Await(drawingSimResource.FrameDoneMarker);
+    if (drawingSimResource->FrameDoneMarker) {
+      drawingSimResource->Fence.Await(drawingSimResource->FrameDoneMarker);
     }
   }
   // hijack a fence and marker to use as last final shutdown sync
-  auto &x = frameResources.front();
+  auto &x = *frameResources.front();
   x.Marker = x.Fence.EnqueueSignal(directQueue);
   x.Fence.Await(x.Marker);
 }
@@ -573,11 +530,11 @@ void App ::DrawImGuiApplicationData(
   shared_.cout.str("");
   ImGui::Text("Press ESC to quit");
   ImGui::Text("Press Space to stop time");
-  ImGui::Text("frame %d", frameCounter_);
-  ImGui::Text(" %.3f s",
+  ImGui::Text("Time since start: %.3f s, frame %d",
               GetDurationInFloatWithPrecision<std::chrono::seconds,
                                               std::chrono::milliseconds>(
-                  GetTimeSinceStart()));
+                  GetTimeSinceStart()),
+              frameCounter_);
   ImGui::Text(" %.3f ms/frame (%.1f FPS)",
               1000.0f / imgui_wrapper_.GetIO().Framerate,
               imgui_wrapper_.GetIO().Framerate);
@@ -698,5 +655,52 @@ Descriptors::Descriptors(GraphicsDevice &device, StartUpSettings &settings)
           .CommonDescriptorHeap = &commonDescriptorHeap,
           .RenderTargetDescriptorHeap = &renderTargetDescriptorHeap,
           .DepthStencilDescriptorHeap = &depthStencilDescriptorHeap} {}
-void Descriptors::Build() {}
+void Descriptors::Build() {
+  groupedResourceAllocator.Build();
+  commonDescriptorHeap.Build();
+  depthStencilDescriptorHeap.Build();
+  renderTargetDescriptorHeap.Build();
+  committedResourceAllocator.Build();
+}
+
+Textures Textures::Default(Descriptors &descriptors) {
+
+  const CubeMapPaths paths = {.PosX = app_folder() / "Assets/skybox/px.png",
+                              .NegX = app_folder() / "Assets/skybox/nx.png",
+                              .PosY = app_folder() / "Assets/skybox/py.png",
+                              .NegY = app_folder() / "Assets/skybox/ny.png",
+                              .PosZ = app_folder() / "Assets/skybox/pz.png",
+                              .NegZ = app_folder() / "Assets/skybox/nz.png"};
+  // CubeMapTexture skyboxTexture{immutableAllocationContext,
+  //                              app_folder() / "Assets/skybox/skybox3.hdr",
+  //                              2024};
+
+  return Textures{
+      .skyboxTexture =
+          CubeMapTexture{descriptors.immutableAllocationContext, paths},
+  };
+}
+Meshes Meshes::Default(Descriptors &descriptors) {
+  using namespace MeshBuilders;
+
+  /*ImmutableMesh BoxOnlyWithIndexBuffer{immutableAllocationContext,
+  CreateBoxInVSMesh()};
+   ImmutableMesh BoxWithoutBottom{immutableAllocationContext,
+   CreateCube(1)};*/
+  return Meshes{
+      .planeMesh = ImmutableMesh{descriptors.immutableAllocationContext,
+                                 CreateQuadPatch()},
+      .simplePlane = ImmutableMesh{descriptors.immutableAllocationContext,
+                                   CreatePlane(2, XMUINT2(2, 2))},
+      .deferredShadingPlane =
+          ImmutableMesh{descriptors.immutableAllocationContext,
+                        CreateBackwardsPlane(2, XMUINT2(2, 2))},
+      .skyboxMesh =
+          ImmutableMesh{descriptors.immutableAllocationContext, CreateCube(2)},
+      .Box =
+          ImmutableMesh{descriptors.immutableAllocationContext, CreateCube(2)},
+      .BoxWithoutBottom = ImmutableMesh{descriptors.immutableAllocationContext,
+                                        CreateCubeWithoutBottom(1)},
+  };
+}
 } // namespace Reun

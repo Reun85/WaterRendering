@@ -30,7 +30,6 @@ struct TimeData {
 };
 
 struct Descriptors {
-
   PipelineStateProvider pipelineStateProvider_;
   GroupedResourceAllocator groupedResourceAllocator;
   ResourceUploader resourceUploader;
@@ -47,8 +46,27 @@ struct Descriptors {
 
   void Build();
   Descriptors(GraphicsDevice &, StartUpSettings &);
+  // Can not be moved, this value is pinned after creation!
   Descriptors(const Descriptors &) = delete;
   Descriptors(Descriptors &&) = delete;
+};
+struct Textures {
+  CubeMapTexture skyboxTexture;
+  static Textures Default(Descriptors &descriptors);
+};
+struct Meshes {
+  ImmutableMesh planeMesh;
+  ImmutableMesh simplePlane;
+
+  ImmutableMesh deferredShadingPlane;
+  ImmutableMesh skyboxMesh;
+  ImmutableMesh Box;
+  ImmutableMesh BoxWithoutBottom;
+  /*ImmutableMesh BoxOnlyWithIndexBuffer
+;
+   ImmutableMesh BoxWithoutBottom
+;*/
+  static Meshes Default(Descriptors &descriptors);
 };
 
 struct App {
@@ -91,7 +109,7 @@ private:
   /// From Outer AppWrapper
   AppShared &shared_;
 
-  // DirectX
+  // DirectX common values
   // -----------------
   GraphicsDevice device;
   CommandQueue directQueue{device};
@@ -99,11 +117,16 @@ private:
   CommandQueue &computeQueue = directQueue;
   CoreSwapChain swapChain;
 
+  // Full resource allocation contexts.
   Descriptors descriptors_{device, shared_.settings};
+
+  Textures textures_;
+  Meshes meshes_;
 
   SimulationStage::WaterSimulationPipelines fullSimPipeline =
       SimulationStage::WaterSimulationPipelines::Create(
           device, descriptors_.pipelineStateProvider_);
+
   Graphics::WaterRenderPipelines fullRenderPipeline =
       Graphics::WaterRenderPipelines::Create(
           device, descriptors_.pipelineStateProvider_,
@@ -114,12 +137,26 @@ private:
   Graphics::DeferredShading::DeferredShaderBuffers defData;
   Graphics::PixelLighting sunData = Graphics::PixelLighting::SunData();
   SimulationData simData = SimulationData::Default();
+
+  // This is called constant, but they can technically change, since the user is
+  // able to overwrite them.
+  SimulationStage::ConstantGpuSources<MutableTexture> simulationConstantSources{
+      descriptors_.mutableAllocationContext, simData};
+  SimulationStage::MutableGpuSources simulationMutableSources{
+      descriptors_.mutableAllocationContext, simData};
+  // SilhouetteDetector::Buffers silhouetteDetectorBuffers(
+  //     mutableAllocationContext, Box.GetIndexCount() * 4);
   // ShadowMapping::Data shadowMapData(cam);
 
-  // ResourceAllocationContext immutableResourceAllocationContext_;
-  // ResourceAllocationContext mutableResourceAllocationContext_;
-  // WaterRenderPipelines renderStage_;
+  // Frame data
+  // ------------------
 
+  std::vector<std::unique_ptr<Graphics::FrameResources>> frameResources;
+
+  std::vector<std::unique_ptr<SimulationStage::SimulationResources>>
+      simulationResources;
+
+  // ImGui Menu and settings
   Menu::ImGUIManager imgui_wrapper_;
   MenuSettings menuSettings_;
 

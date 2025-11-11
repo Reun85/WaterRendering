@@ -221,6 +221,8 @@ struct SimulationResources {
         HighestBuffer(context, N, M), MediumBuffer(context, N, M),
         LowestBuffer(context, N, M) {}
 
+  SimulationResources(const SimulationResources &) = default;
+  SimulationResources(SimulationResources &&) = default;
   void Wait();
 };
 
@@ -301,7 +303,6 @@ struct WaterSimulationPipelines {
 
   static WaterSimulationPipelines
   Create(GraphicsDevice &device, PipelineStateProvider &pipelineStateProvider);
-  void Execute(SimulationFrameContext &context);
 };
 void WaterSimulationComputeShader(
     SimulationStage::SimulationResources &simResource,

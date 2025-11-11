@@ -487,6 +487,7 @@ struct FrameResources : ShaderBuffers {
   void Clear(CommandAllocator &allocator) override;
 
   explicit FrameResources(const ResourceAllocationContext &context);
+  FrameResources(const FrameResources &) = default;
   FrameResources(FrameResources &&) = default;
 
   ~FrameResources() override = default;
