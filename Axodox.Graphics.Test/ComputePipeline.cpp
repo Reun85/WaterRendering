@@ -169,7 +169,7 @@ void SimulationStage::WaterSimulationComputeShader(
       MutableTextureWithState &text2 = dat.buffers.tildeD;
       computeAllocator.AddUAVBarrier(*text2.UnorderedAccess(computeAllocator));
     }
-    // Transition
+    // Transition to SRV
     for (const LODData &dat : lodData) {
       MutableTextureWithState &text = dat.buffers.tildeh;
       text.ShaderResource(computeAllocator);
@@ -190,7 +190,7 @@ void SimulationStage::WaterSimulationComputeShader(
       MutableTextureWithState &text2 = dat.buffers.tildeDBuffer;
       computeAllocator.AddUAVBarrier(*text2.UnorderedAccess(computeAllocator));
     }
-    // Transition
+    // SRV
     for (const LODData &dat : lodData) {
       MutableTextureWithState &text = dat.buffers.tildehBuffer;
       text.ShaderResource(computeAllocator);

@@ -44,7 +44,6 @@ public:
   static std::vector<std::pair<std::string, SimulationData>> Presets();
 };
 
-namespace Inner {
 template <typename Prec = f32>
   requires std::is_floating_point_v<Prec>
 constexpr Prec PhilipsSpektrum(const float2 &k, const Prec &amplitude,
@@ -98,7 +97,6 @@ constexpr u32 Indexing(const u32 i, const u32 j, [[maybe_unused]] const u32 _,
   // return ColumnMajorIndexing(i, j, N);
   return RowMajorIndexing(i, j, M);
 };
-} // namespace Inner
 
 class Xorshift128 {
 public:
@@ -152,10 +150,10 @@ CalculateTildeh0(const SimulationData::PatchData &dat) {
     for (i32 j = 0; j < M; j++) {
       k.y = 2.f * std::numbers::pi_v<Prec> * static_cast<float>(Mx2 - j) / L;
 
-      const auto index = Inner::Indexing(i, j, N, M);
+      const auto index = Indexing(i, j, N, M);
 
-      res[index] = Inner::tilde_h0<Prec>(k, dis(gen), dis(gen), amplitude,
-                                         windForce * windForce / gravity, wind);
+      res[index] = tilde_h0<Prec>(k, dis(gen), dis(gen), amplitude,
+                                  windForce * windForce / gravity, wind);
     }
   }
 
@@ -183,7 +181,7 @@ CalculateFrequencies(const SimulationData::PatchData &dat) {
     for (i32 j = 0; j < M; j++) {
       kvec.y = 2 * std::numbers::pi_v<Prec> * (Mx2 - j) / L;
 
-      const auto index = Inner::Indexing(i, j, N, M);
+      const auto index = Indexing(i, j, N, M);
 
       const float k = length(kvec);
       float tmp = gravity * k * std::tanh(k * D);

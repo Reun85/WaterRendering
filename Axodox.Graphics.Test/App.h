@@ -160,7 +160,7 @@ private:
   Menu::ImGUIManager imgui_wrapper_;
   MenuSettings menuSettings_;
 
-  // ApplicationData
+  // UWP ApplicationData
   // -----------------
   usize frameCounter_ = 0;
   bool isRunning_ = false;

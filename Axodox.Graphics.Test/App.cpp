@@ -30,8 +30,8 @@ App::App(AppShared &shared)
   cam.SetFirstPerson(DefaultsValues::Cam::startFirstPerson);
   SetWindow();
 
-  // frameResources.reserve((usize)shared_.settings.framesInFlight);
-  //  simulationResources.reserve((usize)shared_.settings.framesInFlight);
+  frameResources.reserve((usize)shared_.settings.framesInFlight);
+  simulationResources.reserve((usize)shared_.settings.framesInFlight);
   for (u8 i = 0; i < shared_.settings.framesInFlight; i++) {
     frameResources.push_back(std::make_unique<Graphics::FrameResources>(
         descriptors_.mutableAllocationContext));
@@ -41,6 +41,7 @@ App::App(AppShared &shared)
             descriptors_.mutableAllocationContext, simData.N, simData.M));
   }
 
+  // On frame resize, reset resolution, cam and view dependent SRVs.
   swapChain.Resizing(no_revoke, [this](SwapChain const *self) {
     for (auto &frame : frameResources)
       frame->ScreenResourceView.reset();
@@ -67,6 +68,7 @@ App::App(AppShared &shared)
 void App::DeleteApp(std::unique_ptr<App> &app) {
   app->Suspend();
 
+  // Calls the App dtor
   app.reset();
 }
 
@@ -117,7 +119,7 @@ void App::KeyDown(CoreWindow const &, KeyEventArgs const &args) {
     settings.showImgui = !settings.showImgui;
     break;
   case Windows::System::VirtualKey::F2:
-
+    // Change between fullscreen mode
     if (!applicationView.IsFullScreenMode()) {
       bool success = applicationView.TryEnterFullScreenMode();
       if (!success) {
@@ -495,6 +497,7 @@ void App::Run() {
   x.Marker = x.Fence.EnqueueSignal(directQueue);
   x.Fence.Await(x.Marker);
 }
+
 Reun::Graphics::GlobalGPUBuffers
 App::CreateGlobalGPUBuffers(DynamicBufferManager &bufferManager) {
 
