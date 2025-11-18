@@ -94,6 +94,13 @@ DataInStream &operator>>(DataInStream &is, Enum &value) {
 template <EnumType Enum> class AsShiftedOptionalEnum {
 public:
   using UnderlyingType = std::underlying_type_t<Enum>;
+  // If we print/read as a char, we will get nonsensical values!
+    using ReadType = std::conditional_t<
+        std::is_same_v<UnderlyingType, unsigned char> ||
+        std::is_same_v<UnderlyingType, char>,
+        int,
+        UnderlyingType
+    >;
   explicit AsShiftedOptionalEnum(std::optional<Enum> &val) : val_(val) {}
 
   friend DataOutStream &operator<<(DataOutStream &os,
@@ -101,7 +108,7 @@ public:
 
     if (inp.val_.has_value()) {
       const auto val = inp.val_.value();
-      const auto underlying = static_cast<UnderlyingType>(val);
+      const auto underlying = static_cast<ReadType>(val);
       const auto printed = underlying + 1;
       *os << printed;
     } else {
@@ -115,7 +122,7 @@ public:
 
     auto &value = inp.val_;
     // 0 is definitely inside the UnderlyingType range
-    UnderlyingType temp;
+    ReadType temp;
     is >> temp;
     if (temp == 0) {
       value = std::nullopt;
@@ -430,8 +437,16 @@ void Reun::ShowImguiLoaderConfig(
   bool pressedLoad = false;
   bool pressedDelete = false;
 
+  if (ImGui::Button("Reload file list")) {
+    selectedFile = 0;
+    canOverwrite = false;
+    canOverSave = false;
+    canDelete = false;
+    files = getFiles();
+  }
   if (!files.empty()) {
 
+    ImGui::Text("Selected file for action:");
     if (ImGui::BeginCombo("File", files[selectedFile].first.c_str())) {
       for (u16 i = 0; i < files.size(); i++) {
         bool isSelected = (selectedFile == i);
@@ -444,6 +459,8 @@ void Reun::ShowImguiLoaderConfig(
       }
       ImGui::EndCombo();
     }
+
+    ImGui::SeparatorText("File actions:");
     if (!canDelete)
       ImGui::BeginDisabled();
     if (ImGui::Button("Delete")) {
@@ -454,9 +471,7 @@ void Reun::ShowImguiLoaderConfig(
       ImGui::EndDisabled();
     ImGui::SameLine();
     ImGui::Checkbox("sure?##DeleteCheck", &canDelete);
-  }
 
-  if (files.size() != 0) {
     ImGui::Checkbox("sure?##SaveCheck", &canOverSave);
     ImGui::SameLine();
     if (!canOverSave)
@@ -478,6 +493,8 @@ void Reun::ShowImguiLoaderConfig(
     }
     if (!canOverwrite && !pressedLoad)
       ImGui::EndDisabled();
+
+    ImGui::Separator();
   }
 
   if (Text == "")
