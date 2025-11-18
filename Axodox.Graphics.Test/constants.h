@@ -1,7 +1,7 @@
 #pragma once
 #include "Shaders/constants.hlsli"
-namespace Reun {
 #include "Typedefs.h"
+namespace Reun {
 #define CONST_QUALIFIER static const constexpr
 namespace ShaderConstantCompat {
 CONST_QUALIFIER u32 numInstances = NUM_INSTANCES;
