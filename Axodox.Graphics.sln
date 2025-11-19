@@ -5,6 +5,8 @@ VisualStudioVersion = 17.8.34309.116
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Axodox.Graphics.Test", "Axodox.Graphics.Test\Axodox.Graphics.Test.vcxproj", "{8E862168-F430-4A67-B9D4-E3D04F59E033}"
 	ProjectSection(ProjectDependencies) = postProject
+		{28109BC6-0715-4A75-A589-4CF6F00A8894} = {28109BC6-0715-4A75-A589-4CF6F00A8894}
+		{2E8DB87F-DAFA-433B-95A6-A1B5CEAB7B2A} = {2E8DB87F-DAFA-433B-95A6-A1B5CEAB7B2A}
 		{43C310FC-4137-48FA-A8C4-39EBEE90F12E} = {43C310FC-4137-48FA-A8C4-39EBEE90F12E}
 	EndProjectSection
 EndProject
@@ -48,12 +50,14 @@ Global
 		{28109BC6-0715-4A75-A589-4CF6F00A8894}.Debug|ARM.Build.0 = Debug|x64
 		{28109BC6-0715-4A75-A589-4CF6F00A8894}.Debug|x64.ActiveCfg = Debug|x64
 		{28109BC6-0715-4A75-A589-4CF6F00A8894}.Debug|x64.Build.0 = Debug|x64
+		{28109BC6-0715-4A75-A589-4CF6F00A8894}.Debug|x64.Deploy.0 = Debug|x64
 		{28109BC6-0715-4A75-A589-4CF6F00A8894}.Debug|x86.ActiveCfg = Debug|x64
 		{28109BC6-0715-4A75-A589-4CF6F00A8894}.Debug|x86.Build.0 = Debug|x64
 		{28109BC6-0715-4A75-A589-4CF6F00A8894}.Release|ARM.ActiveCfg = Release|x64
 		{28109BC6-0715-4A75-A589-4CF6F00A8894}.Release|ARM.Build.0 = Release|x64
 		{28109BC6-0715-4A75-A589-4CF6F00A8894}.Release|x64.ActiveCfg = Release|x64
 		{28109BC6-0715-4A75-A589-4CF6F00A8894}.Release|x64.Build.0 = Release|x64
+		{28109BC6-0715-4A75-A589-4CF6F00A8894}.Release|x64.Deploy.0 = Release|x64
 		{28109BC6-0715-4A75-A589-4CF6F00A8894}.Release|x86.ActiveCfg = Release|x64
 		{28109BC6-0715-4A75-A589-4CF6F00A8894}.Release|x86.Build.0 = Release|x64
 		{2E8DB87F-DAFA-433B-95A6-A1B5CEAB7B2A}.Debug|ARM.ActiveCfg = Debug|x64
@@ -89,7 +93,7 @@ Global
 	EndGlobalSection
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
 		Axodox.Graphics.Shared\Axodox.Graphics.Shared.vcxitems*{01e40ab5-c2c7-4d85-a486-aba043e6488a}*SharedItemsImports = 9
-		Axodox.Graphics.Shared\Axodox.Graphics.Shared.vcxitems*{28109bc6-0715-4a75-a589-4cf6f00a8894}*SharedItemsImports = 4
 		Axodox.Graphics.Shared\Axodox.Graphics.Shared.vcxitems*{2e8db87f-dafa-433b-95a6-a1b5ceab7b2a}*SharedItemsImports = 4
+		Axodox.Graphics.Shared\Axodox.Graphics.Shared.vcxitems*{8e862168-f430-4a67-b9d4-e3d04f59e033}*SharedItemsImports = 4
 	EndGlobalSection
 EndGlobal

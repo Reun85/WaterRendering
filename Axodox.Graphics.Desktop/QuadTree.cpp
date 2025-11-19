@@ -151,6 +151,10 @@ inline void ConstQuadTreeLeafIteratorDepthFirst::AdjustNode() {
     node = tree.GetAt(node).children[dir];
     path.push_back(dir);
   } else {
+    if (path.back()==-1){
+      node = tree.GetSize();
+      return;
+    }
     if (order.directions[path.back()] != 9) {
       // Sibling node
     } else {

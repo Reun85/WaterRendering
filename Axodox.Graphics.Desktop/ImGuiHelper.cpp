@@ -73,13 +73,13 @@ void ImGUIManager::SetupPersistence() {
   handler.TypeHash = ImHashStr(iniName.c_str());
   handler.UserData = &persistence;
 
-  handler.ReadOpenFn = [](ImGuiContext *ctx, ImGuiSettingsHandler *handler,
-                          const char *name) -> void * {
+  handler.ReadOpenFn = [](ImGuiContext *, ImGuiSettingsHandler *handler,
+                          const char *) -> void * {
     // what data to read to
     return handler->UserData;
   };
 
-  handler.ReadLineFn = [](ImGuiContext *ctx, ImGuiSettingsHandler *handler,
+  handler.ReadLineFn = [](ImGuiContext *, ImGuiSettingsHandler *,
                           void *user_data, const char *line) {
     std::unordered_map<std::string, std::string> &settings =
         *static_cast<std::unordered_map<std::string, std::string> *>(user_data);
@@ -99,7 +99,7 @@ void ImGUIManager::SetupPersistence() {
       settings[map_key] = map_value;
     }
   };
-  handler.WriteAllFn = [](ImGuiContext *ctx, ImGuiSettingsHandler *handler,
+  handler.WriteAllFn = [](ImGuiContext *, ImGuiSettingsHandler *handler,
                           ImGuiTextBuffer *buf) {
     std::unordered_map<std::string, std::string> &settings =
         *static_cast<std::unordered_map<std::string, std::string> *>(
