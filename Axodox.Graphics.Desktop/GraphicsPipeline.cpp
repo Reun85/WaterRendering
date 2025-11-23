@@ -662,8 +662,7 @@ void WaterRenderPipelines::Execute(RenderFrameContext &context) {
     }
   }
 
-  GpuVirtualAddress waterDataBuffer =
-      frameResource.DynamicBuffer.AddBuffer(constantBuffers.waterData);
+  GpuVirtualAddress waterDataBuffer = constantBuffers.waterData;
 
   // Pre translate resources
   GpuVirtualAddress displacementMapAddressHighest =
