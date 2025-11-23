@@ -28,9 +28,9 @@ struct MenuSettings {
   std::string safeBarName;
   PanelState app{"App"};
   PanelState save{"Save"};
-  PanelState simData{"SimData"};
+  PanelState simData{"Simulation data"};
   PanelState renderingData{"Rendering data"};
-  PanelState debugMenu{"Developer Menu"};
+  PanelState debugMenu{"Developer menu"};
 
 private:
   const std::array<MenuSettings::PanelState *, s_menuCount> list = {

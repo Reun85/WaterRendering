@@ -269,16 +269,16 @@ void Camera::DrawImGui(bool exclusiveWindow) {
 
     ImGui::Checkbox("Firstperson", &firstperson);
 
-    if (ImGui::InputFloat3("Cam eye ", (float *)&m_eye, "%.3f"))
+    if (ImGui::InputFloat3("Camera position ", (float *)&m_eye, "%.3f"))
       SetView(m_eye, m_at, m_worldUp);
 
-    ImGui::SliderFloat("Cam speed", &m_speed, 0, 10);
+    ImGui::SliderFloat("Camera speed", &m_speed, 0, 10);
 
     if (!firstperson) {
-      if (ImGui::InputFloat3("Cam Look At ", (float *)&m_at, "%.3f"))
+      if (ImGui::InputFloat3("Camera look at ", (float *)&m_at, "%.3f"))
         SetView(m_eye, m_at, m_worldUp);
 
-      ImGui::SliderFloat("Cam distance", &m_distance, 0, 100);
+      ImGui::SliderFloat("Camera distance", &m_distance, 0, 100);
     }
   }
   if (exclusiveWindow) {
