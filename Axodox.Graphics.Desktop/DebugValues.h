@@ -47,6 +47,7 @@ struct DebugValues {
   }
   RasterizerFlags rasterizerFlags = RasterizerFlags::CullClockwise;
   void DrawImGui(NeedToDo &out);
+  void DrawImGuiSafeRenderingSubmenu();
 
 private:
   void CullingImGuiDraw(NeedToDo &out);
@@ -78,6 +79,7 @@ struct RuntimeSettings {
   bool timeRunning = true;
   bool showImgui = true;
   XMFLOAT4 clearColor = DefaultsValues::App::clearColor;
-  void DrawImGui([[maybe_unused]] NeedToDo &out, bool exclusiveWindow = false);
+  bool showDebugMenu = false;
+  void DrawImGui();
 };
 } // namespace Reun

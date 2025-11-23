@@ -285,11 +285,12 @@ ShadowMapping::Data::Data(const Camera &cam, f32 closestFrustumEnd,
   lods[2].farPlane = cam.GetZFar();
 }
 
-std::vector<WaterGraphicRootDescription::OceanData> &
-WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
-    std::vector<WaterGraphicRootDescription::OceanData> &vec, const Camera &cam,
-    const XMMATRIX &mMatrix, const float &quadTreeDistanceThreshold,
-    const Depth &MaxDepth, const DebugValues &debugValues,
+std::vector<TesselationGraphicRootDescription::OceanData> &
+TesselationGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
+    std::vector<TesselationGraphicRootDescription::OceanData> &vec,
+    const Camera &cam, const XMMATRIX &mMatrix,
+    const float &quadTreeDistanceThreshold, const Depth &MaxDepth,
+    const DebugValues &debugValues,
     const std::optional<RuntimeResults *> &runtimeResults) {
   float2 fullSizeXZ = {DefaultsValues::App::oceanSize,
                        DefaultsValues::App::oceanSize};
@@ -304,8 +305,12 @@ WaterGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
   XMStoreFloat3(&camDir, tmp);
 
   decltype(std::chrono::steady_clock::now()) start;
-  if (runtimeResults)
+  if (runtimeResults) {
+    (*runtimeResults)->NavigatingTheQuadTree = std::chrono::nanoseconds(0);
+    (*runtimeResults)->QuadTreeBuildTime = std::chrono::nanoseconds(0);
+
     start = std::chrono::steady_clock::now();
+  }
 
   qt.Build(center, fullSizeXZ, float3(camUsedPos.x, camUsedPos.y, camUsedPos.z),
            float3(camDir.x, camDir.y, camDir.z),
@@ -390,7 +395,7 @@ BasicShader::BasicShader(PipelineStateProvider &pipelineProvider,
                   .RootSignature = &Signature,
                   .VertexShader = vs,
                   .PixelShader = ps,
-                  .RasterizerState = RasterizerFlags::CullClockwise,
+                  .RasterizerState = {RasterizerFlags::CullClockwise},
                   .DepthStencilState = DepthStencilMode::WriteDepth,
                   .InputLayout = VertexPositionNormalTexture::Layout,
                   .RenderTargetFormats = std::initializer_list(
@@ -420,7 +425,7 @@ void BasicShader::Run(CommandAllocator &allocator, DynamicBufferManager &,
   auto mask = Signature.Set(allocator, RootSignatureUsage::Graphics);
   mask.camera = inp.camera;
   mask.model = inp.modelTransform;
-  if (inp.texture)
+  if (inp.texture.has_value())
     mask.texture = *inp.texture;
 
   inp.mesh.Draw(allocator);
@@ -476,13 +481,13 @@ void PostProcessingShader::Run(CommandAllocator &allocator,
          {res, ResourceStates::CopyDest, ResourceStates::RenderTarget}});
   }
 }
+std::pair<RootSignature<TesselationGraphicRootDescription>, PipelineState>
+WaterRenderPipelines::CreateWaterPipelineState(GraphicsDevice &device,
+                                               PipelineStateProvider &provider,
+                                               RasterizerFlags flag) {
 
-WaterRenderPipelines
-WaterRenderPipelines::Create(GraphicsDevice &device,
-                             PipelineStateProvider &pipelineStateProvider_,
-                             CreateSettings settings) {
-
-  RootSignature<WaterGraphicRootDescription> waterRootSignature{device};
+  RootSignature<TesselationGraphicRootDescription> TesselationRootSignature{
+      device};
 
   VertexShader simpleVertexShader{app_folder() / L"VertexShader.cso"};
   PixelShader simplePixelShader{app_folder() / L"PixelShader.cso"};
@@ -492,12 +497,12 @@ WaterRenderPipelines::Create(GraphicsDevice &device,
   auto &gBufferFormats = DeferredShading::GBuffer::GetGBufferFormats();
 
   GraphicsPipelineStateDefinition waterPipelineStateDefinition{
-      .RootSignature = &waterRootSignature,
+      .RootSignature = &TesselationRootSignature,
       .VertexShader = &simpleVertexShader,
       .DomainShader = &domainShader,
       .HullShader = &hullShader,
       .PixelShader = &simplePixelShader,
-      .RasterizerState = settings.rasterizerState,
+      .RasterizerState = {flag},
       .DepthStencilState = DepthStencilMode::WriteDepth,
       .InputLayout = VertexPosition::Layout,
       .TopologyType = PrimitiveTopologyType::Patch,
@@ -506,10 +511,22 @@ WaterRenderPipelines::Create(GraphicsDevice &device,
                                 std::to_address(gBufferFormats.end())),
       .DepthStencilFormat = Format::D32_Float};
 
-  Axodox::Graphics::D3D12::PipelineState waterPipelineState =
-      pipelineStateProvider_
-          .CreatePipelineStateAsync(waterPipelineStateDefinition)
-          .get();
+  auto TesselationPipelineState =
+      provider.CreatePipelineStateAsync(waterPipelineStateDefinition).get();
+
+  return {TesselationRootSignature, TesselationPipelineState};
+}
+
+WaterRenderPipelines
+WaterRenderPipelines::Create(GraphicsDevice &device,
+                             PipelineStateProvider &pipelineStateProvider_,
+                             CreateSettings settings) {
+
+  auto &gBufferFormats = DeferredShading::GBuffer::GetGBufferFormats();
+
+  auto [TesselationRootSignature, TesselationPipelineState] =
+      CreateWaterPipelineState(device, pipelineStateProvider_,
+                               settings.rasterizerState);
 
   VertexShader atmosphereVS{app_folder() / L"AtmosphereVS.cso"};
   PixelShader atmospherePS{app_folder() / L"AtmospherePS.cso"};
@@ -521,7 +538,7 @@ WaterRenderPipelines::Create(GraphicsDevice &device,
       .RootSignature = &skyboxRootSignature,
       .VertexShader = &atmosphereVS,
       .PixelShader = &atmospherePS,
-      .RasterizerState = RasterizerFlags::CullNone,
+      .RasterizerState = {RasterizerFlags::CullNone},
       .DepthStencilState = skyboxDepthStencilState,
       .InputLayout = VertexPositionNormalTexture::Layout,
       .RenderTargetFormats =
@@ -529,10 +546,8 @@ WaterRenderPipelines::Create(GraphicsDevice &device,
                                 std::to_address(gBufferFormats.end())),
 
       .DepthStencilFormat = Format::D32_Float};
-  Axodox::Graphics::D3D12::PipelineState skyboxPipelineState =
-      pipelineStateProvider_
-          .CreatePipelineStateAsync(skyboxPipelineStateDefinition)
-          .get();
+  auto skyboxPipelineState = pipelineStateProvider_.CreatePipelineStateAsync(
+      skyboxPipelineStateDefinition);
 
   VertexShader deferredShadingVS{app_folder() / L"DeferredShadingVS.cso"};
   PixelShader deferredShadingPS{app_folder() / L"DeferredShadingPS.cso"};
@@ -543,22 +558,24 @@ WaterRenderPipelines::Create(GraphicsDevice &device,
       .VertexShader = &deferredShadingVS,
       .PixelShader = &deferredShadingPS,
       .BlendState = {BlendType::Additive, BlendType::AlphaBlend},
-      .RasterizerState = RasterizerFlags::CullCounterClockwise,
+      .RasterizerState = {RasterizerFlags::CullCounterClockwise},
       .InputLayout = VertexPositionNormalTexture::Layout,
       .TopologyType = PrimitiveTopologyType::Triangle,
       .RenderTargetFormats = {Format::B8G8R8A8_UNorm},
   };
 
-  Axodox::Graphics::D3D12::PipelineState deferredShadingPipelineState =
-      pipelineStateProvider_
-          .CreatePipelineStateAsync(deferredShadingPipelineStateDefinition)
-          .get();
+  auto deferredShadingPipelineState =
+      pipelineStateProvider_.CreatePipelineStateAsync(
+          deferredShadingPipelineStateDefinition);
 
-  PostProcessingShader postProcessingShader =
-      PostProcessingShader::WithDefaultShaders(pipelineStateProvider_, device);
+  auto postProcessingShader = threadpool_execute<PostProcessingShader>([&]() {
+    return PostProcessingShader::WithDefaultShaders(pipelineStateProvider_,
+                                                    device);
+  });
 
-  BasicShader basicShader =
-      BasicShader::WithDefaultShaders(pipelineStateProvider_, device);
+  auto basicShader = threadpool_execute<BasicShader>([&]() {
+    return BasicShader::WithDefaultShaders(pipelineStateProvider_, device);
+  });
 
   // SilhouetteDetector silhouetteDetector =
   //     SilhouetteDetector::WithDefaultShaders(pipelineStateProvider,
@@ -571,32 +588,31 @@ WaterRenderPipelines::Create(GraphicsDevice &device,
   //     SilhouetteDetectorTester::WithDefaultShaders(pipelineStateProvider,
   //                                                  device);
 
-  ParallaxDraw parallaxDraw =
-      ParallaxDraw::WithDefaultShaders(pipelineStateProvider_, device);
+  auto parallaxDraw = threadpool_execute<ParallaxDraw>([&]() {
+    return ParallaxDraw::WithDefaultShaders(pipelineStateProvider_, device);
+  });
 
-  PrismParallaxDraw prismParallaxDraw =
-      PrismParallaxDraw::WithDefaultShaders(pipelineStateProvider_, device);
+  auto prismParallaxDraw = threadpool_execute<PrismParallaxDraw>([&]() {
+    return PrismParallaxDraw::WithDefaultShaders(pipelineStateProvider_,
+                                                 device);
+  });
 
   return WaterRenderPipelines{
-      .waterRootSignature = waterRootSignature,
-      .waterPipelineStateDefinition = waterPipelineStateDefinition,
-      .waterPipelineState = waterPipelineState,
+      .TesselationRootSignature = TesselationRootSignature,
+      .TesselationPipelineState = TesselationPipelineState,
       .skyboxRootSignature = skyboxRootSignature,
-      .skyboxPipelineStateDefinition = skyboxPipelineStateDefinition,
-      .skyboxPipelineState = skyboxPipelineState,
+      .skyboxPipelineState = skyboxPipelineState.get(),
       .deferredShadingRootSignature = deferredShadingRootSignature,
-      .deferredShadingPipelineStateDefinition =
-          deferredShadingPipelineStateDefinition,
-      .deferredShadingPipelineState = deferredShadingPipelineState,
-      .postProcessingShader = postProcessingShader,
-      .basicShader = basicShader,
+      .deferredShadingPipelineState = deferredShadingPipelineState.get(),
+      .postProcessingShader = postProcessingShader.get(),
+      .basicShader = basicShader.get(),
       //. silhouetteDetector=silhouetteDetector  ,
 
       // . silhouetteClear= silhouetteClear ,
 
       // . silhouetteTester=silhouetteTester  ,
-      .parallaxDraw = parallaxDraw,
-      .prismParallaxDraw = prismParallaxDraw};
+      .parallaxDraw = parallaxDraw.get(),
+      .prismParallaxDraw = prismParallaxDraw.get()};
 }
 
 void WaterRenderPipelines::Execute(RenderFrameContext &context) {
@@ -753,7 +769,7 @@ void WaterRenderPipelines::Execute(RenderFrameContext &context) {
       if (debugValues.drawMethod == DebugValues::DrawTechnology::Tesselation) {
 
         // Ocean Buffers
-        WaterGraphicRootDescription::ModelConstants modelConstants{};
+        TesselationGraphicRootDescription::ModelConstants modelConstants{};
 
         XMStoreFloat4x4(&modelConstants.mMatrix,
                         XMMatrixTranspose(modelMatrix));
@@ -761,14 +777,14 @@ void WaterRenderPipelines::Execute(RenderFrameContext &context) {
         GpuVirtualAddress modelBuffer =
             frameResource.DynamicBuffer.AddBuffer(modelConstants);
 
-        waterPipelineState.Apply(allocator);
+        TesselationPipelineState.Apply(allocator);
 
         const auto &oceanQuadData = context.others.oceanDataFuture.get();
         for (auto &curr : oceanQuadData) {
           if (curr.N == 0)
             continue;
-          auto mask =
-              waterRootSignature.Set(allocator, RootSignatureUsage::Graphics);
+          auto mask = TesselationRootSignature.Set(
+              allocator, RootSignatureUsage::Graphics);
 
           if (usedTextureAddress.has_value())
             mask.texture = **usedTextureAddress;

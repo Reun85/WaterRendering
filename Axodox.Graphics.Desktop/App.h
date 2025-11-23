@@ -72,7 +72,8 @@ struct Meshes {
 struct App {
 
   struct RuntimeCPUBuffers {
-    std::vector<Graphics::WaterGraphicRootDescription::OceanData> oceanData;
+    std::vector<Graphics::TesselationGraphicRootDescription::OceanData>
+        oceanData;
   };
 
   explicit App(AppShared &shared);
@@ -133,7 +134,7 @@ private:
           Graphics::WaterRenderPipelines::CreateSettings{});
 
   // Common Data
-  Graphics::WaterGraphicRootDescription::WaterPixelShaderData waterData;
+  Graphics::TesselationGraphicRootDescription::WaterPixelShaderData waterData;
   Graphics::DeferredShading::DeferredShaderBuffers defData;
   Graphics::PixelLighting sunData = Graphics::PixelLighting::SunData();
   SimulationData simData = SimulationData::Default();

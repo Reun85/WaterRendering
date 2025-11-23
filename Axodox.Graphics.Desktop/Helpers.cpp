@@ -64,7 +64,8 @@ void RuntimeResults::DrawImGui(bool exclusiveWindow) const {
   if (exclusiveWindow)
     cont = ImGui::Begin("Results");
   if (cont) {
-    ImGui::Text("QuadTree Nodes = %d", qtNodes);
+    ImGui::Text("QuadTree nodes (including leafs) = %d", qtNodes);
+    ImGui::Text("Drawn nodes (leafs) = %d", drawnNodes);
 
     ImGui::Text("QuadTree buildtime %.3f ms/frame",
                 GetDurationInFloatWithPrecision<std::chrono::milliseconds,
@@ -74,9 +75,8 @@ void RuntimeResults::DrawImGui(bool exclusiveWindow) const {
                 GetDurationInFloatWithPrecision<std::chrono::milliseconds,
                                                 std::chrono::nanoseconds>(
                     NavigatingTheQuadTree));
-    ImGui::Text("Drawn Nodes: %d", drawnNodes);
     ImGui::Text(
-        "CPU time %.3f ms/frame",
+        "Total CPU time %.3f ms/frame",
         GetDurationInFloatWithPrecision<std::chrono::milliseconds,
                                         std::chrono::nanoseconds>(CPUTime));
   }

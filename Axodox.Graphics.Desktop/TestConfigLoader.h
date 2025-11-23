@@ -11,8 +11,8 @@ struct NeedToDo;
 namespace Graphics {
 struct DeferredShading;
 struct DeferredShading::DeferredShaderBuffers;
-struct WaterGraphicRootDescription;
-struct WaterGraphicRootDescription::WaterPixelShaderData;
+struct TesselationGraphicRootDescription;
+struct TesselationGraphicRootDescription::WaterPixelShaderData;
 
 struct PixelLighting;
 } // namespace Graphics
@@ -22,7 +22,8 @@ struct PixelLighting;
 /// </summary>
 void ShowImguiLoaderConfig(
     DebugValues &debugValues, SimulationData &simData,
-    Graphics::WaterGraphicRootDescription::WaterPixelShaderData &waterData,
+    Graphics::TesselationGraphicRootDescription::WaterPixelShaderData
+        &waterData,
     Graphics::PixelLighting &sunData,
     Graphics::DeferredShading::DeferredShaderBuffers &deferredData,
     RuntimeSettings &settings, Camera &cam, NeedToDo &beforeNextFrame);

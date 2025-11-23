@@ -11,8 +11,9 @@ static const std::string_view s_isDetachedKeyMod = "_is_detached"sv;
 static const std::string_view s_active_key = "MOD-Active"sv;
 template <typename Map, typename Key>
 auto get_optional_from_map(Map &&m, Key &&k) {
-  auto it = m.find(std::forward<Key>(k));
-  if (it == m.end())
+  auto b = std::forward<Map>(m);
+  auto it = b.find(std::forward<Key>(k));
+  if (it == b.end())
     return std::optional<
         std::reference_wrapper<const std::decay<Map>::type::mapped_type>>{};
   return std::optional<
@@ -35,10 +36,8 @@ MenuSettings::MenuSettings(
     std::optional<std::reference_wrapper<const std::string>> x =
         get_optional_from_map(persistence,
                               panel.name + std::string(s_isDetachedKeyMod));
-    if (x) {
-      if (x->get() == s_detachedValue) {
-        panel.isDetached = true;
-      }
+    if (x && x->get() == s_detachedValue) {
+      panel.isDetached = true;
     }
   };
   for (PanelState *p : list) {
@@ -81,13 +80,15 @@ void MenuSettings::Draw() {
   // Floating panels
   for (PanelState *p : list) {
     auto &panel = *p;
-    if (panel.isDetached) {
+    if (panel.isDetached && panel.enabled) {
 
       if (ImGui::Begin(panel.safeName.c_str())) {
         DrawPanelContent(panel, true);
       }
       ImGui::End();
-    } else {
+
+    } else if (panel.enabled) {
+      // If it is disabled do not allow it to count as not detached.
       number_not_detached++;
     }
   }
@@ -102,7 +103,7 @@ void MenuSettings::Draw() {
 
       for (PanelState *p : list) {
         auto &panel = *p;
-        if (!panel.isDetached) {
+        if (!panel.isDetached && panel.enabled) {
 
           if (ImGui::BeginTabItem(panel.name.c_str())) {
 

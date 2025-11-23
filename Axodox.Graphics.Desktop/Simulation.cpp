@@ -23,7 +23,7 @@ void SimulationData::DrawImGui(NeedToDo &out) {
     }
     ImGui::EndCombo();
   }
-  change |= ImGui::InputFloat2("Wind Direction", &windDirection.x);
+  change |= ImGui::InputFloat2("Wind direction", &windDirection.x);
   change |= ImGui::InputFloat("Gravity", &gravity);
   change |= ImGui::InputFloat("Depth", &depth);
   bool hig = false;
@@ -38,35 +38,37 @@ void SimulationData::DrawImGui(NeedToDo &out) {
   if (ImGui::CollapsingHeader("Lowest")) {
     low = lowest.DrawImGui("Lowest");
   }
-  ImGui::Separator();
-  ImGui::InputFloat("QuadTree distanceThreshold", &quadTreeDistanceThreshold);
-  i32 x = (i32)maxDepth;
-  ImGui::InputInt("Max Depth", &x);
-  maxDepth = (u32)x;
-  ImGui::Separator();
+  if (ImGui::CollapsingHeader("Quadtree")) {
+
+    ImGui::InputFloat("QuadTree distance threshold for subdivision",
+                      &quadTreeDistanceThreshold);
+    auto x = (i32)maxDepth;
+    ImGui::InputInt("Max depth", &x);
+    maxDepth = (u32)x;
+  }
   out.patchHighestChanged = hig || change;
   out.patchMediumChanged = med || change;
   out.patchLowestChanged = low || change;
 }
 bool SimulationData::PatchData::DrawImGui(std::string_view ID) {
   bool change = false;
-  const std::string text1 = "Patch Size##" + std::string(ID);
+  const std::string text1 = "Patch size##" + std::string(ID);
   change |= ImGui::InputFloat(text1.c_str(), &patchSize);
-  const std::string text1_2 = "Patch Display Size##" + std::string(ID);
+  const std::string text1_2 = "Patch display size##" + std::string(ID);
   change |= ImGui::InputFloat(text1_2.c_str(), &patchExtent);
-  const std::string text2 = "Foam Decay##" + std::string(ID);
+  const std::string text2 = "Foam decay##" + std::string(ID);
   change |= ImGui::SliderFloat(text2.c_str(), &foamExponentialDecay, 0, 1);
-  const std::string text3 = "Displacement Lambda##" + std::string(ID);
+  const std::string text3 = "Displacement lambda##" + std::string(ID);
   change |= ImGui::InputFloat3(text3.c_str(), (float *)&displacementLambda);
   const std::string text4 = "Amplitude##" + std::string(ID);
   change |= ImGui::InputFloat(text4.c_str(), &amplitude, 0, 0, "%.5f");
-  const std::string text5 = "WindForce##" + std::string(ID);
+  const std::string text5 = "Wind force##" + std::string(ID);
   change |= ImGui::InputFloat(text5.c_str(), &windForce);
-  const std::string text6 = "Foam Min Value##" + std::string(ID);
+  const std::string text6 = "Foam min value##" + std::string(ID);
   change |= ImGui::InputFloat(text6.c_str(), &foamMinValue);
-  const std::string text7 = "Foam Bias##" + std::string(ID);
+  const std::string text7 = "Foam bias##" + std::string(ID);
   change |= ImGui::InputFloat(text7.c_str(), &foamBias);
-  const std::string text8 = "Foam Mult##" + std::string(ID);
+  const std::string text8 = "Foam mult##" + std::string(ID);
   change |= ImGui::InputFloat(text8.c_str(), &foamMult);
   return change;
 }

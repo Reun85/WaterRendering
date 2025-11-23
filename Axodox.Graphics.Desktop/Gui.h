@@ -12,13 +12,15 @@ struct MenuSettings {
     std::string safeName;
     std::string detachButton;
     std::string attachButton;
+    bool enabled = true;
     explicit PanelState(std::string name);
     PanelState(std::string name, std::string safe_name);
   };
 
   static constexpr usize s_menuCount = 5;
 
-  MenuSettings(std::unordered_map<std::string, std::string> &persistence);
+  explicit MenuSettings(
+      std::unordered_map<std::string, std::string> &persistence);
   ~MenuSettings();
   void Draw();
 
@@ -28,7 +30,7 @@ struct MenuSettings {
   PanelState save{"Save"};
   PanelState simData{"SimData"};
   PanelState renderingData{"Rendering data"};
-  PanelState debugMenu{"Debug Menu"};
+  PanelState debugMenu{"Developer Menu"};
 
 private:
   const std::array<MenuSettings::PanelState *, s_menuCount> list = {

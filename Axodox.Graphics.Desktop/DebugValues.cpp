@@ -30,8 +30,15 @@ const static constexpr std::initializer_list<
                      {u8(29), std::nullopt},
                      {u8(30), std::nullopt},
                      {u8(31), std::nullopt}};
+const static constexpr std::initializer_list<std::pair<u8, const char *>>
+    SafeDebugBits = {{u8(2), "Use Foam"},
+                     {u8(3), "Use channel Highest"},
+                     {u8(4), "Use channel Medium"},
+                     {u8(5), "Use channel Lowest"}};
 
 void DebugValues::DrawImGui(NeedToDo &out) {
+  ImGui::Text("This is a developer menu. Settings inside this tab may lead "
+              "to instability.");
   // useTexture
   useTextureImGuiDraw();
   // Culling
@@ -68,6 +75,46 @@ void DebugValues::DrawImGui(NeedToDo &out) {
       ImGui::Checkbox(*name, &DebugBits[id]);
     else
       ImGui::Checkbox(std::format("Debug Bit {}", id).c_str(), &DebugBits[id]);
+  }
+}
+
+void DebugValues::DrawImGuiSafeRenderingSubmenu() {
+
+  if (!ImGui::CollapsingHeader("Rendering method settings"))
+    return;
+  ImGui::InputFloat4("Blend distances between used LODs",
+                     (float *)&blendDistances);
+  static const std::array<std::string, 3> modeitems = {
+      "Tesselation",
+      "Parallax",
+      "PrismParallax",
+  };
+  static const std::array<std::string, 2> choosable = {
+      "Tesselation",
+      "Parallax",
+  };
+  if (ImGui::BeginCombo("Used render method",
+                        modeitems[(u32)(drawMethod)].c_str())) {
+    for (uint i = 0; i < choosable.size(); i++) {
+      bool isSelected = ((u32)(drawMethod) == i);
+      if (ImGui::Selectable(choosable[i].c_str(), isSelected)) {
+        drawMethod = DrawTechnology(i);
+      }
+      if (isSelected) {
+        ImGui::SetItemDefaultFocus();
+      }
+    }
+    ImGui::EndCombo();
+  }
+  if (drawMethod == DrawTechnology::PrismParallax ||
+      drawMethod == DrawTechnology::Parallax) {
+    ImGui::SliderFloat("Cone step relax", &coneStepRelax, 0, 3);
+
+    ImGui::InputInt("Max ray marching step", &maxConeStep);
+  }
+
+  for (auto &[id, name] : SafeDebugBits) {
+    ImGui::Checkbox(name, &DebugBits[id]);
   }
 }
 
@@ -206,16 +253,9 @@ DebugGPUBufferStuff From(const DebugValues &deb,
   return res;
 }
 
-void RuntimeSettings::DrawImGui([[maybe_unused]] NeedToDo &out,
-                                bool exclusiveWindow) {
-  bool cont = true;
-  if (exclusiveWindow)
-    cont = ImGui::Begin("Runtime Settings");
-  if (cont) {
-    ImGui::ColorEdit3("clear color", (float *)&clearColor);
-    ImGui::Checkbox("Time running", &timeRunning);
-  }
-  if (exclusiveWindow)
-    ImGui::End();
+void RuntimeSettings::DrawImGui() {
+  // ImGui::ColorEdit3("clear color", (float *)&clearColor);
+  ImGui::Checkbox("Time running", &timeRunning);
+  ImGui::Checkbox("Enable developer menu.", &showDebugMenu);
 }
 } // namespace Reun

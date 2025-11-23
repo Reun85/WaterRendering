@@ -50,7 +50,7 @@ private:
   }
 };
 
-struct WaterGraphicRootDescription : public RootSignatureMask {
+struct TesselationGraphicRootDescription : public RootSignatureMask {
   struct ModelConstants {
     XMFLOAT4X4 mMatrix;
   };
@@ -152,7 +152,8 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
 
   StaticSampler _textureSampler;
 
-  explicit WaterGraphicRootDescription(const RootSignatureContext &context)
+  explicit TesselationGraphicRootDescription(
+      const RootSignatureContext &context)
       : RootSignatureMask(context),
         vertexBuffer(this, {2}, ShaderVisibility::Vertex),
         hullBuffer(this, {1}, ShaderVisibility::Hull),
@@ -180,9 +181,9 @@ struct WaterGraphicRootDescription : public RootSignatureMask {
     Flags = RootSignatureFlags::AllowInputAssemblerInputLayout;
   }
 
-  static std::vector<WaterGraphicRootDescription::OceanData> &
+  static std::vector<TesselationGraphicRootDescription::OceanData> &
   CollectOceanQuadInfoWithQuadTree(
-      std::vector<WaterGraphicRootDescription::OceanData> &vec,
+      std::vector<TesselationGraphicRootDescription::OceanData> &vec,
       const Camera &cam, const XMMATRIX &mMatrix,
       const float &quadTreeDistanceThreshold, const u32 &MaxDepth,
       const DebugValues &debugValues,
@@ -519,7 +520,7 @@ struct Textures {
 struct OtherInput {
   XMMATRIX &oceanModelMatrix;
   DebugValues &debugValues;
-  std::future<std::vector<WaterGraphicRootDescription::OceanData> &>
+  std::future<std::vector<TesselationGraphicRootDescription::OceanData> &>
       &oceanDataFuture;
 };
 
@@ -544,16 +545,13 @@ struct WaterRenderPipelines {
 
   typedef Axodox::Graphics::D3D12::PipelineState PipelineState;
 
-  RootSignature<WaterGraphicRootDescription> waterRootSignature;
-  GraphicsPipelineStateDefinition waterPipelineStateDefinition;
-  PipelineState waterPipelineState;
+  RootSignature<TesselationGraphicRootDescription> TesselationRootSignature;
+  PipelineState TesselationPipelineState;
 
   RootSignature<SkyboxRootDescription> skyboxRootSignature;
-  GraphicsPipelineStateDefinition skyboxPipelineStateDefinition;
   PipelineState skyboxPipelineState;
 
   RootSignature<DeferredShading> deferredShadingRootSignature;
-  GraphicsPipelineStateDefinition deferredShadingPipelineStateDefinition;
   PipelineState deferredShadingPipelineState;
 
   PostProcessingShader postProcessingShader;
@@ -571,6 +569,11 @@ struct WaterRenderPipelines {
   PrismParallaxDraw prismParallaxDraw;
 
   void Execute(RenderFrameContext &context);
+  static std::pair<RootSignature<TesselationGraphicRootDescription>,
+                   PipelineState>
+  CreateWaterPipelineState(GraphicsDevice &device,
+                           PipelineStateProvider &provider,
+                           RasterizerFlags flag);
   static WaterRenderPipelines Create(GraphicsDevice &device,
                                      PipelineStateProvider &provider,
                                      CreateSettings settings);

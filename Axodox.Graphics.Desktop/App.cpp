@@ -173,41 +173,43 @@ void App::SetWindow() {
 }
 
 void DrawImGuiForPSResources(
-    Reun::Graphics::WaterGraphicRootDescription::WaterPixelShaderData
+    Reun::Graphics::TesselationGraphicRootDescription::WaterPixelShaderData
         &waterData,
     Reun::Graphics::PixelLighting &sunData,
     Reun::Graphics::DeferredShading::DeferredShaderBuffers &defData) {
-  ImGui::ColorEdit3("Surface Color", &waterData.AlbedoColor.x);
-  ImGui::SliderFloat("Roughness", &waterData.Roughness, 0.0f, 1.0f);
+  if (ImGui::CollapsingHeader("Ocean shading")) {
+    ImGui::ColorEdit3("Surface color", &waterData.AlbedoColor.x);
+    ImGui::SliderFloat("Roughness", &waterData.Roughness, 0.0f, 1.0f);
 
-  ImGui::ColorEdit3("Tip Color", &defData._TipColor.x);
-  ImGui::SliderFloat("Normal Depth Attenuation",
-                     &waterData.NormalDepthAttenuation, 0, 2);
-  ImGui::SliderFloat("Foam Roughness Modifier",
-                     &waterData.foamRoughnessModifier, 0.0f, 10.0f);
-  ImGui::SliderFloat("Foam Depth Falloff", &waterData.foamDepthFalloff, 0.0f,
-                     10.0f);
-  ImGui::SliderFloat("Height Modifier", &waterData._HeightModifier, 0.0f,
-                     10.0f);
-  ImGui::SliderFloat("Fresnel", &waterData._Fresnel, 0.0f, 1.0f);
-  ImGui::SliderFloat("Wave Peak Scatter Strength",
-                     &waterData._WavePeakScatterStrength, 0.0f, 10.0f);
-  ImGui::SliderFloat("Scatter Shadow Strength",
-                     &waterData._ScatterShadowStrength, 0.0f, 10.0f);
+    ImGui::ColorEdit3("Tip color", &defData._TipColor.x);
+    ImGui::SliderFloat("Normal depth attenuation",
+                       &waterData.NormalDepthAttenuation, 0, 2);
+    ImGui::SliderFloat("Foam roughness modifier",
+                       &waterData.foamRoughnessModifier, 0.0f, 10.0f);
+    ImGui::SliderFloat("Foam depth falloff", &waterData.foamDepthFalloff, 0.0f,
+                       10.0f);
+    ImGui::SliderFloat("Height modifier", &waterData._HeightModifier, 0.0f,
+                       10.0f);
+    ImGui::SliderFloat("Fresnel", &waterData._Fresnel, 0.0f, 1.0f);
+    ImGui::SliderFloat("Wave peak scatter strength",
+                       &waterData._WavePeakScatterStrength, 0.0f, 10.0f);
+    ImGui::SliderFloat("Scatter shadow strength",
+                       &waterData._ScatterShadowStrength, 0.0f, 10.0f);
+  }
+  if (ImGui::CollapsingHeader("Lighting")) {
 
-  ImGui::Separator();
-  ImGui::Text("Sun Data");
-  ImGui::SliderFloat3("Light Pos", (float *)&sunData.lights[0].lightPos, -1, 1);
+    ImGui::SliderFloat3("Light pos", (float *)&sunData.lights[0].lightPos, -1,
+                        1);
 
-  ImGui::ColorEdit3("Light Color", (float *)&sunData.lights[0].lightColor);
-  ImGui::SliderFloat("Light Intensity", &sunData.lights[0].lightColor.w, 0, 10);
+    ImGui::ColorEdit3("Light color", (float *)&sunData.lights[0].lightColor);
+    ImGui::SliderFloat("Light intensity", &sunData.lights[0].lightColor.w, 0,
+                       10);
 
-  ImGui::ColorEdit3("Ambient Color", &sunData.lights[0].AmbientColor.x);
-  ImGui::SliderFloat("Ambient Mult", &sunData.lights[0].AmbientColor.w, 0.0f,
-                     10.0f);
-  ImGui::Separator();
-  ImGui::Text("DeferredShaderBuffer Data");
-  ImGui::SliderFloat("Env Map", &defData.EnvMapMult, 0, 2);
+    ImGui::ColorEdit3("Ambient color", &sunData.lights[0].AmbientColor.x);
+    ImGui::SliderFloat("Ambient mult", &sunData.lights[0].AmbientColor.w, 0.0f,
+                       10.0f);
+    ImGui::SliderFloat("Environment map multiplier", &defData.EnvMapMult, 0, 2);
+  }
 }
 
 void App::Run() {
@@ -242,7 +244,10 @@ void App::Run() {
     auto renderTargetView = swapChain.RenderTargetView();
 
     struct NewData {
-      std::optional<std::future<PipelineState>> pipelineState;
+      std::future<
+          std::pair<RootSignature<Graphics::TesselationGraphicRootDescription>,
+                    PipelineState>>
+          tesselationPipelineState;
       std::optional<SimulationStage::ConstantGpuSources<>::LODDataSource>
           highestData;
       std::optional<SimulationStage::ConstantGpuSources<>::LODDataSource>
@@ -254,11 +259,15 @@ void App::Run() {
     NewData newData;
     {
       if (beforeNextFrame_.changeFlag) {
-        fullRenderPipeline.waterPipelineStateDefinition.RasterizerState.Flags =
-            *beforeNextFrame_.changeFlag;
-        newData.pipelineState =
-            descriptors_.pipelineStateProvider_.CreatePipelineStateAsync(
-                fullRenderPipeline.waterPipelineStateDefinition);
+        // fullRenderPipeline.TesselationRootSignature.RasterizerState.Flags =
+        //     *beforeNextFrame_.changeFlag;
+        newData.tesselationPipelineState = threadpool_execute<std::pair<
+            RootSignature<Graphics::TesselationGraphicRootDescription>,
+            PipelineState>>([this]() {
+          return Graphics::WaterRenderPipelines::CreateWaterPipelineState(
+              device, descriptors_.pipelineStateProvider_,
+              *beforeNextFrame_.changeFlag);
+        });
       }
       if (beforeNextFrame_.patchHighestChanged) {
         newData.highestData =
@@ -282,8 +291,15 @@ void App::Run() {
     // This is necessary for the compute queue
     calculatingSimResource.Wait();
 
-    if (beforeNextFrame_.changeFlag && newData.pipelineState) {
-      fullRenderPipeline.waterPipelineState = newData.pipelineState->get();
+    if (beforeNextFrame_.changeFlag &&
+        newData.tesselationPipelineState.valid()) {
+      for (const auto &x : frameResources) {
+        x->Wait();
+      }
+
+      auto [sign, pipeline] = newData.tesselationPipelineState.get();
+      fullRenderPipeline.TesselationRootSignature = sign;
+      fullRenderPipeline.TesselationPipelineState = pipeline;
       beforeNextFrame_.changeFlag = std::nullopt;
     }
 
@@ -303,26 +319,27 @@ void App::Run() {
     }
 
     // QuadTrees
-    std::future<std::vector<Graphics::WaterGraphicRootDescription::OceanData> &>
+    std::future<
+        std::vector<Graphics::TesselationGraphicRootDescription::OceanData> &>
         oceanDataFuture;
     if (debugValues.drawMethod == DebugValues::DrawTechnology::Tesselation ||
         debugValues.drawMethod == DebugValues::DrawTechnology::PrismParallax ||
         first_loop) {
-      oceanDataFuture = threadpool_execute<
-          std::vector<Graphics::WaterGraphicRootDescription::OceanData> &>(
+      oceanDataFuture = threadpool_execute<std::vector<
+          Graphics::TesselationGraphicRootDescription::OceanData> &>(
           [this, camChanged]()
-              -> std::vector<Graphics::WaterGraphicRootDescription::OceanData>
-                  & {
-                    if (camChanged && !debugValues.lockQuadTree) {
-                      cpuBuffers.oceanData.clear();
-                      return Graphics::WaterGraphicRootDescription::
-                          CollectOceanQuadInfoWithQuadTree(
-                              cpuBuffers.oceanData, cam, oceanModelMatrix,
-                              simData.quadTreeDistanceThreshold,
-                              simData.maxDepth, debugValues, &runtimeResults_);
-                    }
-                    return cpuBuffers.oceanData;
-                  });
+              -> std::vector<
+                  Graphics::TesselationGraphicRootDescription::OceanData> & {
+            if (camChanged && !debugValues.lockQuadTree) {
+              cpuBuffers.oceanData.clear();
+              return Graphics::TesselationGraphicRootDescription::
+                  CollectOceanQuadInfoWithQuadTree(
+                      cpuBuffers.oceanData, cam, oceanModelMatrix,
+                      simData.quadTreeDistanceThreshold, simData.maxDepth,
+                      debugValues, &runtimeResults_);
+            }
+            return cpuBuffers.oceanData;
+          });
     }
 
     // Compute shader stage
@@ -531,22 +548,28 @@ void App ::DrawImGuiApplicationData(
 
   shared_.prints += shared_.cout.str();
   shared_.cout.str("");
-  ImGui::Text("Press ESC to quit");
-  ImGui::Text("Press Space to stop time");
-  ImGui::Text("Time since start: %.3f s, frame %d",
-              GetDurationInFloatWithPrecision<std::chrono::seconds,
-                                              std::chrono::milliseconds>(
-                  GetTimeSinceStart()),
-              frameCounter_);
-  ImGui::Text(" %.3f ms/frame (%.1f FPS)",
-              1000.0f / imgui_wrapper_.GetIO().Framerate,
-              imgui_wrapper_.GetIO().Framerate);
+  ImGui::SeparatorText("Help");
+  ImGui::Text("Press ESC to quit.");
+  ImGui::Text("Press Space to stop time.");
+  ImGui::Text("Use WASD and EQ to move.");
+  settings.DrawImGui();
+  if (ImGui::CollapsingHeader("Telemetry")) {
+    ImGui::Text("Time since start: %.3f s, frame %d",
+                GetDurationInFloatWithPrecision<std::chrono::seconds,
+                                                std::chrono::milliseconds>(
+                    GetTimeSinceStart()),
+                frameCounter_);
+    ImGui::Text(" %.3f ms/frame (%.1f FPS)",
+                1000.0f / imgui_wrapper_.GetIO().Framerate,
+                imgui_wrapper_.GetIO().Framerate);
+  }
 
-  settings.DrawImGui(beforeNextFrame_);
+  if (ImGui::CollapsingHeader("CPU task Telemetry"))
+    runtimeResults_.DrawImGui(false);
 
-  runtimeResults_.DrawImGui(false);
-  cam.DrawImGui(false);
-  for (int i = 0; i < 3; ++i) {
+  if (ImGui::CollapsingHeader("Camera"))
+    cam.DrawImGui(false);
+  /*for (int i = 0; i < 3; ++i) {
     ImGui::Text(std::format("{}", i).c_str());
     ImGui::SameLine();
     ImGui::Image(
@@ -581,9 +604,10 @@ void App ::DrawImGuiApplicationData(
   ImGui::Image((void *)((*frameResource.GBuffer.Normal.ShaderResource())
                             .GpuHandle()
                             .ptr),
-               ImVec2(256, 256));
+               ImVec2(256, 256));*/
 
-  ImGui::Text("LOGS:\n---------------------\n%s", shared_.prints.c_str());
+  if (ImGui::CollapsingHeader("Logs"))
+    ImGui::Text("%s", shared_.prints.c_str());
 }
 void App::DrawImGuiMenu(
     CommandAllocator &allocator, Graphics::FrameResources &frameResource,
@@ -598,6 +622,7 @@ void App::DrawImGuiMenu(
                                    &drawingSimResource]() {
     DrawImGuiApplicationData(allocator, frameResource, drawingSimResource);
   };
+  menuSettings_.debugMenu.enabled = settings.showDebugMenu;
   menuSettings_.debugMenu.drawContent = [this]() {
     debugValues.DrawImGui(beforeNextFrame_);
   };
@@ -607,6 +632,7 @@ void App::DrawImGuiMenu(
 
   menuSettings_.renderingData.drawContent = [this]() {
     DrawImGuiForPSResources(waterData, sunData, defData);
+    debugValues.DrawImGuiSafeRenderingSubmenu();
   };
 
   menuSettings_.save.drawContent = [this]() {

@@ -56,13 +56,16 @@ WaterSimulationPipelines SimulationStage::WaterSimulationPipelines::Create(
   auto foamDecayPipelineState = pipelineStateProvider.CreatePipelineStateAsync(
       foamDecayRootStateDefinition);
 
-  ConeMapCreater coneMapCreater =
-      ConeMapCreater::WithDefaultShaders(pipelineStateProvider, device);
-  ConeMapCreater2 coneMapCreater2 =
-      ConeMapCreater2::WithDefaultShaders(pipelineStateProvider, device);
+  auto coneMapCreater = threadpool_execute<ConeMapCreater>([&]() {
+    return ConeMapCreater::WithDefaultShaders(pipelineStateProvider, device);
+  });
+  auto coneMapCreater2 = threadpool_execute<ConeMapCreater2>([&]() {
+    return ConeMapCreater2::WithDefaultShaders(pipelineStateProvider, device);
+  });
 
-  MixMaxCompute mixMaxCompute =
-      MixMaxCompute::WithDefaultShaders(pipelineStateProvider, device);
+  auto mixMaxCompute = threadpool_execute<MixMaxCompute>([&]() {
+    return MixMaxCompute::WithDefaultShaders(pipelineStateProvider, device);
+  });
 
   return WaterSimulationPipelines{
       .spektrumRootDescription = spektrumRootDescription,
@@ -75,9 +78,9 @@ WaterSimulationPipelines SimulationStage::WaterSimulationPipelines::Create(
       .displacementPipeline = displacementPipelineState.get(),
       .gradientPipeline = gradientPipelineState.get(),
       .foamDecayPipeline = foamDecayPipelineState.get(),
-      .coneMapCreater = coneMapCreater,
-      .coneMapCreater2 = coneMapCreater2,
-      .mixMaxCompute = mixMaxCompute};
+      .coneMapCreater = coneMapCreater.get(),
+      .coneMapCreater2 = coneMapCreater2.get(),
+      .mixMaxCompute = mixMaxCompute.get()};
 }
 
 void SimulationStage::WaterSimulationComputeShader(

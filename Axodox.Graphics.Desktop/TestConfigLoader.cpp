@@ -95,12 +95,10 @@ template <EnumType Enum> class AsShiftedOptionalEnum {
 public:
   using UnderlyingType = std::underlying_type_t<Enum>;
   // If we print/read as a char, we will get nonsensical values!
-    using ReadType = std::conditional_t<
-        std::is_same_v<UnderlyingType, unsigned char> ||
-        std::is_same_v<UnderlyingType, char>,
-        int,
-        UnderlyingType
-    >;
+  using ReadType =
+      std::conditional_t<std::is_same_v<UnderlyingType, unsigned char> ||
+                             std::is_same_v<UnderlyingType, char>,
+                         int, UnderlyingType>;
   explicit AsShiftedOptionalEnum(std::optional<Enum> &val) : val_(val) {}
 
   friend DataOutStream &operator<<(DataOutStream &os,
@@ -350,7 +348,8 @@ void HandleSimulationData(
 template <MyStream OS>
 void HandleWaterPixelShaderData(
     OS &s,
-    Reun::Graphics::WaterGraphicRootDescription::WaterPixelShaderData &x) {
+    Reun::Graphics::TesselationGraphicRootDescription::WaterPixelShaderData
+        &x) {
 
   streamdo(s, x.AlbedoColor);
   streamdo(s, x.Roughness);
@@ -401,7 +400,7 @@ template <MyStream OS> void HandleCamera(OS &s, Reun::Camera &x) {
 template <MyStream OS>
 void PerformFileOperation(
     OS &stream, DebugValues &debugValues, SimulationData &simData,
-    Reun::Graphics::WaterGraphicRootDescription::WaterPixelShaderData
+    Reun::Graphics::TesselationGraphicRootDescription::WaterPixelShaderData
         &waterData,
     Reun::Graphics::PixelLighting &sunData,
     Reun::Graphics::DeferredShading::DeferredShaderBuffers &deferredData,
@@ -418,7 +417,8 @@ void PerformFileOperation(
 
 void Reun::ShowImguiLoaderConfig(
     Reun::DebugValues &debugValues, Reun::SimulationData &simData,
-    Graphics::WaterGraphicRootDescription::WaterPixelShaderData &waterData,
+    Graphics::TesselationGraphicRootDescription::WaterPixelShaderData
+        &waterData,
     Graphics::PixelLighting &sunData,
     Graphics::DeferredShading::DeferredShaderBuffers &deferredData,
     Reun::RuntimeSettings &settings, Reun::Camera &cam,
