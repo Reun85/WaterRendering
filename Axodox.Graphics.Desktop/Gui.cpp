@@ -11,9 +11,8 @@ static const std::string_view s_isDetachedKeyMod = "_is_detached"sv;
 static const std::string_view s_active_key = "MOD-Active"sv;
 template <typename Map, typename Key>
 auto get_optional_from_map(Map &&m, Key &&k) {
-  auto b = std::forward<Map>(m);
-  auto it = b.find(std::forward<Key>(k));
-  if (it == b.end())
+  auto it = m.find(std::forward<Key>(k));
+  if (it == m.end())
     return std::optional<
         std::reference_wrapper<const std::decay<Map>::type::mapped_type>>{};
   return std::optional<
