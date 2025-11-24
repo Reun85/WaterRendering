@@ -55,13 +55,12 @@ TEST_METHOD(Node_HasChildren_Logic) {
   node.children[0] = 0;
   Assert::IsFalse(node.HasChildren());
 
-  node.children[0] = 5; // Set a valid child ID
+  node.children[0] = 5;
   Assert::IsTrue(node.HasChildren(),
                  L"Node should report children if index 0 is non-zero");
 }
 
 TEST_METHOD(Node_GetCenter_3D_Projection) {
-  // The QuadTree is 2D (XZ), but GetCenter projects to 3D (XYZ)
   Node node;
   node.center = {10.5f, -5.5f};
   float height = 100.0f;
@@ -152,7 +151,7 @@ TEST_METHOD(Iterator_Traversal) {
   int leafCount = 0;
   for (auto it = qt.begin(); it != qt.end(); ++it) {
     leafCount++;
-    // Sanity check: Leaves in a depth-1 tree should not have children
+    // Sanity check, iterated elements should not have children.
     Assert::IsFalse(it->HasChildren());
   }
 
@@ -188,9 +187,6 @@ TEST_METHOD(Neighbor_Ratio_Calculation) {
   for (auto it = qt.begin(); it != qt.end(); ++it) {
     auto ratios = it.GetSmallerNeighbor();
 
-    // We expect valid ratios to be 1.0 (same size), 0.5 (neighbor is larger),
-    // or 0 (no neighbor) We want to assert we aren't getting garbage values.
-
     auto validate = [](float r) {
       return r == 0.0f || r == 0.5f || r == 1.0f || r == 2.0f;
     };
@@ -203,4 +199,4 @@ TEST_METHOD(Neighbor_Ratio_Calculation) {
 }
 }
 ;
-}
+} // namespace ReunTests
