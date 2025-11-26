@@ -2,6 +2,7 @@
 #define NOMINMAX
 #define PLATFORM_WINDOWS
 
+// std
 #include <vector>
 #include <string>
 #include <cstdint>
@@ -19,6 +20,7 @@
 #include <array>
 #include <ranges>
 
+// windows
 #include <windows.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
@@ -29,6 +31,7 @@
 #include <winrt/Windows.UI.Input.h>
 #include <winrt/Windows.Storage.h>
 
+// Vendor
 #include "../Axodox.Graphics.Shared/Include/Axodox.Graphics.D3D12.h"
 
 #include "../ImGUI/Includes/includes.h"

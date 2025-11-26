@@ -18,7 +18,7 @@ struct PixelLighting;
 } // namespace Graphics
 
 /// <summary>
-/// uses static data
+/// Uses static for internal state. Must only be used once per draw call.
 /// </summary>
 void ShowImguiLoaderConfig(
     DebugValues &debugValues, SimulationData &simData,

@@ -16,7 +16,7 @@ std::string Reun::Utf16ToUtf8(const std::wstring_view &wstr) {
   int size_needed = WideCharToMultiByte(
       CP_UTF8, 0, wstr.data(), (int)wstr.size(), nullptr, 0, nullptr, nullptr);
   if (size_needed == 0)
-    return {}; // handle error as needed
+    return {};
   std::string str(size_needed, 0);
   WideCharToMultiByte(CP_UTF8, 0, wstr.data(), (int)wstr.size(), &str[0],
                       size_needed, nullptr, nullptr);
@@ -29,7 +29,7 @@ std::wstring Reun::Utf8ToUtf16(const std::string_view &str) {
   int size_needed =
       MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), nullptr, 0);
   if (size_needed == 0)
-    return {}; // handle error as needed
+    return {};
   std::wstring wstr(size_needed, 0);
   MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), &wstr[0],
                       size_needed);
@@ -56,7 +56,6 @@ std::filesystem::path GetLocalFolder() {
   std::wstring Wpath = localFolder.c_str();
   auto path = Utf16ToUtf8(Wpath);
   return path;
-  // return std::filesystem::path(path);
 }
 
 void RuntimeResults::DrawImGui(bool exclusiveWindow) const {

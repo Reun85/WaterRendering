@@ -11,6 +11,7 @@ struct ViewFrustumCoordinates {
   constexpr static std::pair<f32, f32> zRange = {0.f, 1.f};
 };
 
+// The type used in the CG course taught in ELTE.
 class Camera {
 
 public:

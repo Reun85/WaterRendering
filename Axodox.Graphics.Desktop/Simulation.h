@@ -92,19 +92,23 @@ constexpr u32 RowMajorIndexing(const u32 i, const u32 j, const u32 M) {
 constexpr u32 ColumnMajorIndexing(const u32 i, const u32 j, const u32 N) {
   return i + j * N;
 };
+// DirectX uses RowMajor :c
 constexpr u32 Indexing(const u32 i, const u32 j, [[maybe_unused]] const u32 _,
                        const u32 M) {
   // return ColumnMajorIndexing(i, j, N);
   return RowMajorIndexing(i, j, M);
 };
 
-class Xorshift128 {
+/// <summary>
+/// A default XorShift128 implementation.
+/// </summary>
+class XorShift128 {
 public:
   using result_type = uint32_t;
 
-  explicit Xorshift128(result_type seed = std::random_device{}()) {
+  explicit XorShift128(result_type seed = std::random_device{}()) {
     x = seed;
-    // truncate them
+    // if needed truncate them
     y = static_cast<result_type>(seed ^ 0x6C8E9CF570932BD5ULL);
     z = static_cast<result_type>(seed ^ 0xDEADBEEFDEADBEEFULL);
     w = static_cast<result_type>(seed ^ 0xBADDCAFEFEEDFACEULL);
@@ -138,7 +142,7 @@ CalculateTildeh0(const SimulationData::PatchData &dat) {
   const auto &L = dat.patchSize;
 
   std::random_device rd;
-  Xorshift128 gen(rd());
+  XorShift128 gen(rd());
   std::normal_distribution<Prec> dis(0, 1);
 
   const i32 Nx2 = N / 2;

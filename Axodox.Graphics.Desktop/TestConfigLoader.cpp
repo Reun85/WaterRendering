@@ -10,7 +10,8 @@
 #include "TestConfigLoader.h"
 
 namespace Reun {
-// Helper streams
+// Helper streams. This is used to not pollute the namespace with potentially
+// bad ostream operator<< implementations.
 // -----------------------------------------------------------------------------
 struct DataOutStream {
   explicit DataOutStream(std::ostream &os) : os(os) {}
@@ -57,6 +58,7 @@ template <IStreamReadable T> DataInStream &operator>>(DataInStream &is, T &x) {
   *is >> x;
   return is;
 }
+// Writable concepts
 
 template <typename T>
 concept MyStreamWriteable = requires(DataOutStream &os, const T &value) {
@@ -77,16 +79,25 @@ concept EnumType = std::is_enum_v<T>;
 template <EnumType Enum>
 DataOutStream &operator<<(DataOutStream &os, const Enum &value) {
   using UnderlyingType = std::underlying_type_t<Enum>;
-  *os << static_cast<UnderlyingType>(value);
+  using ReadType =
+      std::conditional_t<std::is_same_v<UnderlyingType, unsigned char> ||
+                             std::is_same_v<UnderlyingType, char>,
+                         int, UnderlyingType>;
+  *os << static_cast<ReadType>(static_cast<UnderlyingType>(value));
   return os;
 }
 
 template <EnumType Enum>
 DataInStream &operator>>(DataInStream &is, Enum &value) {
   using UnderlyingType = std::underlying_type_t<Enum>;
-  UnderlyingType temp;
+  using ReadType =
+      std::conditional_t<std::is_same_v<UnderlyingType, unsigned char> ||
+                             std::is_same_v<UnderlyingType, char>,
+                         int, UnderlyingType>;
+  ReadType temp;
   *is >> temp;
-  value = static_cast<Enum>(temp); // Cast back to Enum type
+  UnderlyingType t = static_cast<UnderlyingType>(temp);
+  value = static_cast<Enum>(t); // Cast back to Enum type
   return is;
 }
 
@@ -106,7 +117,8 @@ public:
 
     if (inp.val_.has_value()) {
       const auto val = inp.val_.value();
-      const auto underlying = static_cast<ReadType>(val);
+      const auto underlying =
+          static_cast<ReadType>(static_cast<UnderlyingType>(val));
       const auto printed = underlying + 1;
       *os << printed;
     } else {
@@ -119,16 +131,17 @@ public:
                                   AsShiftedOptionalEnum<Enum> &inp) {
 
     auto &value = inp.val_;
-    // 0 is definitely inside the UnderlyingType range
     ReadType temp;
     is >> temp;
+    // 0 is definitely inside the UnderlyingType range
     if (temp == 0) {
       value = std::nullopt;
     }
 
     else {
       temp -= 1;
-      value = Enum(temp); // Cast back to Enum type
+      value = static_cast<Enum>(
+          static_cast<UnderlyingType>(temp)); // Cast back to Enum type
     }
     return is;
   }
@@ -250,6 +263,8 @@ DataOutStream &operator<<(DataOutStream &os, const XMVECTOR &y) {
   return os;
 }
 
+// streamdo = depending on the passed Stream type (In,Out) perform the possible
+// action.
 // -----------------------------------------------------------------------------
 
 template <MyStreamWriteable T> void streamdo(DataOutStream &os, const T &val) {
@@ -266,7 +281,8 @@ template <MyStreamReadable T> void streamdo(DataInStream &is, T &&val) {
   is >> val;
 }
 
-static std::vector<std::pair<std::string, std::filesystem::path>> getFiles() {
+static std::vector<std::pair<std::string, std::filesystem::path>>
+getPossibleConfigFilesFromLocalFolder() {
   std::vector<std::pair<std::string, std::filesystem::path>> files;
 
   std::filesystem::path dir =
@@ -425,7 +441,7 @@ void Reun::ShowImguiLoaderConfig(
     Reun::NeedToDo &beforeNextFrame) {
 
   static std::vector<std::pair<std::string, std::filesystem::path>> files =
-      getFiles();
+      getPossibleConfigFilesFromLocalFolder();
   static std::string Text = "";
   Text.reserve(128);
   static u16 selectedFile = 0;
@@ -442,7 +458,7 @@ void Reun::ShowImguiLoaderConfig(
     canOverwrite = false;
     canOverSave = false;
     canDelete = false;
-    files = getFiles();
+    files = getPossibleConfigFilesFromLocalFolder();
   }
   if (!files.empty()) {
 
@@ -509,7 +525,7 @@ void Reun::ShowImguiLoaderConfig(
     fs::path file = dir / Text;
     std::ofstream os(file);
     os.close();
-    files = getFiles();
+    files = getPossibleConfigFilesFromLocalFolder();
     auto it = std::ranges::find_if(
         files, [](const auto &pair) { return pair.first == Text; });
 
@@ -520,10 +536,12 @@ void Reun::ShowImguiLoaderConfig(
   }
   if (Text == "")
     ImGui::EndDisabled();
+
   ImGui::SameLine();
   if (ImGui::InputText("New file: ##Createnewfile", Text.data(), 128)) {
     Text.resize(strlen(Text.c_str()));
   }
+
   // Do the chosen operations
   if (pressedSave) {
     std::ofstream os(files[selectedFile].second);
@@ -540,7 +558,7 @@ void Reun::ShowImguiLoaderConfig(
   }
   if (pressedDelete) {
     std::filesystem::remove(files[selectedFile].second);
-    files = getFiles();
+    files = getPossibleConfigFilesFromLocalFolder();
   }
 }
 } // namespace Reun

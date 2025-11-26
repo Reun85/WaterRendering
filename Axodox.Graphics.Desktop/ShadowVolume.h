@@ -1,11 +1,15 @@
 #pragma once
 #include "pch.h"
+/// <summary>
+/// This file's content is unused in the current application.
+/// </summary>
 
 namespace Reun {
 using namespace Axodox::Infrastructure;
 using namespace Axodox::Storage;
 class Camera;
 
+// Unused currently.
 struct ShadowVolume : ShaderJob {
   struct ShaderMask : RootSignatureMask {
     explicit ShaderMask(const RootSignatureContext &context)

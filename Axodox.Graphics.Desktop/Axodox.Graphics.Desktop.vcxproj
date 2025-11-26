@@ -124,7 +124,6 @@
     <ClInclude Include="ImGuiHelper.h" />
     <ClInclude Include="Meshes.h" />
     <ClInclude Include="MutableTextureWithState.hpp" />
-    <ClInclude Include="oldstuff.h" />
     <ClInclude Include="Parallax.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="QuadTree.h" />
@@ -193,7 +192,6 @@
     <None Include="PropertySheet.props" />
     <None Include="Shaders\common.hlsli" />
     <None Include="Shaders\constants.hlsli" />
-    <Text Include="readme.txt" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shaders\AtmospherePS.hlsl">

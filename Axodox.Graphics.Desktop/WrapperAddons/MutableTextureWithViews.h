@@ -13,6 +13,7 @@ struct TextureViewDefinitions {
   GetDepthStencilWithShaderView(const Format &DSFormat,
                                 const Format &SRVFormat);
 };
+
 /// <summary>
 /// When generating a texture with Axodox graphics, depending on the
 /// TextureFlags it will assume its usage, and generate the views accordingly.

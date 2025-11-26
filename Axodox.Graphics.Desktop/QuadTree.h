@@ -22,6 +22,7 @@ struct Node {
       {{-1.f, -1.f}, {-1.f, 1.f}, {1.f, -1.f}, {1.f, 1.f}}};
 
   /*
+   Indexing
 
      ^   2 3
      |   0 1
@@ -92,7 +93,8 @@ private:
   void IterateTillLeaf();
 
   NodeID node;
-  // Path to get current leaf
+  /// Path to get current leaf,
+  // contains -1 at index 0 to easily find the beginning
   std::vector<ChildrenID> path;
   const QuadTree &tree;
   const TravelOrder order;

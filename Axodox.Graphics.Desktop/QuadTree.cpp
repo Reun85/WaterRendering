@@ -29,7 +29,6 @@ using NeedToGoUp = bool;
 using NeighborDirection =
     const std::array<const std::pair<const ChildrenID, const NeedToGoUp>, 4>;
 
-// NodeID must be a leaf.
 constexpr float IsSmaller(NeighborDirection &directions, const QuadTree &tree,
                           const std::vector<int> &path,
                           std::vector<ChildrenID> &buff, const Node *node) {
@@ -94,19 +93,6 @@ IsSmallerTemplated(const QuadTree &tree, const std::vector<ChildrenID> &path,
   return ret;
 }
 
-/*
-  constexpr static std::array<float2, 4> childDirections = {
-      {{-1, -1}, {-1, 1}, {1, -1}, {1, 1}}};
-
-  /*
-
-     ^   2 3
-     |   0 1
-    xpos
-     0 zpos ->
-
-  */
-
 ConstQuadTreeLeafIteratorDepthFirst::SmallerNeighborRatio
 ConstQuadTreeLeafIteratorDepthFirst::GetSmallerNeighbor() const {
   static constexpr NeighborDirection xpos = {{{ChildrenID(2), false},
@@ -151,7 +137,7 @@ inline void ConstQuadTreeLeafIteratorDepthFirst::AdjustNode() {
     node = tree.GetAt(node).children[dir];
     path.push_back(dir);
   } else {
-    if (path.back()==-1){
+    if (path.back() == -1) {
       node = tree.GetSize();
       return;
     }
@@ -200,6 +186,7 @@ void QuadTree::Build(const float3 &center, const float2 &fullSizeXZ,
   BuildRecursively(0, center.y, camEye, quadTreeDistanceThreshold, 0, f,
                    mMatrix);
 }
+
 inline bool IsInViewFrustum(const Node &node, const float &yCoordinate,
                             const Frustum &f, const XMMATRIX &mMatrix) {
 
@@ -208,6 +195,7 @@ inline bool IsInViewFrustum(const Node &node, const float &yCoordinate,
 
   return aabb.isOnFrustum(f, mMatrix);
 }
+
 void QuadTree::BuildRecursively(const uint index, const float yCoordinate,
                                 const float3 camEye,
                                 const float quadTreeDistanceThreshold,

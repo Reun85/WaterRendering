@@ -6,7 +6,7 @@ namespace Reun::Menu {
 using namespace winrt;
 void SetupImGuiStyle() {
   using namespace Reun::Menu::Bess::Config;
-  setBessDarkColors(); // 4/5
+  setBessDarkColors();
 }
 
 void InitImGui(const std::filesystem::path &iniPath) {

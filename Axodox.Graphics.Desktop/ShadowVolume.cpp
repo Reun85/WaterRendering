@@ -2,6 +2,10 @@
 #include "ShadowVolume.h"
 #include "GraphicsPipeline.h"
 
+/// <summary>
+/// This file's content is unused in the current application.
+/// </summary>
+
 using namespace winrt;
 
 using namespace Windows::ApplicationModel::Core;

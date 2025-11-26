@@ -466,7 +466,7 @@ struct PostProcessingShader : ShaderJob {
   ~PostProcessingShader() override = default;
 };
 
-/// @brief All resources that may be used by a single frame rendering.
+/// All resources that may be used by a single frame rendering.
 struct FrameResources : ShaderBuffers {
   CommandAllocator Allocator;
   CommandFence Fence;
@@ -524,7 +524,7 @@ struct OtherInput {
       &oceanDataFuture;
 };
 
-/// @brief All tools needed to render a frame.
+/// All tools needed to render a frame.
 struct RenderFrameContext {
   const RenderTargetView *renderTargetView;
   FrameResources &frameResources;
