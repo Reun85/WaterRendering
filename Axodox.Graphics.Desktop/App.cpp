@@ -493,8 +493,8 @@ void App::Run() {
     }
 
     // Present frame
-    computeStage.wait();
     swapChain.Present();
+    computeStage.wait();
     first_loop = false;
   }
   // Wait until everything is done before deleting context

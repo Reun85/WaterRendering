@@ -380,7 +380,7 @@ TesselationGraphicRootDescription::CollectOceanQuadInfoWithQuadTree(
 
     // If a quarter of the capacity is unused shrink the vector in a
     // way that the unused capacity is halfed
-    // how though?
+    // perhaps?
   }
   return vec;
 }
