@@ -266,6 +266,7 @@ void ShadowMapping::Data::Update(const Camera &cam, const LightData &light) {
     } else {
       lightPos = lightP;
       lightView = XMMatrixIdentity();
+      // Not handled currently.
       assert("IMPLEMENT THIS");
     }
 

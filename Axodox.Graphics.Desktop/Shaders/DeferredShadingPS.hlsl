@@ -176,7 +176,7 @@ float4 main(input_t input) : SV_TARGET
     if (has_flag(debugValues.flags, 20))
     {
         // F = 1;
-        F *=
+        F *= 1;
         D = 1;
         G = 1;
     }
