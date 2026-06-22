@@ -190,8 +190,14 @@ void QuadTree::Build(const float3 &center, const float2 &fullSizeXZ,
 inline bool IsInViewFrustum(const Node &node, const float &yCoordinate,
                             const Frustum &f, const XMMATRIX &mMatrix) {
 
-  const AABB aabb{XMVECTOR{node.center.x, yCoordinate, node.center.y},
-                  node.size.x / 2, 0, node.size.y / 2};
+  const float y_offset_neg = -5.f;
+  const float y_offset_pos = 5.f;
+
+  // const float y_offset_neg = 0.f;
+  // const float y_offset_pos = 0.f;
+  const AABB aabb{
+      XMVECTOR{node.center.x, yCoordinate + y_offset_neg, node.center.y},
+      node.size.x / 2, y_offset_pos, node.size.y / 2};
 
   return aabb.isOnFrustum(f, mMatrix);
 }
