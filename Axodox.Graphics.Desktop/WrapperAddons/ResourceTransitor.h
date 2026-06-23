@@ -51,15 +51,6 @@ public:
     }
     other.Invalidate();
   }
-  ResourceTransitor &
-  Add(const std::initializer_list<std::pair<ResourceStates, ResourceStates>>
-          &inp) {
-    for (auto &tr : inp) {
-      if (n > N)
-        throw new std::runtime_error("ResourceTransitor: Too many transitions");
-      arr[n++].x = tr;
-    }
-  }
   void Queue() {
 
     std::array<D3D12_RESOURCE_BARRIER, N> barriers;
