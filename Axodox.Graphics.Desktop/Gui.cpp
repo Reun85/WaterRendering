@@ -28,7 +28,7 @@ MenuSettings::PanelState::PanelState(std::string name, std::string safeName)
 
 MenuSettings::MenuSettings(
     std::unordered_map<std::string, std::string> &persistence)
-    : persistence(persistence), safeName("##MainAppMenu"),
+    : persistence(persistence), safeName("Main Menu##MainAppMenu"),
       safeBarName(safeName + "Bar") {
   // Load!
   auto f = [persistence](PanelState &panel) {
